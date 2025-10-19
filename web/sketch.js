@@ -29,6 +29,9 @@ let dragOffsetY = 0;
 let baseOffset = 0.2;
 let noise = 0.1;
 
+// Render control
+let needsRedraw = true;
+
 function setup() {
   const canvas = createCanvas(canvasWidth, canvasHeight);
   canvas.parent('p5-container');
@@ -41,9 +44,18 @@ function setup() {
   colorMode(HSB, 360, 100, 100); // Enable HSB for proper color gradients
   strokeWeight(1);
   noFill();
+
+  // Disable continuous rendering - only redraw on demand
+  noLoop();
 }
 
 function draw() {
+  // Only render when needed
+  if (!needsRedraw) {
+    return;
+  }
+  needsRedraw = false;
+
   background(250);
 
   if (svgData) {
@@ -221,6 +233,8 @@ function mousePressed() {
   // Not clicking on attractor - add new one
   attractorSystem.addAttractor(svgX, svgY);
   updateAttractorList();
+  needsRedraw = true;
+  redraw();
 }
 
 /**
@@ -235,6 +249,8 @@ function mouseDragged() {
     draggedAttractor.y = svgY - dragOffsetY;
 
     updateAttractorList();
+    needsRedraw = true;
+    redraw();
   }
 }
 
@@ -245,6 +261,8 @@ function mouseReleased() {
   if (draggedAttractor) {
     draggedAttractor = null;
     cursor('default');
+    needsRedraw = true;
+    redraw();
   }
 }
 
@@ -252,35 +270,57 @@ function mouseReleased() {
  * Load SVG file
  */
 function loadSVGFile(file) {
+  // Show loading indicator
+  updateStatus('Loading SVG...');
+  showLoadingSpinner(true);
+
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      svgData = svgParser.parseSVGContent(e.target.result);
-      console.log('SVG Data:', svgData);
-      console.log('ViewBox:', svgData.viewBox);
-      console.log('Bounds:', svgParser.getBounds());
-      console.log('First few paths:', svgData.paths.slice(0, 3));
+      // Parse SVG (this may take a moment for large files)
+      updateStatus('Parsing paths...');
 
-      // Calculate and display length range
-      const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
-      if (lengths.length > 0) {
-        const minLen = Math.min(...lengths);
-        const maxLen = Math.max(...lengths);
-        console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
+      // Use setTimeout to allow UI to update before heavy parsing
+      setTimeout(() => {
+        try {
+          svgData = svgParser.parseSVGContent(e.target.result);
+          console.log('SVG Data:', svgData);
+          console.log('ViewBox:', svgData.viewBox);
+          console.log('Bounds:', svgParser.getBounds());
+          console.log('First few paths:', svgData.paths.slice(0, 3));
 
-        // Update UI hints
-        const minInfo = document.getElementById('min-length-info');
-        const maxInfo = document.getElementById('max-length-info');
-        if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
-        if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
-      }
+          // Calculate and display length range
+          const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
+          if (lengths.length > 0) {
+            const minLen = Math.min(...lengths);
+            const maxLen = Math.max(...lengths);
+            console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
 
-      fitSVGToCanvas();
-      updateStatus(`Loaded ${svgData.paths.length} paths`);
+            // Update UI hints
+            const minInfo = document.getElementById('min-length-info');
+            const maxInfo = document.getElementById('max-length-info');
+            if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
+            if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
+          }
+
+          fitSVGToCanvas();
+          updateStatus(`Loaded ${svgData.paths.length} paths`);
+          showLoadingSpinner(false);
+
+          // Trigger redraw
+          needsRedraw = true;
+          redraw();
+        } catch (error) {
+          console.error('Failed to load SVG:', error);
+          console.error('Error stack:', error.stack);
+          updateStatus('Error loading SVG');
+          showLoadingSpinner(false);
+        }
+      }, 50);
     } catch (error) {
-      console.error('Failed to load SVG:', error);
-      console.error('Error stack:', error.stack);
-      updateStatus('Error loading SVG');
+      console.error('Failed to read SVG file:', error);
+      updateStatus('Error reading SVG file');
+      showLoadingSpinner(false);
     }
   };
   reader.readAsText(file);
@@ -313,6 +353,8 @@ function clearSVG() {
   attractorSystem.clearAll();
   updateAttractorList();
   updateStatus('SVG cleared');
+  needsRedraw = true;
+  redraw();
 }
 
 /**
@@ -351,4 +393,16 @@ function updateAttractorList() {
 function removeAttractor(id) {
   attractorSystem.removeAttractor(id);
   updateAttractorList();
+  needsRedraw = true;
+  redraw();
+}
+
+/**
+ * Show/hide loading spinner
+ */
+function showLoadingSpinner(show) {
+  const spinner = document.getElementById('loading-spinner');
+  if (spinner) {
+    spinner.style.display = show ? 'flex' : 'none';
+  }
 }

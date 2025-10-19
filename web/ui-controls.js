@@ -35,6 +35,8 @@ function initializeControls() {
       });
 
       updateStatus(useAttractors ? 'Attractor mode (click to place)' : 'Length-based mode');
+      needsRedraw = true;
+      redraw();
     });
   });
 
@@ -42,57 +44,83 @@ function initializeControls() {
   document.getElementById('clear-attractors').addEventListener('click', () => {
     attractorSystem.clearAll();
     updateAttractorList();
+    needsRedraw = true;
+    redraw();
   });
 
   // Attractor settings
   setupSlider('strength', (value) => {
     attractorSystem.updateConfig({ strength: value });
+    needsRedraw = true;
+    redraw();
   });
 
   setupSlider('falloff-radius', (value) => {
     attractorSystem.updateConfig({ falloffRadius: value });
+    needsRedraw = true;
+    redraw();
   });
 
   document.getElementById('falloff-curve').addEventListener('change', (e) => {
     attractorSystem.updateConfig({ falloffCurve: e.target.value });
+    needsRedraw = true;
+    redraw();
   });
 
   document.getElementById('attractor-mode').addEventListener('change', (e) => {
     attractorSystem.updateConfig({ mode: e.target.value });
+    needsRedraw = true;
+    redraw();
   });
 
   document.getElementById('multi-mode').addEventListener('change', (e) => {
     attractorSystem.updateConfig({ multiMode: e.target.value });
+    needsRedraw = true;
+    redraw();
   });
 
   // Line weight settings
   setupSlider('base-offset', (value) => {
     baseOffset = value;
+    needsRedraw = true;
+    redraw();
   });
 
   setupSlider('noise', (value) => {
     noise = value;
+    needsRedraw = true;
+    redraw();
   });
 
   setupSlider('min-passes', (value) => {
     attractorSystem.updateConfig({ minPasses: value });
+    needsRedraw = true;
+    redraw();
   });
 
   setupSlider('max-passes', (value) => {
     attractorSystem.updateConfig({ maxPasses: value });
+    needsRedraw = true;
+    redraw();
   });
 
   // Display toggles
   document.getElementById('show-attractors').addEventListener('change', (e) => {
     showAttractors = e.target.checked;
+    needsRedraw = true;
+    redraw();
   });
 
   document.getElementById('show-influence').addEventListener('change', (e) => {
     showInfluence = e.target.checked;
+    needsRedraw = true;
+    redraw();
   });
 
   document.getElementById('preview-mode').addEventListener('change', (e) => {
     previewMode = e.target.checked;
+    needsRedraw = true;
+    redraw();
   });
 
   // Export controls
@@ -275,6 +303,10 @@ function loadPreset(file) {
       // Update all UI controls
       updateUIFromConfig();
       updateAttractorList();
+
+      // Trigger redraw
+      needsRedraw = true;
+      redraw();
 
       console.log('Preset loaded successfully');
     } catch (error) {
