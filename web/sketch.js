@@ -261,6 +261,20 @@ function loadSVGFile(file) {
       console.log('Bounds:', svgParser.getBounds());
       console.log('First few paths:', svgData.paths.slice(0, 3));
 
+      // Calculate and display length range
+      const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
+      if (lengths.length > 0) {
+        const minLen = Math.min(...lengths);
+        const maxLen = Math.max(...lengths);
+        console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
+
+        // Update UI hints
+        const minInfo = document.getElementById('min-length-info');
+        const maxInfo = document.getElementById('max-length-info');
+        if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
+        if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
+      }
+
       fitSVGToCanvas();
       updateStatus(`Loaded ${svgData.paths.length} paths`);
     } catch (error) {

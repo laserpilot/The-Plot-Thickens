@@ -138,16 +138,45 @@ function exportSVG() {
   // Generate processed paths
   const processedPaths = [];
 
+  // Calculate min/max lengths for normalization
+  const lengths = svgData.paths.map(p => p.length || 0).filter(l => l > 0);
+  const autoMinLength = lengths.length > 0 ? Math.min(...lengths) : 0;
+  const autoMaxLength = lengths.length > 0 ? Math.max(...lengths) : 100;
+
+  // Check for manual overrides
+  const minLengthInput = document.getElementById('min-length-threshold');
+  const maxLengthInput = document.getElementById('max-length-threshold');
+  const minLength = (minLengthInput && minLengthInput.value && parseFloat(minLengthInput.value) > 0)
+    ? parseFloat(minLengthInput.value)
+    : autoMinLength;
+  const maxLength = (maxLengthInput && maxLengthInput.value && parseFloat(maxLengthInput.value) > 0)
+    ? parseFloat(maxLengthInput.value)
+    : autoMaxLength;
+
+  console.log(`Using length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)}mm`);
+
   svgData.paths.forEach(path => {
     let passes;
 
     if (useAttractors) {
       passes = attractorSystem.calculatePathWeight(path.points);
     } else {
-      passes = calculateLengthBasedWeight(path.length);
+      // Length-based weight calculation (inline to avoid scope issues)
+      const pathLength = path.length || 0;
+
+      if (pathLength === 0 || maxLength === minLength) {
+        passes = attractorSystem.config.minPasses;
+      } else {
+        const normalized = (pathLength - minLength) / (maxLength - minLength);
+        passes = Math.round(
+          attractorSystem.config.minPasses +
+          normalized * (attractorSystem.config.maxPasses - attractorSystem.config.minPasses)
+        );
+        passes = Math.max(attractorSystem.config.minPasses, Math.min(attractorSystem.config.maxPasses, passes));
+      }
     }
 
-    console.log(`Path ${path.id}: ${passes} passes`);
+    console.log(`Path ${path.id}: length=${path.length}, passes=${passes}`);
 
     // Generate deterministic seed from path data
     const seed = hashString(path.d);

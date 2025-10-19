@@ -39,6 +39,7 @@ class SVGParser {
 
     // Extract all path elements and convert shapes to paths
     const pathElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+    console.log(`Found ${pathElements.length} path/shape elements in SVG`);
     this.paths = [];
 
     pathElements.forEach((element, index) => {
@@ -71,9 +72,19 @@ class SVGParser {
         const points = this.pathToPoints(pathData);
         const length = this.estimatePathLength(pathData);
 
+        // Debug logging for first few paths and any problems
+        if (index < 3 || isNaN(length) || points.length === 0) {
+          console.log(`Path ${index}: ${points.length} points, length=${length.toFixed(2)}`);
+        }
+
         // Skip paths with no valid points
-        if (points.length === 0 || (points.length === 1 && points[0].x === 0 && points[0].y === 0)) {
-          console.warn(`Skipping path ${index}: no valid points`);
+        if (points.length === 0) {
+          console.warn(`Skipping path ${index}: no points generated`);
+          return;
+        }
+
+        if (points.length === 1 && points[0].x === 0 && points[0].y === 0) {
+          console.warn(`Skipping path ${index}: only fallback point (0,0)`);
           return;
         }
 
@@ -174,9 +185,63 @@ class SVGParser {
 
   /**
    * Convert SVG path to array of points for rendering
-   * Properly handles relative and absolute commands
+   * Uses arc-length based sampling for efficient, high-quality output
    */
   pathToPoints(pathData) {
+    const points = [];
+
+    try {
+      // Use svg-path-commander for proper arc-length sampling
+      if (typeof SVGPathCommander !== 'undefined') {
+        return this.pathToPointsArcLength(pathData);
+      }
+
+      // Fallback to manual parsing if library not available
+      return this.pathToPointsManual(pathData);
+    } catch (error) {
+      console.warn('Failed to parse path:', pathData.substring(0, 50), error);
+      return [{ x: 0, y: 0 }];
+    }
+  }
+
+  /**
+   * Arc-length based sampling using svg-path-commander
+   */
+  pathToPointsArcLength(pathData) {
+    const points = [];
+
+    try {
+      const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+      const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+      if (totalLength === 0 || isNaN(totalLength)) {
+        return [{ x: 0, y: 0 }];
+      }
+
+      // Sample every 1-2mm, or at least 10 points per path
+      const sampleInterval = Math.min(2, totalLength / 10);
+      const numSamples = Math.ceil(totalLength / sampleInterval);
+
+      for (let i = 0; i <= numSamples; i++) {
+        const t = (i / numSamples) * totalLength;
+        const pt = SVGPathCommander.getPointAtLength(absolutePath, t);
+
+        if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
+          points.push({ x: pt.x, y: pt.y });
+        }
+      }
+
+      return points.length > 0 ? points : [{ x: 0, y: 0 }];
+    } catch (error) {
+      console.warn('Arc-length sampling failed, using fallback');
+      return this.pathToPointsManual(pathData);
+    }
+  }
+
+  /**
+   * Manual path parsing fallback (command-by-command)
+   */
+  pathToPointsManual(pathData) {
     const points = [];
     let currentX = 0;
     let currentY = 0;
@@ -376,8 +441,19 @@ class SVGParser {
     let length = 0;
 
     for (let i = 1; i < points.length; i++) {
+      // Skip if this is a move command (start of new subpath)
+      if (points[i].move) {
+        continue;
+      }
+
       const dx = points[i].x - points[i - 1].x;
       const dy = points[i].y - points[i - 1].y;
+
+      // Validate coordinates
+      if (isNaN(dx) || isNaN(dy) || !isFinite(dx) || !isFinite(dy)) {
+        continue;
+      }
+
       length += Math.sqrt(dx * dx + dy * dy);
     }
 
