@@ -70,10 +70,10 @@ class SVGParser {
         }
 
         const points = this.pathToPoints(pathData);
-        const length = this.estimatePathLength(pathData);
+        const length = this.estimatePathLength(points);
 
-        // Debug logging for first few paths and any problems
-        if (index < 3 || isNaN(length) || points.length === 0) {
+        // Debug logging for first few paths only (reduce log spam)
+        if (index < 3) {
           console.log(`Path ${index}: ${points.length} points, length=${length.toFixed(2)}`);
         }
 
@@ -206,6 +206,7 @@ class SVGParser {
 
   /**
    * Arc-length based sampling using svg-path-commander
+   * Adaptive sampling: longer paths use larger intervals to avoid over-sampling
    */
   pathToPointsArcLength(pathData) {
     const points = [];
@@ -218,9 +219,10 @@ class SVGParser {
         return [{ x: 0, y: 0 }];
       }
 
-      // Sample every 1-2mm, or at least 10 points per path
-      const sampleInterval = Math.min(2, totalLength / 10);
-      const numSamples = Math.ceil(totalLength / sampleInterval);
+      // Adaptive sampling: cap at ~800 samples per path for performance
+      // For preview: 5-10mm intervals is fine, export can use finer sampling
+      const stride = Math.max(5, totalLength / 800);
+      const numSamples = Math.min(4000, Math.ceil(totalLength / stride));
 
       for (let i = 0; i <= numSamples; i++) {
         const t = (i / numSamples) * totalLength;
@@ -434,10 +436,9 @@ class SVGParser {
   }
 
   /**
-   * Estimate path length (simplified)
+   * Estimate path length from pre-generated points (avoids duplicate sampling)
    */
-  estimatePathLength(pathData) {
-    const points = this.pathToPoints(pathData);
+  estimatePathLength(points) {
     let length = 0;
 
     for (let i = 1; i < points.length; i++) {
