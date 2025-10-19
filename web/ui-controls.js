@@ -166,21 +166,27 @@ async function exportSVG() {
   // If paths haven't been processed yet, process them now
   if (!pathsProcessed && svgRawData) {
     console.log('Paths not yet processed - processing now for export...');
-    updateStatus('Processing paths for export...');
 
-    try {
-      await processPaths();
-      // processPaths() sets pathsProcessed = true and populates svgData
-    } catch (error) {
-      console.error('Failed to process paths for export:', error);
-      alert('Failed to process SVG paths. Check console for details.');
+    // Call the global processPaths() function from sketch.js
+    if (typeof processPaths === 'function') {
+      try {
+        await processPaths();
+        // Wait a bit to ensure pathsProcessed flag is updated
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Failed to process paths for export:', error);
+        alert('Failed to process SVG paths. Check console for details.');
+        return;
+      }
+    } else {
+      alert('Please click "Process Paths" button first, then export.');
       return;
     }
   }
 
   // Double-check we have processed data
   if (!svgData || !pathsProcessed) {
-    alert('No processed SVG data available');
+    alert('Please click "Process Paths" button first, then try export again.');
     return;
   }
 
