@@ -149,15 +149,30 @@ function exportSVG() {
 
     console.log(`Path ${path.id}: ${passes} passes`);
 
-    // Generate offset duplicates
+    // Generate deterministic seed from path data
+    const seed = hashString(path.d);
+
+    // Generate offset duplicates with centered distribution
     for (let i = 0; i < passes; i++) {
-      const offsetPathData = generateOffsetPath(path.d, i, baseOffset, noise);
-      processedPaths.push({
-        d: offsetPathData,
-        stroke: path.stroke,
-        fill: path.fill,
-        strokeWidth: path.strokeWidth,
-      });
+      const passIndex = Math.floor(i / 2); // Distance from center
+      const isRight = i % 2 === 0; // Alternate sides
+      const direction = isRight ? 1 : -1;
+
+      const offsetDistance = direction * passIndex * baseOffset;
+      const passSeed = seed + i;
+
+      // Generate offset using proper perpendicular algorithm
+      const offsetPoints = generateOffsetPath(path.points, offsetDistance, noise, passSeed);
+
+      if (offsetPoints) {
+        const offsetPathData = pointsToPathString(offsetPoints);
+        processedPaths.push({
+          d: offsetPathData,
+          stroke: path.stroke,
+          fill: path.fill,
+          strokeWidth: path.strokeWidth,
+        });
+      }
     }
   });
 
@@ -168,32 +183,6 @@ function exportSVG() {
   const filename = useAttractors ? 'processed-attractor.svg' : 'processed-length.svg';
   downloadFile(svgContent, filename, 'image/svg+xml');
   console.log(`Exported ${processedPaths.length} paths (${useAttractors ? 'attractor' : 'length'} mode)`);
-}
-
-/**
- * Generate offset version of a path
- * Simplified version - adds small random variations
- */
-function generateOffsetPath(pathData, passIndex, baseOffset, noise) {
-  // This is a simplified approach
-  // For production, use proper perpendicular offset algorithm
-  const offsetAmount = passIndex * baseOffset * 0.1;
-  const noiseAmount = noise * (Math.random() - 0.5) * 2;
-
-  // Simple coordinate offset (not true perpendicular offset)
-  const offsetPattern = /([0-9.-]+)/g;
-  let coordIndex = 0;
-
-  return pathData.replace(offsetPattern, (match) => {
-    const num = parseFloat(match);
-    const isX = coordIndex % 2 === 0;
-    coordIndex++;
-
-    const variation = (Math.random() - 0.5) * noise;
-    const offset = offsetAmount + noiseAmount + variation;
-
-    return (num + (isX ? offset * 0.5 : offset * 0.5)).toFixed(3);
-  });
 }
 
 /**
