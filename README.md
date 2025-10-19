@@ -11,6 +11,7 @@ This tool manipulates SVG line weights by duplicating and offsetting paths with 
 - ✅ **Phase 1**: Test Pattern Generator (complete)
 - ✅ **Phase 2**: Path Length-Based Weight (complete)
 - ✅ **Phase 3**: Attractor-Based Weight System (complete)
+- ✅ **Performance**: Optimized for large SVG files (200+ paths)
 - ⏳ **Phase 4**: Combined System (pending)
 
 ---
@@ -208,6 +209,24 @@ python3 -m http.server 8000
 
 ---
 
+## Performance
+
+The web interface is optimized for large SVG files:
+
+- **Adaptive sampling:** Automatically adjusts point density based on path length
+- **Efficient parsing:** Handles 200+ paths without UI freezing
+- **Smart caching:** Reuses calculated data to avoid duplicate work
+- **Optimized rendering:** Cap of ~800 points per path for smooth preview
+
+**Example:** topographical_merged.svg (254 paths, longest path 125m)
+- Parses in <1 second
+- Preview renders smoothly at 60fps
+- Uses ~200k points total (vs 15M+ without optimization)
+
+See [VERIFICATION.md](VERIFICATION.md) for technical details.
+
+---
+
 ## Output Format
 
 All generated SVGs are **plotter-ready**:
@@ -222,6 +241,8 @@ All generated SVGs are **plotter-ready**:
 ## Testing
 
 Start with the Phase 1 test pattern to calibrate your plotter and understand how parameters affect real-world output.
+
+For parser testing, use `test-parser.html` to verify SVG parsing performance.
 
 ---
 
