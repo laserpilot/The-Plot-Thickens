@@ -12,7 +12,130 @@ class SVGParser {
   }
 
   /**
-   * Parse SVG content from file
+   * Quick parse: Extract SVG structure without processing paths to points
+   * Fast preview to show path count before heavy processing
+   */
+  quickParseSVG(svgContent) {
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
+    const svgElement = svgDoc.querySelector('svg');
+
+    if (!svgElement) {
+      throw new Error('Invalid SVG: No <svg> element found');
+    }
+
+    // Extract viewBox
+    const viewBoxAttr = svgElement.getAttribute('viewBox');
+    if (viewBoxAttr) {
+      const [x, y, w, h] = viewBoxAttr.split(/\s+/).map(parseFloat);
+      this.viewBox = { x, y, width: w, height: h };
+    }
+
+    // Extract width/height
+    const widthAttr = svgElement.getAttribute('width');
+    const heightAttr = svgElement.getAttribute('height');
+
+    this.width = widthAttr ? this.parseUnit(widthAttr) : this.viewBox.width;
+    this.height = heightAttr ? this.parseUnit(heightAttr) : this.viewBox.height;
+
+    // Count path elements
+    const pathElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon');
+
+    // Store raw data for later processing
+    const rawPaths = [];
+    pathElements.forEach((element, index) => {
+      let pathData = element.getAttribute('d');
+
+      // Convert basic shapes to path data
+      if (!pathData) {
+        pathData = this.shapeToPath(element);
+      }
+
+      if (pathData) {
+        // Get attributes
+        let stroke = element.getAttribute('stroke');
+        const fill = element.getAttribute('fill');
+        const strokeWidth = element.getAttribute('stroke-width') || '0.3';
+
+        // Skip patterns/gradients
+        if (stroke && (stroke.startsWith('url(') || stroke.includes('#PATTERN'))) {
+          return;
+        }
+
+        if ((!stroke || stroke === 'none') && fill && fill !== 'none') {
+          stroke = fill;
+        } else if (!stroke) {
+          stroke = 'black';
+        }
+
+        rawPaths.push({
+          id: index,
+          d: pathData,
+          stroke,
+          fill: 'none',
+          strokeWidth: parseFloat(strokeWidth),
+        });
+      }
+    });
+
+    console.log(`Quick parse: Found ${rawPaths.length} valid paths`);
+
+    return {
+      paths: rawPaths,
+      pathCount: rawPaths.length,
+      viewBox: this.viewBox,
+      width: this.width,
+      height: this.height,
+    };
+  }
+
+  /**
+   * Process raw paths to points (heavy operation)
+   */
+  processPathsToPoints(rawPaths) {
+    console.log(`Processing ${rawPaths.length} paths to points...`);
+    const processedPaths = [];
+
+    rawPaths.forEach((path, index) => {
+      const points = this.pathToPoints(path.d);
+      const length = this.estimatePathLength(points);
+
+      // Debug logging for first few paths only
+      if (index < 3) {
+        console.log(`Path ${index}: ${points.length} points, length=${length.toFixed(2)}`);
+      }
+
+      // Skip paths with no valid points
+      if (points.length === 0) {
+        console.warn(`Skipping path ${index}: no points generated`);
+        return;
+      }
+
+      if (points.length === 1 && points[0].x === 0 && points[0].y === 0) {
+        console.warn(`Skipping path ${index}: only fallback point (0,0)`);
+        return;
+      }
+
+      processedPaths.push({
+        ...path,
+        points,
+        length,
+      });
+    });
+
+    console.log(`Processed ${processedPaths.length} paths successfully`);
+    this.paths = processedPaths;
+
+    return {
+      paths: processedPaths,
+      viewBox: this.viewBox,
+      width: this.width,
+      height: this.height,
+    };
+  }
+
+  /**
+   * Parse SVG content from file (original full parse method)
    */
   parseSVGContent(svgContent) {
     const parser = new DOMParser();

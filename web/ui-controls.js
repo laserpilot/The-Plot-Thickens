@@ -21,6 +21,7 @@ function initializeControls() {
   });
 
   document.getElementById('clear-svg').addEventListener('click', clearSVG);
+  document.getElementById('process-paths').addEventListener('click', processPaths);
 
   // Weight mode toggle
   document.querySelectorAll('input[name="weight-mode"]').forEach(radio => {
@@ -156,12 +157,13 @@ function setupSlider(id, callback) {
  * Export processed SVG with weight-based duplicates
  */
 function exportSVG() {
-  if (!svgData) {
-    alert('No SVG loaded');
+  if (!svgData || !pathsProcessed) {
+    alert('Please load and process an SVG file first');
     return;
   }
 
   console.log('Generating processed SVG...');
+  updateStatus('Exporting SVG...');
 
   // Generate processed paths
   const processedPaths = [];
@@ -239,7 +241,10 @@ function exportSVG() {
   // Download
   const filename = useAttractors ? 'processed-attractor.svg' : 'processed-length.svg';
   downloadFile(svgContent, filename, 'image/svg+xml');
-  console.log(`Exported ${processedPaths.length} paths (${useAttractors ? 'attractor' : 'length'} mode)`);
+
+  const message = `Exported ${processedPaths.length} paths (${useAttractors ? 'attractor' : 'length'} mode)`;
+  console.log(message);
+  updateStatus(message);
 }
 
 /**
@@ -344,13 +349,23 @@ function updateUIFromConfig() {
  * Download file helper
  */
 function downloadFile(content, filename, mimeType) {
+  console.log(`Downloading file: ${filename} (${content.length} bytes)`);
+
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
   document.body.appendChild(link);
+
+  console.log(`Triggering download...`);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+  // Clean up after a delay
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    console.log(`Download cleanup complete`);
+  }, 100);
 }

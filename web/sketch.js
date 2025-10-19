@@ -5,6 +5,7 @@
 let svgParser;
 let attractorSystem;
 let svgData = null;
+let svgRawData = null; // Raw SVG structure before processing
 
 // Display settings
 let canvasWidth = 800;
@@ -19,6 +20,7 @@ let showInfluence = true;
 let previewMode = true;
 let useAttractors = false; // Attractors disabled by default
 let weightMode = 'length'; // 'length' or 'attractor'
+let pathsProcessed = false; // Track if paths have been converted to points
 
 // Drag state
 let draggedAttractor = null;
@@ -267,7 +269,7 @@ function mouseReleased() {
 }
 
 /**
- * Load SVG file
+ * Load SVG file (Stage 1: Quick preview)
  */
 function loadSVGFile(file) {
   // Show loading indicator
@@ -277,53 +279,93 @@ function loadSVGFile(file) {
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      // Parse SVG (this may take a moment for large files)
-      updateStatus('Parsing paths...');
+      // Stage 1: Quick parse to get path count
+      svgRawData = svgParser.quickParseSVG(e.target.result);
 
-      // Use setTimeout to allow UI to update before heavy parsing
-      setTimeout(() => {
-        try {
-          svgData = svgParser.parseSVGContent(e.target.result);
-          console.log('SVG Data:', svgData);
-          console.log('ViewBox:', svgData.viewBox);
-          console.log('Bounds:', svgParser.getBounds());
-          console.log('First few paths:', svgData.paths.slice(0, 3));
+      console.log(`SVG loaded: ${svgRawData.pathCount} paths found`);
+      console.log('ViewBox:', svgRawData.viewBox);
 
-          // Calculate and display length range
-          const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
-          if (lengths.length > 0) {
-            const minLen = Math.min(...lengths);
-            const maxLen = Math.max(...lengths);
-            console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
+      // Show path count and process button
+      const svgInfo = document.getElementById('svg-info');
+      const pathCountInfo = document.getElementById('path-count-info');
+      if (svgInfo && pathCountInfo) {
+        pathCountInfo.innerHTML = `<strong>${svgRawData.pathCount} paths</strong> found in SVG.<br>Click "Process Paths" to calculate lengths and preview.`;
+        svgInfo.style.display = 'block';
+      }
 
-            // Update UI hints
-            const minInfo = document.getElementById('min-length-info');
-            const maxInfo = document.getElementById('max-length-info');
-            if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
-            if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
-          }
+      updateStatus(`SVG loaded: ${svgRawData.pathCount} paths found (not yet processed)`);
+      showLoadingSpinner(false);
+      pathsProcessed = false;
 
-          fitSVGToCanvas();
-          updateStatus(`Loaded ${svgData.paths.length} paths`);
-          showLoadingSpinner(false);
-
-          // Trigger redraw
-          needsRedraw = true;
-          redraw();
-        } catch (error) {
-          console.error('Failed to load SVG:', error);
-          console.error('Error stack:', error.stack);
-          updateStatus('Error loading SVG');
-          showLoadingSpinner(false);
-        }
-      }, 50);
     } catch (error) {
-      console.error('Failed to read SVG file:', error);
-      updateStatus('Error reading SVG file');
+      console.error('Failed to load SVG:', error);
+      console.error('Error stack:', error.stack);
+      updateStatus('Error loading SVG');
       showLoadingSpinner(false);
     }
   };
   reader.readAsText(file);
+}
+
+/**
+ * Process paths to points (Stage 2: Heavy operation)
+ */
+function processPaths() {
+  if (!svgRawData) {
+    alert('No SVG loaded');
+    return;
+  }
+
+  if (pathsProcessed) {
+    console.log('Paths already processed');
+    return;
+  }
+
+  // Show loading indicator
+  updateStatus('Processing paths to points...');
+  showLoadingSpinner(true);
+
+  // Use setTimeout to allow UI to update before heavy parsing
+  setTimeout(() => {
+    try {
+      svgData = svgParser.processPathsToPoints(svgRawData.paths);
+      console.log('SVG Data:', svgData);
+      console.log('Bounds:', svgParser.getBounds());
+      console.log('First few paths:', svgData.paths.slice(0, 3));
+
+      // Calculate and display length range
+      const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
+      if (lengths.length > 0) {
+        const minLen = Math.min(...lengths);
+        const maxLen = Math.max(...lengths);
+        console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
+
+        // Update UI hints
+        const minInfo = document.getElementById('min-length-info');
+        const maxInfo = document.getElementById('max-length-info');
+        if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
+        if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
+      }
+
+      fitSVGToCanvas();
+      updateStatus(`Processed ${svgData.paths.length} paths successfully`);
+      showLoadingSpinner(false);
+      pathsProcessed = true;
+
+      // Hide process button
+      const svgInfo = document.getElementById('svg-info');
+      if (svgInfo) svgInfo.style.display = 'none';
+
+      // Trigger redraw
+      needsRedraw = true;
+      redraw();
+    } catch (error) {
+      console.error('Failed to process paths:', error);
+      console.error('Error stack:', error.stack);
+      updateStatus('Error processing paths');
+      showLoadingSpinner(false);
+    }
+  }, 50);
 }
 
 /**
@@ -350,9 +392,16 @@ function fitSVGToCanvas() {
  */
 function clearSVG() {
   svgData = null;
+  svgRawData = null;
+  pathsProcessed = false;
   attractorSystem.clearAll();
   updateAttractorList();
   updateStatus('SVG cleared');
+
+  // Hide process button
+  const svgInfo = document.getElementById('svg-info');
+  if (svgInfo) svgInfo.style.display = 'none';
+
   needsRedraw = true;
   redraw();
 }
