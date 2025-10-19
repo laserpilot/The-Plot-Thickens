@@ -172,7 +172,17 @@
         <!-- Loading Spinner -->
         <div id="loading-spinner" style="display: none;">
           <div class="spinner"></div>
-          <p>Processing SVG paths...</p>
+          <p id="spinner-message">Processing SVG paths...</p>
+        </div>
+        <!-- Processing Progress -->
+        <div id="processing-progress" style="display: none;">
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p id="progress-text">Processing 0/254 paths...</p>
+            <p id="progress-time">Elapsed: 0s</p>
+          </div>
         </div>
       </main>
     </div>

@@ -310,7 +310,7 @@ function loadSVGFile(file) {
 /**
  * Process paths to points (Stage 2: Heavy operation)
  */
-function processPaths() {
+async function processPaths() {
   if (!svgRawData) {
     alert('No SVG loaded');
     return;
@@ -321,51 +321,59 @@ function processPaths() {
     return;
   }
 
-  // Show loading indicator
+  // Show progress UI
   updateStatus('Processing paths to points...');
-  showLoadingSpinner(true);
+  showLoadingSpinner(false); // Hide spinner, use progress bar instead
+  showProcessingProgress(true);
 
-  // Use setTimeout to allow UI to update before heavy parsing
-  setTimeout(() => {
-    try {
-      svgData = svgParser.processPathsToPoints(svgRawData.paths);
-      console.log('SVG Data:', svgData);
-      console.log('Bounds:', svgParser.getBounds());
-      console.log('First few paths:', svgData.paths.slice(0, 3));
+  const startTime = Date.now();
+  const totalPaths = svgRawData.paths.length;
 
-      // Calculate and display length range
-      const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
-      if (lengths.length > 0) {
-        const minLen = Math.min(...lengths);
-        const maxLen = Math.max(...lengths);
-        console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
+  try {
+    // Process with progress callback
+    svgData = await svgParser.processPathsToPoints(svgRawData.paths, (processed, total) => {
+      const percent = Math.round((processed / total) * 100);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      updateProcessingProgress(processed, total, percent, elapsed);
+    });
 
-        // Update UI hints
-        const minInfo = document.getElementById('min-length-info');
-        const maxInfo = document.getElementById('max-length-info');
-        if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
-        if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
-      }
+    console.log('SVG Data:', svgData);
+    console.log('Bounds:', svgParser.getBounds());
+    console.log('First few paths:', svgData.paths.slice(0, 3));
 
-      fitSVGToCanvas();
-      updateStatus(`Processed ${svgData.paths.length} paths successfully`);
-      showLoadingSpinner(false);
-      pathsProcessed = true;
+    // Calculate and display length range
+    const lengths = svgData.paths.map(p => p.length).filter(l => l && !isNaN(l));
+    if (lengths.length > 0) {
+      const minLen = Math.min(...lengths);
+      const maxLen = Math.max(...lengths);
+      console.log(`Path length range: ${minLen.toFixed(1)} - ${maxLen.toFixed(1)}mm`);
 
-      // Hide process button
-      const svgInfo = document.getElementById('svg-info');
-      if (svgInfo) svgInfo.style.display = 'none';
-
-      // Trigger redraw
-      needsRedraw = true;
-      redraw();
-    } catch (error) {
-      console.error('Failed to process paths:', error);
-      console.error('Error stack:', error.stack);
-      updateStatus('Error processing paths');
-      showLoadingSpinner(false);
+      // Update UI hints
+      const minInfo = document.getElementById('min-length-info');
+      const maxInfo = document.getElementById('max-length-info');
+      if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
+      if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
     }
-  }, 50);
+
+    fitSVGToCanvas();
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    updateStatus(`Processed ${svgData.paths.length} paths in ${totalTime}s`);
+    showProcessingProgress(false);
+    pathsProcessed = true;
+
+    // Hide process button
+    const svgInfo = document.getElementById('svg-info');
+    if (svgInfo) svgInfo.style.display = 'none';
+
+    // Trigger redraw
+    needsRedraw = true;
+    redraw();
+  } catch (error) {
+    console.error('Failed to process paths:', error);
+    console.error('Error stack:', error.stack);
+    updateStatus('Error processing paths');
+    showProcessingProgress(false);
+  }
 }
 
 /**
@@ -453,5 +461,36 @@ function showLoadingSpinner(show) {
   const spinner = document.getElementById('loading-spinner');
   if (spinner) {
     spinner.style.display = show ? 'flex' : 'none';
+  }
+}
+
+/**
+ * Show/hide processing progress bar
+ */
+function showProcessingProgress(show) {
+  const progress = document.getElementById('processing-progress');
+  if (progress) {
+    progress.style.display = show ? 'flex' : 'none';
+  }
+}
+
+/**
+ * Update processing progress
+ */
+function updateProcessingProgress(processed, total, percent, elapsed) {
+  const progressFill = document.getElementById('progress-fill');
+  const progressText = document.getElementById('progress-text');
+  const progressTime = document.getElementById('progress-time');
+
+  if (progressFill) {
+    progressFill.style.width = `${percent}%`;
+  }
+
+  if (progressText) {
+    progressText.textContent = `Processing ${processed}/${total} paths (${percent}%)`;
+  }
+
+  if (progressTime) {
+    progressTime.textContent = `Elapsed: ${elapsed}s`;
   }
 }

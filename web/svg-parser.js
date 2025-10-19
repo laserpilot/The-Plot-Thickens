@@ -91,37 +91,54 @@ class SVGParser {
 
   /**
    * Process raw paths to points (heavy operation)
+   * Can be called with progress callback for chunked processing
    */
-  processPathsToPoints(rawPaths) {
+  async processPathsToPoints(rawPaths, progressCallback = null) {
     console.log(`Processing ${rawPaths.length} paths to points...`);
     const processedPaths = [];
+    const chunkSize = 25; // Process in batches to allow UI updates
 
-    rawPaths.forEach((path, index) => {
-      const points = this.pathToPoints(path.d);
-      const length = this.estimatePathLength(points);
+    for (let chunkStart = 0; chunkStart < rawPaths.length; chunkStart += chunkSize) {
+      const chunkEnd = Math.min(chunkStart + chunkSize, rawPaths.length);
+      const chunk = rawPaths.slice(chunkStart, chunkEnd);
 
-      // Debug logging for first few paths only
-      if (index < 3) {
-        console.log(`Path ${index}: ${points.length} points, length=${length.toFixed(2)}`);
-      }
+      // Process chunk
+      chunk.forEach((path, chunkIndex) => {
+        const index = chunkStart + chunkIndex;
+        const points = this.pathToPoints(path.d);
+        const length = this.estimatePathLength(points);
 
-      // Skip paths with no valid points
-      if (points.length === 0) {
-        console.warn(`Skipping path ${index}: no points generated`);
-        return;
-      }
+        // Debug logging for first few paths only
+        if (index < 3) {
+          console.log(`Path ${index}: ${points.length} points, length=${length.toFixed(2)}`);
+        }
 
-      if (points.length === 1 && points[0].x === 0 && points[0].y === 0) {
-        console.warn(`Skipping path ${index}: only fallback point (0,0)`);
-        return;
-      }
+        // Skip paths with no valid points
+        if (points.length === 0) {
+          console.warn(`Skipping path ${index}: no points generated`);
+          return;
+        }
 
-      processedPaths.push({
-        ...path,
-        points,
-        length,
+        if (points.length === 1 && points[0].x === 0 && points[0].y === 0) {
+          console.warn(`Skipping path ${index}: only fallback point (0,0)`);
+          return;
+        }
+
+        processedPaths.push({
+          ...path,
+          points,
+          length,
+        });
       });
-    });
+
+      // Report progress
+      if (progressCallback) {
+        progressCallback(chunkEnd, rawPaths.length);
+      }
+
+      // Yield to UI thread between chunks
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     console.log(`Processed ${processedPaths.length} paths successfully`);
     this.paths = processedPaths;
@@ -342,10 +359,11 @@ class SVGParser {
         return [{ x: 0, y: 0 }];
       }
 
-      // Adaptive sampling: cap at ~800 samples per path for performance
-      // For preview: 5-10mm intervals is fine, export can use finer sampling
-      const stride = Math.max(5, totalLength / 800);
-      const numSamples = Math.min(4000, Math.ceil(totalLength / stride));
+      // Reduced sampling for preview: 100 samples max (8× faster than 800)
+      // This is just for visual preview - export can use finer sampling if needed
+      const maxSamples = 100;
+      const stride = Math.max(10, totalLength / maxSamples);
+      const numSamples = Math.min(500, Math.ceil(totalLength / stride));
 
       for (let i = 0; i <= numSamples; i++) {
         const t = (i / numSamples) * totalLength;
