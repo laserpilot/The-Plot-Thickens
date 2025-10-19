@@ -156,9 +156,31 @@ function setupSlider(id, callback) {
 /**
  * Export processed SVG with weight-based duplicates
  */
-function exportSVG() {
+async function exportSVG() {
+  // Check if SVG is loaded
+  if (!svgRawData && !svgData) {
+    alert('Please load an SVG file first');
+    return;
+  }
+
+  // If paths haven't been processed yet, process them now
+  if (!pathsProcessed && svgRawData) {
+    console.log('Paths not yet processed - processing now for export...');
+    updateStatus('Processing paths for export...');
+
+    try {
+      await processPaths();
+      // processPaths() sets pathsProcessed = true and populates svgData
+    } catch (error) {
+      console.error('Failed to process paths for export:', error);
+      alert('Failed to process SVG paths. Check console for details.');
+      return;
+    }
+  }
+
+  // Double-check we have processed data
   if (!svgData || !pathsProcessed) {
-    alert('Please load and process an SVG file first');
+    alert('No processed SVG data available');
     return;
   }
 
