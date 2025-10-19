@@ -240,7 +240,7 @@ function exportSVG() {
 
   // Download
   const filename = useAttractors ? 'processed-attractor.svg' : 'processed-length.svg';
-  downloadFile(svgContent, filename, 'image/svg+xml');
+  downloadFile(svgContent, filename);
 
   const message = `Exported ${processedPaths.length} paths (${useAttractors ? 'attractor' : 'length'} mode)`;
   console.log(message);
@@ -279,7 +279,7 @@ function savePreset() {
   };
 
   const json = JSON.stringify(preset, null, 2);
-  downloadFile(json, 'attractor-preset.json', 'application/json');
+  downloadFile(json, 'attractor-preset.json');
   console.log('Preset saved');
 }
 
@@ -348,18 +348,31 @@ function updateUIFromConfig() {
 /**
  * Download file helper
  */
-function downloadFile(content, filename, mimeType) {
+function downloadFile(content, filename) {
   console.log(`Downloading file: ${filename} (${content.length} bytes)`);
+
+  // Determine MIME type from filename extension
+  let mimeType = 'text/plain';
+  if (filename.endsWith('.svg')) {
+    mimeType = 'image/svg+xml';
+  } else if (filename.endsWith('.json')) {
+    mimeType = 'application/json';
+  }
+
+  console.log(`MIME type: ${mimeType}`);
 
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
-  link.style.display = 'none';
+
+  // Force download attribute to prevent navigation
+  link.setAttribute('download', filename);
+
   document.body.appendChild(link);
 
-  console.log(`Triggering download...`);
+  console.log(`Triggering download for ${filename}...`);
   link.click();
 
   // Clean up after a delay
@@ -367,5 +380,5 @@ function downloadFile(content, filename, mimeType) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     console.log(`Download cleanup complete`);
-  }, 100);
+  }, 200);
 }
