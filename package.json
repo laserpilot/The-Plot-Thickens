@@ -1,0 +1,24 @@
+{
+  "name": "plotter-line-thickener",
+  "version": "0.1.0",
+  "description": "SVG line weight utility with attractor-based thickness control for pen plotters",
+  "main": "test-pattern-generator.js",
+  "scripts": {
+    "generate-test": "node test-pattern-generator.js > output/test-pattern.svg",
+    "process": "node process-svg.js",
+    "init-config": "node process-svg.js init-config",
+    "test": "node test-pattern-generator.js"
+  },
+  "keywords": [
+    "svg",
+    "plotter",
+    "line-weight",
+    "generative-art"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.1",
+    "svg-path-commander": "^2.1.11"
+  }
+}
