@@ -27,6 +27,11 @@ let draggedAttractor = null;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
 
+// Pan state
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+
 // Processing settings
 let baseOffset = 0.2;
 let noise = 0.1;
@@ -214,7 +219,18 @@ function drawInfluenceField() {
  * Handle mouse press - check if clicking on attractor or adding new one
  */
 function mousePressed() {
-  if (!useAttractors || !svgData) return;
+  if (!svgData) return;
+
+  // Right click or space+click = pan mode
+  if (mouseButton === CENTER || (mouseButton === LEFT && keyIsDown(32))) {
+    isPanning = true;
+    panStartX = mouseX;
+    panStartY = mouseY;
+    cursor('grab');
+    return;
+  }
+
+  if (!useAttractors) return;
 
   // Transform mouse coordinates to SVG space
   const svgX = (mouseX - offsetX) / zoomScale;
@@ -240,9 +256,21 @@ function mousePressed() {
 }
 
 /**
- * Handle mouse drag - move attractor
+ * Handle mouse drag - move attractor or pan canvas
  */
 function mouseDragged() {
+  if (isPanning) {
+    const dx = mouseX - panStartX;
+    const dy = mouseY - panStartY;
+    offsetX += dx;
+    offsetY += dy;
+    panStartX = mouseX;
+    panStartY = mouseY;
+    needsRedraw = true;
+    redraw();
+    return;
+  }
+
   if (draggedAttractor && useAttractors && svgData) {
     const svgX = (mouseX - offsetX) / zoomScale;
     const svgY = (mouseY - offsetY) / zoomScale;
@@ -257,15 +285,54 @@ function mouseDragged() {
 }
 
 /**
- * Handle mouse release - stop dragging
+ * Handle mouse release - stop dragging or panning
  */
 function mouseReleased() {
+  if (isPanning) {
+    isPanning = false;
+    cursor('default');
+    needsRedraw = true;
+    redraw();
+  }
+
   if (draggedAttractor) {
     draggedAttractor = null;
     cursor('default');
     needsRedraw = true;
     redraw();
   }
+}
+
+/**
+ * Handle mouse wheel - zoom in/out
+ */
+function mouseWheel(event) {
+  if (!svgData) return false;
+
+  // Get mouse position before zoom
+  const mouseXBefore = (mouseX - offsetX) / zoomScale;
+  const mouseYBefore = (mouseY - offsetY) / zoomScale;
+
+  // Apply zoom (negative delta = zoom in, positive = zoom out)
+  const zoomDelta = event.delta > 0 ? 0.9 : 1.1;
+  zoomScale *= zoomDelta;
+
+  // Clamp zoom level
+  zoomScale = constrain(zoomScale, 0.1, 10);
+
+  // Adjust offset to keep mouse position stable
+  offsetX = mouseX - mouseXBefore * zoomScale;
+  offsetY = mouseY - mouseYBefore * zoomScale;
+
+  // Update status to show new zoom level
+  const zoomPercent = Math.round(zoomScale * 100);
+  updateStatus(`Processed ${svgData.paths.length} paths`);
+
+  needsRedraw = true;
+  redraw();
+
+  // Prevent page scroll
+  return false;
 }
 
 /**
@@ -420,7 +487,13 @@ function clearSVG() {
 function updateStatus(message) {
   const statusEl = document.getElementById('canvas-status');
   if (statusEl) {
-    statusEl.textContent = message;
+    // Add zoom level if SVG is loaded
+    if (svgData && pathsProcessed) {
+      const zoomPercent = Math.round(zoomScale * 100);
+      statusEl.textContent = `${message} | Zoom: ${zoomPercent}% (scroll to zoom, space+drag to pan)`;
+    } else {
+      statusEl.textContent = message;
+    }
   }
 }
 

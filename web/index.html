@@ -96,28 +96,38 @@
         <section class="control-group">
           <h3>Line Weight Settings</h3>
 
-          <label>
+          <!-- Live Parameter Preview -->
+          <div class="parameter-preview">
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 0.5rem;">Live Preview:</p>
+            <canvas id="param-preview-canvas" width="280" height="80"></canvas>
+          </div>
+
+          <label title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">
             Base Offset (mm):
             <input type="range" id="base-offset" min="0.01" max="3" step="0.05" value="0.2">
             <span id="base-offset-value">0.2</span>
+            <span class="hint-icon" title="Distance between duplicate lines">?</span>
           </label>
 
-          <label>
+          <label title="Random variation added to each line. Creates organic, hand-drawn look. 0 = perfectly parallel lines.">
             Noise (mm):
             <input type="range" id="noise" min="0" max="3" step="0.05" value="0.1">
             <span id="noise-value">0.1</span>
+            <span class="hint-icon" title="Random variation for organic look">?</span>
           </label>
 
-          <label>
+          <label title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">
             Min Passes:
             <input type="range" id="min-passes" min="1" max="10" step="1" value="1">
             <span id="min-passes-value">1</span>
+            <span class="hint-icon" title="Minimum line duplicates (thinnest)">?</span>
           </label>
 
-          <label>
+          <label title="Maximum number of duplicate lines for thickest paths. Higher = thicker, but slower plotting.">
             Max Passes:
             <input type="range" id="max-passes" min="5" max="50" step="1" value="20">
             <span id="max-passes-value">20</span>
+            <span class="hint-icon" title="Maximum line duplicates (thickest)">?</span>
           </label>
 
           <label title="Paths shorter than this get minimum passes">
@@ -192,6 +202,7 @@
   <script src="offset-utils.js"></script>
   <script src="attractor.js"></script>
   <script src="svg-parser.js"></script>
+  <script src="param-preview.js"></script>
   <script src="sketch.js"></script>
   <script src="ui-controls.js"></script>
 </body>
