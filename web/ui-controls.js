@@ -242,11 +242,17 @@ async function prepareExport() {
 
   console.log(`Using length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)}mm`);
 
+  // Re-process paths with high quality for export
+  console.log('Re-processing paths with high resolution for export...');
+
   svgData.paths.forEach((path, index) => {
+    // Re-sample path with high quality for export
+    const highQualityPoints = svgParser.pathToPoints(path.d, true);
+
     let passes;
 
     if (useAttractors) {
-      passes = attractorSystem.calculatePathWeight(path.points);
+      passes = attractorSystem.calculatePathWeight(highQualityPoints);
     } else {
       // Length-based weight calculation (inline to avoid scope issues)
       const pathLength = path.length || 0;
@@ -266,7 +272,7 @@ async function prepareExport() {
     // Only log first 5 and last 5 paths to avoid console spam
     const totalPaths = svgData.paths.length;
     if (index < 5 || index >= totalPaths - 5) {
-      console.log(`Path ${path.id}: length=${path.length}, passes=${passes}`);
+      console.log(`Path ${path.id}: ${highQualityPoints.length} HQ points, length=${path.length}, passes=${passes}`);
     } else if (index === 5) {
       console.log(`... (logging only first 5 and last 5 of ${totalPaths} paths)`);
     }
@@ -283,8 +289,8 @@ async function prepareExport() {
       const offsetDistance = direction * passIndex * baseOffset;
       const passSeed = seed + i;
 
-      // Generate offset using proper perpendicular algorithm
-      const offsetPoints = generateOffsetPath(path.points, offsetDistance, noise, passSeed);
+      // Generate offset using high-quality points
+      const offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed);
 
       if (offsetPoints) {
         const offsetPathData = pointsToPathString(offsetPoints);

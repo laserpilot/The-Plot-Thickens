@@ -326,14 +326,14 @@ class SVGParser {
   /**
    * Convert SVG path to array of points for rendering
    * Uses arc-length based sampling for efficient, high-quality output
+   * @param {string} pathData - SVG path data string
+   * @param {boolean} highQuality - If true, use higher resolution for export (default: false for preview)
    */
-  pathToPoints(pathData) {
-    const points = [];
-
+  pathToPoints(pathData, highQuality = false) {
     try {
       // Use svg-path-commander for proper arc-length sampling
       if (typeof SVGPathCommander !== 'undefined') {
-        return this.pathToPointsArcLength(pathData);
+        return this.pathToPointsArcLength(pathData, highQuality);
       }
 
       // Fallback to manual parsing if library not available
@@ -347,8 +347,10 @@ class SVGParser {
   /**
    * Arc-length based sampling using svg-path-commander
    * Adaptive sampling: longer paths use larger intervals to avoid over-sampling
+   * @param {string} pathData - SVG path data string
+   * @param {boolean} highQuality - If true, use higher resolution for export (default: false for preview)
    */
-  pathToPointsArcLength(pathData) {
+  pathToPointsArcLength(pathData, highQuality = false) {
     const points = [];
 
     try {
@@ -359,11 +361,20 @@ class SVGParser {
         return [{ x: 0, y: 0 }];
       }
 
-      // Reduced sampling for preview: 100 samples max (8× faster than 800)
-      // This is just for visual preview - export can use finer sampling if needed
-      const maxSamples = 100;
-      const stride = Math.max(10, totalLength / maxSamples);
-      const numSamples = Math.min(500, Math.ceil(totalLength / stride));
+      // Choose sampling density based on quality mode
+      let maxSamples, stride, numSamples;
+
+      if (highQuality) {
+        // High-quality export: much denser sampling for smooth curves
+        maxSamples = 800; // 8x more detail than preview
+        stride = Math.max(1, totalLength / maxSamples);
+        numSamples = Math.min(2000, Math.ceil(totalLength / stride));
+      } else {
+        // Preview mode: reduced sampling for speed
+        maxSamples = 100;
+        stride = Math.max(10, totalLength / maxSamples);
+        numSamples = Math.min(500, Math.ceil(totalLength / stride));
+      }
 
       for (let i = 0; i <= numSamples; i++) {
         const t = (i / numSamples) * totalLength;
