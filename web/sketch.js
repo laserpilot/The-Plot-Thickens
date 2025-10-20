@@ -219,6 +219,12 @@ function drawInfluenceField() {
  * Handle mouse press - check if clicking on attractor or adding new one
  */
 function mousePressed() {
+  // Only handle mouse events if they're actually over the canvas
+  // This prevents intercepting clicks on UI buttons outside the canvas
+  if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) {
+    return; // Click is outside canvas, ignore it
+  }
+
   if (!svgData) return;
 
   // Right click or space+click = pan mode
@@ -259,6 +265,15 @@ function mousePressed() {
  * Handle mouse drag - move attractor or pan canvas
  */
 function mouseDragged() {
+  // Allow dragging to continue even if mouse leaves canvas (for panning/dragging)
+  // But only if we were already in a drag state
+  if (!isPanning && !draggedAttractor) {
+    // Not currently dragging, check if mouse is over canvas
+    if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) {
+      return;
+    }
+  }
+
   if (isPanning) {
     const dx = mouseX - panStartX;
     const dy = mouseY - panStartY;

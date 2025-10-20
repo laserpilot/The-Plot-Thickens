@@ -2,6 +2,9 @@
  * UI Controls and event handlers
  */
 
+// Store prepared download to allow two-click pattern (avoids extension blocking)
+let preparedDownload = null;
+
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
   initializeControls();
@@ -124,8 +127,8 @@ function initializeControls() {
     redraw();
   });
 
-  // Export controls
-  document.getElementById('export-svg').addEventListener('click', exportSVG);
+  // Export controls - two-click pattern to avoid extension blocking
+  document.getElementById('export-svg').addEventListener('click', handleExportClick);
   document.getElementById('save-preset').addEventListener('click', savePreset);
   document.getElementById('load-preset').addEventListener('click', () => {
     document.getElementById('preset-upload').click();
@@ -154,9 +157,35 @@ function setupSlider(id, callback) {
 }
 
 /**
- * Export processed SVG with weight-based duplicates
+ * Handle export button click - two-click pattern to avoid extension blocking
  */
-async function exportSVG() {
+async function handleExportClick() {
+  const exportButton = document.getElementById('export-svg');
+
+  // If download is ready, execute it now (second click - direct user gesture)
+  if (preparedDownload) {
+    try {
+      triggerDownload(preparedDownload.content, preparedDownload.filename);
+      exportButton.textContent = 'Export SVG';
+      preparedDownload = null;
+      updateStatus('Download complete');
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert(`Download failed: ${error.message}`);
+      exportButton.textContent = 'Export SVG';
+      preparedDownload = null;
+    }
+    return;
+  }
+
+  // Otherwise, prepare the export (first click - async processing)
+  await prepareExport();
+}
+
+/**
+ * Prepare export (async processing) - saves download for second click
+ */
+async function prepareExport() {
   // Check if SVG is loaded
   if (!svgRawData && !svgData) {
     alert('Please load an SVG file first');
@@ -213,7 +242,7 @@ async function exportSVG() {
 
   console.log(`Using length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)}mm`);
 
-  svgData.paths.forEach(path => {
+  svgData.paths.forEach((path, index) => {
     let passes;
 
     if (useAttractors) {
@@ -234,7 +263,13 @@ async function exportSVG() {
       }
     }
 
-    console.log(`Path ${path.id}: length=${path.length}, passes=${passes}`);
+    // Only log first 5 and last 5 paths to avoid console spam
+    const totalPaths = svgData.paths.length;
+    if (index < 5 || index >= totalPaths - 5) {
+      console.log(`Path ${path.id}: length=${path.length}, passes=${passes}`);
+    } else if (index === 5) {
+      console.log(`... (logging only first 5 and last 5 of ${totalPaths} paths)`);
+    }
 
     // Generate deterministic seed from path data
     const seed = hashString(path.d);
@@ -263,14 +298,44 @@ async function exportSVG() {
     }
   });
 
-  // Build SVG
-  const svgContent = buildSVGContent(processedPaths);
+  console.log(`Generated ${processedPaths.length} total processed paths from ${svgData.paths.length} source paths`);
 
-  // Download
-  const filename = useAttractors ? 'processed-attractor.svg' : 'processed-length.svg';
-  downloadFile(svgContent, filename);
+  // Build SVG with error handling
+  let svgContent;
+  try {
+    svgContent = buildSVGContent(processedPaths);
 
-  const message = `Exported ${processedPaths.length} paths (${useAttractors ? 'attractor' : 'length'} mode)`;
+    if (!svgContent || svgContent.length === 0) {
+      alert('Failed to generate SVG content - result is empty');
+      updateStatus('Export failed: empty SVG content');
+      return;
+    }
+
+    const sizeMB = (svgContent.length / 1024 / 1024).toFixed(2);
+    console.log(`Generated SVG: ${svgContent.length} bytes (${sizeMB} MB)`);
+  } catch (error) {
+    console.error('Error building SVG content:', error);
+    alert(`Failed to build SVG: ${error.message}`);
+    updateStatus('Export failed: error building SVG');
+    return;
+  }
+
+  // Store prepared download (don't execute yet - wait for second click)
+  // Add timestamp to filename for versioning
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
+  const mode = useAttractors ? 'attractor' : 'length';
+  const filename = `processed-${mode}-${timestamp}.svg`;
+
+  preparedDownload = {
+    content: svgContent,
+    filename: filename
+  };
+
+  // Update UI to indicate download is ready
+  const exportButton = document.getElementById('export-svg');
+  exportButton.textContent = 'Download Ready – Click to Save';
+
+  const message = `Export ready: ${processedPaths.length} paths (${(svgContent.length / 1024 / 1024).toFixed(2)} MB) - Click again to download`;
   console.log(message);
   updateStatus(message);
 }
@@ -279,21 +344,69 @@ async function exportSVG() {
  * Build SVG content from processed paths
  */
 function buildSVGContent(paths) {
+  // Validate svgData exists and has required properties
+  if (!svgData) {
+    throw new Error('svgData is not defined');
+  }
+
+  if (!svgData.viewBox) {
+    throw new Error('svgData.viewBox is not defined');
+  }
+
+  // Use fallback values if dimensions are missing
+  const width = svgData.width || 100;
+  const height = svgData.height || 100;
+  const vbX = svgData.viewBox.x ?? 0;
+  const vbY = svgData.viewBox.y ?? 0;
+  const vbWidth = svgData.viewBox.width ?? width;
+  const vbHeight = svgData.viewBox.height ?? height;
+
+  console.log(`Building SVG: ${width}x${height}mm, viewBox: ${vbX} ${vbY} ${vbWidth} ${vbHeight}`);
+
   const parts = [];
 
   parts.push('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
-  parts.push(`<svg width="${svgData.width}mm" height="${svgData.height}mm" viewBox="${svgData.viewBox.x} ${svgData.viewBox.y} ${svgData.viewBox.width} ${svgData.viewBox.height}" xmlns="http://www.w3.org/2000/svg">`);
+  parts.push(`<svg width="${width}mm" height="${height}mm" viewBox="${vbX} ${vbY} ${vbWidth} ${vbHeight}" xmlns="http://www.w3.org/2000/svg">`);
   parts.push(`  <!-- Generated by plotter-line-thickener (${useAttractors ? 'Attractor-based' : 'Length-based'}) -->`);
   parts.push('  <g id="processed-paths">');
 
-  paths.forEach(path => {
-    parts.push(`    <path d="${path.d}" fill="${path.fill}" stroke="${path.stroke}" stroke-width="${path.strokeWidth}" />`);
+  paths.forEach((path, index) => {
+    // Validate path attributes to prevent HTML injection
+    if (!path.d || typeof path.d !== 'string') {
+      console.warn(`Path ${index}: invalid d attribute, skipping`);
+      return;
+    }
+
+    // Escape any HTML characters in path data
+    const escapedD = path.d.replace(/[<>&"']/g, char => {
+      const escapeMap = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
+      return escapeMap[char];
+    });
+
+    const fill = path.fill || 'none';
+    const stroke = path.stroke || 'black';
+    const strokeWidth = path.strokeWidth || 0.1;
+
+    parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
   });
 
   parts.push('  </g>');
   parts.push('</svg>');
 
-  return parts.join('\n');
+  const result = parts.join('\n');
+
+  // Debug: Log first 500 chars to verify it's pure SVG
+  console.log('SVG content preview (first 500 chars):');
+  console.log(result.substring(0, 500));
+
+  // Validate it starts with XML declaration
+  if (!result.startsWith('<?xml')) {
+    console.error('ERROR: SVG does not start with XML declaration!');
+    console.error('First 200 chars:', result.substring(0, 200));
+    throw new Error('Generated invalid SVG content');
+  }
+
+  return result;
 }
 
 /**
@@ -307,7 +420,7 @@ function savePreset() {
   };
 
   const json = JSON.stringify(preset, null, 2);
-  downloadFile(json, 'attractor-preset.json');
+  triggerDownload(json, 'attractor-preset.json');
   console.log('Preset saved');
 }
 
@@ -374,10 +487,16 @@ function updateUIFromConfig() {
 }
 
 /**
- * Download file helper
+ * Download file helper - renamed to avoid conflicts with native functions
  */
-function downloadFile(content, filename) {
-  console.log(`Downloading file: ${filename} (${content.length} bytes)`);
+function triggerDownload(content, filename) {
+  console.log(`🔵 TRIGGER DOWNLOAD CALLED: ${filename} (${content.length} bytes)`);
+  alert(`DEBUG: triggerDownload() called for ${filename}`);
+
+  // Validate content
+  if (!content || content.length === 0) {
+    throw new Error('Cannot download empty content');
+  }
 
   // Determine MIME type from filename extension
   let mimeType = 'text/plain';
@@ -389,24 +508,38 @@ function downloadFile(content, filename) {
 
   console.log(`MIME type: ${mimeType}`);
 
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
+  try {
+    const blob = new Blob([content], { type: mimeType });
+    console.log(`Created blob: ${blob.size} bytes`);
 
-  // Force download attribute to prevent navigation
-  link.setAttribute('download', filename);
+    const url = URL.createObjectURL(blob);
+    console.log(`Created blob URL: ${url}`);
 
-  document.body.appendChild(link);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
 
-  console.log(`Triggering download for ${filename}...`);
-  link.click();
+    // Force download attribute to prevent navigation
+    link.setAttribute('download', filename);
 
-  // Clean up after a delay
-  setTimeout(() => {
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    console.log(`Download cleanup complete`);
-  }, 200);
+    document.body.appendChild(link);
+
+    console.log(`Triggering download for ${filename}...`);
+
+    // Now that we're on a direct user gesture (two-click pattern),
+    // link.click() should work reliably without being blocked
+    link.click();
+    console.log('Download triggered');
+
+    // Clean up after a longer delay for large files
+    const cleanupDelay = content.length > 1000000 ? 2000 : 500; // 2s for files >1MB
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      console.log(`Download cleanup complete (after ${cleanupDelay}ms)`);
+    }, cleanupDelay);
+  } catch (error) {
+    console.error('Error in downloadFile:', error);
+    throw new Error(`Download failed: ${error.message}`);
+  }
 }
