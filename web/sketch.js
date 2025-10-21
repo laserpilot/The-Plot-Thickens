@@ -18,6 +18,7 @@ let offsetY = 0;
 let showAttractors = true;
 let showInfluence = true;
 let previewMode = true;
+let previewDisplayMode = 'weight'; // 'weight' or 'offset'
 let useAttractors = false; // Attractors disabled by default
 let weightMode = 'length'; // 'length' or 'attractor'
 let pathsProcessed = false; // Track if paths have been converted to points
@@ -101,9 +102,22 @@ function draw() {
 }
 
 /**
- * Draw SVG paths with optional weight preview
+ * Draw SVG paths with optional weight preview or offset rendering
  */
 function drawPaths() {
+  if (previewDisplayMode === 'offset') {
+    // Render actual offset paths
+    renderOffsetPreview();
+  } else {
+    // Weight-only preview (fast)
+    renderWeightPreview();
+  }
+}
+
+/**
+ * Render weight preview (color-coded, fast)
+ */
+function renderWeightPreview() {
   svgData.paths.forEach(path => {
     let weight;
 
@@ -141,6 +155,65 @@ function drawPaths() {
     });
 
     endShape();
+  });
+}
+
+/**
+ * Render actual offset paths (accurate but slower)
+ */
+function renderOffsetPreview() {
+  stroke(100); // Gray color
+  strokeWeight(0.5);
+  noFill();
+
+  svgData.paths.forEach((path, pathIndex) => {
+    // Calculate weight
+    let weight;
+    if (useAttractors) {
+      weight = attractorSystem.calculatePathWeight(path.points);
+    } else {
+      weight = calculateLengthBasedWeight(path.length);
+    }
+
+    // Generate deterministic seed
+    const seed = hashString(path.d);
+
+    // Get envelope function if using normal mode
+    const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
+
+    // Generate offset passes (limit for performance)
+    const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
+
+    for (let i = 0; i < maxPreviewPasses; i++) {
+      const passIndex = Math.floor(i / 2);
+      const isRight = i % 2 === 0;
+      const direction = isRight ? 1 : -1;
+      const offsetDistance = direction * passIndex * baseOffset;
+      const passSeed = seed + i;
+
+      let offsetPoints;
+
+      if (useNormalOffset) {
+        // Normal mode: use path data string
+        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+      } else {
+        // Legacy mode: use points (low quality for speed)
+        const sampledPoints = path.points.filter((_, idx) => idx % 3 === 0); // Subsample for speed
+        offsetPoints = generateOffsetPath(sampledPoints, offsetDistance, noise, passSeed, path.id, null, false);
+      }
+
+      if (offsetPoints && offsetPoints.length > 0) {
+        beginShape();
+        offsetPoints.forEach((pt, idx) => {
+          if (pt.move && idx > 0) {
+            endShape();
+            beginShape();
+          }
+          vertex(pt.x, pt.y);
+        });
+        endShape();
+      }
+    }
   });
 }
 

@@ -183,8 +183,11 @@
           <h3>Display</h3>
 
           <label>
-            <input type="checkbox" id="preview-mode" checked>
-            Preview Weight (color-coded)
+            Preview Mode:
+            <select id="preview-display-mode">
+              <option value="weight">Weight Only (fast)</option>
+              <option value="offset">Offset Rendering (accurate)</option>
+            </select>
           </label>
 
           <div class="attractor-controls" style="display: none;">

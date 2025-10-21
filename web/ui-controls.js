@@ -162,11 +162,15 @@ function initializeControls() {
     redraw();
   });
 
-  document.getElementById('preview-mode').addEventListener('change', (e) => {
-    previewMode = e.target.checked;
-    needsRedraw = true;
-    redraw();
-  });
+  // Preview display mode toggle
+  const previewDisplayModeSelect = document.getElementById('preview-display-mode');
+  if (previewDisplayModeSelect) {
+    previewDisplayModeSelect.addEventListener('change', (e) => {
+      previewDisplayMode = e.target.value;
+      needsRedraw = true;
+      redraw();
+    });
+  }
 
   // Export controls - two-click pattern to avoid extension blocking
   document.getElementById('export-svg').addEventListener('click', handleExportClick);
