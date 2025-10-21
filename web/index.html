@@ -145,6 +145,13 @@
             <span class="hint-icon" title="Random variation for organic look">?</span>
           </label>
 
+          <label title="Controls smoothness of noise. Lower = smoother organic curves (50-100mm), higher = more texture/detail (5-20mm).">
+            Noise Frequency (mm):
+            <input type="range" id="noise-frequency" min="5" max="200" step="5" value="50">
+            <span id="noise-frequency-value">50</span>
+            <span class="hint-icon" title="Wavelength of noise variation">?</span>
+          </label>
+
           <label title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">
             Min Passes:
             <input type="range" id="min-passes" min="1" max="10" step="1" value="1">

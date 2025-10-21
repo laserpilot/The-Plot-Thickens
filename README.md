@@ -110,6 +110,7 @@ node process-svg.js input.svg output.svg \
 |-----------|---------|-------------|
 | `baseOffset` | 0.25 | Base offset distance per pass (mm) |
 | `noise` | 0.05 | Random variation in offset (mm) |
+| `noiseFrequency` | 50 | Noise wavelength (mm) - lower = smoother |
 | `minPasses` | 1 | Minimum number of path duplicates |
 | `maxPasses` | 20 | Maximum number of path duplicates |
 | `curve` | linear | Length-to-weight mapping curve |
@@ -159,12 +160,13 @@ The original point-based offset algorithm that samples paths and calculates norm
 
 ### Normal Mode (New)
 
-An improved arc-length based offset algorithm with support for taper envelopes:
+An improved arc-length based offset algorithm with support for taper envelopes and smooth noise:
 
 **Benefits:**
 - More accurate offsets using `svg-path-commander` for precise arc-length sampling
 - Uniform point distribution along curved paths
 - Support for taper envelopes to create variable-width effects
+- **Smooth noise control** via `noiseFrequency` parameter for organic variation without jagged edges
 
 **Envelope Presets:**
 - `flat` - No taper (default, same as legacy)
@@ -174,6 +176,13 @@ An improved arc-length based offset algorithm with support for taper envelopes:
 - `sinTaperBoth` - Smooth bulge in middle
 - `exponentialTaper` - Slow start, fast end
 - `easeInOut` - Smooth parabolic taper at both ends
+
+### Noise Frequency Control
+
+The `noiseFrequency` parameter controls the smoothness of random variation:
+- **Low (50-100mm)**: Smooth, calligraphic organic curves
+- **Medium (20-40mm)**: Gentle texture
+- **High (5-10mm)**: Detailed texture, more jagged
 
 ### CLI Examples
 
@@ -189,6 +198,18 @@ node process-svg.js input.svg output.svg --offset-mode normal --envelope sinTape
 
 # Normal mode with both-ends taper (creates pointed ends)
 node process-svg.js input.svg output.svg --offset-mode normal --envelope linearTaperBoth
+
+# Smooth organic variation with low-frequency noise
+node process-svg.js input.svg output.svg \
+  --offset-mode normal \
+  --noise 0.2 \
+  --noise-frequency 80
+
+# Textured effect with high-frequency noise
+node process-svg.js input.svg output.svg \
+  --offset-mode normal \
+  --noise 0.15 \
+  --noise-frequency 10
 ```
 
 ### Web Interface
@@ -196,8 +217,9 @@ node process-svg.js input.svg output.svg --offset-mode normal --envelope linearT
 The web interface includes a new **Offset Mode** control panel:
 1. Toggle between **Legacy** and **Normal** modes
 2. Select envelope preset when in Normal mode
-3. Preview shows the effect in real-time
-4. Export includes the selected mode in the SVG comment
+3. **Noise Frequency** slider (5-200mm) - controls smoothness
+4. Preview shows the effect in real-time
+5. Export includes the selected mode in the SVG comment
 
 ---
 

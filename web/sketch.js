@@ -40,6 +40,7 @@ let panStartY = 0;
 // Processing settings
 let baseOffset = 0.2;
 let noise = 0.1;
+let noiseFrequency = 50; // Noise wavelength in mm
 
 // Render control
 let needsRedraw = true;

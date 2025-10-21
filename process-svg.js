@@ -14,6 +14,7 @@ const { processFile } = require('./lib/svg-processor');
 const DEFAULT_CONFIG = {
   baseOffset: 0.25, // mm
   noise: 0.05, // mm
+  noiseFrequency: 50, // mm (wavelength for smooth variation)
   minPasses: 1,
   maxPasses: 20,
   curve: 'linear', // 'linear', 'exponential', 'logarithmic'
@@ -36,6 +37,7 @@ program
   .option('-c, --config <file>', 'JSON configuration file')
   .option('-o, --offset <number>', 'Base offset distance in mm', parseFloat)
   .option('-n, --noise <number>', 'Noise amount in mm', parseFloat)
+  .option('--noise-frequency <number>', 'Noise wavelength in mm (lower=smoother, default: 50)', parseFloat)
   .option('--min-passes <number>', 'Minimum number of passes', parseInt)
   .option('--max-passes <number>', 'Maximum number of passes', parseInt)
   .option('--curve <type>', 'Length-to-weight curve (linear|exponential|logarithmic)')
@@ -64,6 +66,7 @@ program
     // Override with command-line options
     if (options.offset !== undefined) config.baseOffset = options.offset;
     if (options.noise !== undefined) config.noise = options.noise;
+    if (options.noiseFrequency !== undefined) config.noiseFrequency = options.noiseFrequency;
     if (options.minPasses !== undefined) config.minPasses = options.minPasses;
     if (options.maxPasses !== undefined) config.maxPasses = options.maxPasses;
     if (options.curve !== undefined) config.curve = options.curve;

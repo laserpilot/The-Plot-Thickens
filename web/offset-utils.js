@@ -96,9 +96,10 @@ function generateOffsetPathLegacy(pathPoints, offset, noise, seed) {
  * @param {number} seed - Random seed
  * @param {string} pathId - Path identifier for envelope calculation
  * @param {Function} offsetEnvelope - Optional envelope function (pathId, t) => multiplier (default: 1.0)
+ * @param {number} noiseFrequency - Noise wavelength in mm (default: 50 for smooth variation)
  * @returns {Array} Array of offset points
  */
-function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', offsetEnvelope = null) {
+function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', offsetEnvelope = null, noiseFrequency = 50) {
   if (!pathData || typeof pathData !== 'string') {
     return null;
   }
@@ -155,7 +156,8 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
       const envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
 
       // Apply noise modulated along the normal
-      const noiseValue = noise > 0 ? simpleNoise(arcLength / 10, seed) * noise : 0;
+      // Lower frequency = smoother (50mm+), higher = more texture (5-10mm)
+      const noiseValue = noise > 0 ? simpleNoise(arcLength / noiseFrequency, seed) * noise : 0;
       const totalOffset = (offset + noiseValue) * envelopeMultiplier;
 
       // Offset point along normal
@@ -183,11 +185,12 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
  * @param {string} pathId - Path identifier for envelope (normal mode only)
  * @param {Function} offsetEnvelope - Envelope function (normal mode only)
  * @param {boolean} useNormalMode - Whether to use normal-based offset (default: false for backward compat)
+ * @param {number} noiseFrequency - Noise wavelength in mm (normal mode only, default: 50)
  * @returns {Array} Offset points
  */
-function generateOffsetPath(pathPointsOrData, offset, noise, seed, pathId = '', offsetEnvelope = null, useNormalMode = false) {
+function generateOffsetPath(pathPointsOrData, offset, noise, seed, pathId = '', offsetEnvelope = null, useNormalMode = false, noiseFrequency = 50) {
   if (useNormalMode && typeof pathPointsOrData === 'string') {
-    return generateOffsetPathNormal(pathPointsOrData, offset, noise, seed, pathId, offsetEnvelope);
+    return generateOffsetPathNormal(pathPointsOrData, offset, noise, seed, pathId, offsetEnvelope, noiseFrequency);
   } else {
     return generateOffsetPathLegacy(pathPointsOrData, offset, noise, seed);
   }

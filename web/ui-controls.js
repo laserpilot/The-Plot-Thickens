@@ -124,6 +124,12 @@ function initializeControls() {
     redraw();
   });
 
+  setupSlider('noise-frequency', (value) => {
+    noiseFrequency = value;
+    needsRedraw = true;
+    redraw();
+  });
+
   setupSlider('min-passes', (value) => {
     attractorSystem.updateConfig({ minPasses: value });
     needsRedraw = true;
@@ -323,8 +329,8 @@ async function prepareExport() {
       // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
       let offsetPoints;
       if (useNormalOffset) {
-        // Normal mode: pass path data string directly
-        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true);
+        // Normal mode: pass path data string directly with noise frequency
+        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
       } else {
         // Legacy mode: use high-quality points
         offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);
