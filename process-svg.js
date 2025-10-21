@@ -12,7 +12,7 @@ const { processFile } = require('./lib/svg-processor');
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  baseOffset: 0.1, // mm
+  baseOffset: 0.25, // mm
   noise: 0.05, // mm
   minPasses: 1,
   maxPasses: 20,
@@ -20,6 +20,8 @@ const DEFAULT_CONFIG = {
   exponent: 2, // for exponential curve
   minLength: null, // auto-detect if null
   maxLength: null, // auto-detect if null
+  offsetMode: 'legacy', // 'legacy' or 'normal'
+  envelope: 'flat', // envelope preset name
 };
 
 // CLI setup
@@ -40,6 +42,8 @@ program
   .option('--exponent <number>', 'Exponent for exponential curve', parseFloat)
   .option('--min-length <number>', 'Minimum path length (auto-detect if omitted)', parseFloat)
   .option('--max-length <number>', 'Maximum path length (auto-detect if omitted)', parseFloat)
+  .option('--offset-mode <mode>', 'Offset mode (legacy|normal)', 'legacy')
+  .option('--envelope <preset>', 'Envelope preset for normal mode (flat|linearTaper|sinTaper|etc)', 'flat')
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -66,6 +70,8 @@ program
     if (options.exponent !== undefined) config.exponent = options.exponent;
     if (options.minLength !== undefined) config.minLength = options.minLength;
     if (options.maxLength !== undefined) config.maxLength = options.maxLength;
+    if (options.offsetMode !== undefined) config.offsetMode = options.offsetMode;
+    if (options.envelope !== undefined) config.envelope = options.envelope;
 
     // Determine output path
     const outputPath = output || input.replace(/\.svg$/, '-processed.svg');

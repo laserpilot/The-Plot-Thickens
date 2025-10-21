@@ -44,6 +44,34 @@ function initializeControls() {
     });
   });
 
+  // Offset mode toggle
+  document.querySelectorAll('input[name="offset-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      offsetMode = e.target.value;
+      useNormalOffset = offsetMode === 'normal';
+
+      // Show/hide envelope controls
+      const envelopeControls = document.getElementById('envelope-controls');
+      if (envelopeControls) {
+        envelopeControls.style.display = useNormalOffset ? 'block' : 'none';
+      }
+
+      updateStatus(useNormalOffset ? 'Normal offset mode (arc-length based)' : 'Legacy offset mode');
+      needsRedraw = true;
+      redraw();
+    });
+  });
+
+  // Envelope preset selector
+  const envelopeSelect = document.getElementById('envelope-preset');
+  if (envelopeSelect) {
+    envelopeSelect.addEventListener('change', (e) => {
+      envelopePreset = e.target.value;
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
   // Attractor controls
   document.getElementById('clear-attractors').addEventListener('click', () => {
     attractorSystem.clearAll();
@@ -280,6 +308,9 @@ async function prepareExport() {
     // Generate deterministic seed from path data
     const seed = hashString(path.d);
 
+    // Get envelope function if using normal mode
+    const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
+
     // Generate offset duplicates with centered distribution
     for (let i = 0; i < passes; i++) {
       const passIndex = Math.floor(i / 2); // Distance from center
@@ -289,8 +320,15 @@ async function prepareExport() {
       const offsetDistance = direction * passIndex * baseOffset;
       const passSeed = seed + i;
 
-      // Generate offset using high-quality points
-      const offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed);
+      // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
+      let offsetPoints;
+      if (useNormalOffset) {
+        // Normal mode: pass path data string directly
+        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true);
+      } else {
+        // Legacy mode: use high-quality points
+        offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);
+      }
 
       if (offsetPoints) {
         const offsetPathData = pointsToPathString(offsetPoints);

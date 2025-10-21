@@ -11,8 +11,9 @@ This tool manipulates SVG line weights by duplicating and offsetting paths with 
 - ✅ **Phase 1**: Test Pattern Generator (complete)
 - ✅ **Phase 2**: Path Length-Based Weight (complete)
 - ✅ **Phase 3**: Attractor-Based Weight System (complete)
+- ✅ **Phase 4**: Normal-Based Offsets with Taper (complete)
 - ✅ **Performance**: Optimized for large SVG files (200+ paths)
-- ⏳ **Phase 4**: Combined System (pending)
+- ⏳ **Phase 5**: Combined System (pending)
 
 ---
 
@@ -98,14 +99,16 @@ node process-svg.js input.svg output.svg \
   --curve exponential \    # Curve type: linear, exponential, logarithmic
   --exponent 2 \           # Exponent for exponential curve
   --min-length 10 \        # Min path length (auto-detect if omitted)
-  --max-length 100         # Max path length (auto-detect if omitted)
+  --max-length 100 \       # Max path length (auto-detect if omitted)
+  --offset-mode normal \   # Offset mode: legacy or normal
+  --envelope sinTaper      # Envelope preset (normal mode only)
 ```
 
 ### Configuration Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `baseOffset` | 0.1 | Base offset distance per pass (mm) |
+| `baseOffset` | 0.25 | Base offset distance per pass (mm) |
 | `noise` | 0.05 | Random variation in offset (mm) |
 | `minPasses` | 1 | Minimum number of path duplicates |
 | `maxPasses` | 20 | Maximum number of path duplicates |
@@ -113,6 +116,8 @@ node process-svg.js input.svg output.svg \
 | `exponent` | 2 | Exponent for exponential curve |
 | `minLength` | auto | Minimum path length (auto-detected) |
 | `maxLength` | auto | Maximum path length (auto-detected) |
+| `offsetMode` | legacy | Offset algorithm: `legacy` or `normal` |
+| `envelope` | flat | Taper envelope (normal mode only) |
 
 ### Curve Types
 
@@ -141,6 +146,58 @@ node process-svg.js artwork.svg output/artwork-thick.svg \
 3. **Map to weight**: Determines number of passes based on length
 4. **Generate duplicates**: Creates offset copies with noise
 5. **Export SVG**: Flat structure, plotter-ready
+
+---
+
+## Phase 4: Normal-Based Offsets with Taper
+
+The tool now supports two offset algorithms:
+
+### Legacy Mode (Default)
+
+The original point-based offset algorithm that samples paths and calculates normals from neighboring points. Fast and reliable for most use cases.
+
+### Normal Mode (New)
+
+An improved arc-length based offset algorithm with support for taper envelopes:
+
+**Benefits:**
+- More accurate offsets using `svg-path-commander` for precise arc-length sampling
+- Uniform point distribution along curved paths
+- Support for taper envelopes to create variable-width effects
+
+**Envelope Presets:**
+- `flat` - No taper (default, same as legacy)
+- `linearTaper` - Linear taper from start to end
+- `linearTaperBoth` - Tapers at both ends, full in middle
+- `sinTaper` - Smooth sinusoidal taper
+- `sinTaperBoth` - Smooth bulge in middle
+- `exponentialTaper` - Slow start, fast end
+- `easeInOut` - Smooth parabolic taper at both ends
+
+### CLI Examples
+
+```bash
+# Legacy mode (backward compatible)
+node process-svg.js input.svg output.svg
+
+# Normal mode with flat envelope (no taper)
+node process-svg.js input.svg output.svg --offset-mode normal --envelope flat
+
+# Normal mode with sin taper (smooth taper from start to end)
+node process-svg.js input.svg output.svg --offset-mode normal --envelope sinTaper
+
+# Normal mode with both-ends taper (creates pointed ends)
+node process-svg.js input.svg output.svg --offset-mode normal --envelope linearTaperBoth
+```
+
+### Web Interface
+
+The web interface includes a new **Offset Mode** control panel:
+1. Toggle between **Legacy** and **Normal** modes
+2. Select envelope preset when in Normal mode
+3. Preview shows the effect in real-time
+4. Export includes the selected mode in the SVG comment
 
 ---
 
@@ -222,11 +279,12 @@ python3 -m http.server 8000
 
 ---
 
-## Phase 4: Coming Soon
+## Phase 5: Coming Soon
 
 - Combined length + attractor weighting system
 - Batch processing with saved configurations
 - Additional attractor shapes (line, polygon)
+- Curvature-based width modulation
 
 ---
 

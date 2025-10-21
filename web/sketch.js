@@ -22,6 +22,11 @@ let useAttractors = false; // Attractors disabled by default
 let weightMode = 'length'; // 'length' or 'attractor'
 let pathsProcessed = false; // Track if paths have been converted to points
 
+// Offset mode state
+let offsetMode = 'legacy'; // 'legacy' or 'normal'
+let useNormalOffset = false; // Use normal-based offset
+let envelopePreset = 'flat'; // Envelope preset name
+
 // Drag state
 let draggedAttractor = null;
 let dragOffsetX = 0;

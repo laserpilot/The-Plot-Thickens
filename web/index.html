@@ -94,6 +94,35 @@
         </section>
 
         <section class="control-group">
+          <h3>Offset Mode</h3>
+
+          <label>
+            <input type="radio" name="offset-mode" value="legacy" checked>
+            Legacy (point-based)
+          </label>
+
+          <label>
+            <input type="radio" name="offset-mode" value="normal">
+            Normal (arc-length based, with taper)
+          </label>
+
+          <div id="envelope-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+            <label>
+              Envelope Preset:
+              <select id="envelope-preset">
+                <option value="flat">Flat (no taper)</option>
+                <option value="linearTaper">Linear Taper (start → end)</option>
+                <option value="linearTaperBoth">Linear Taper (both ends)</option>
+                <option value="sinTaper">Sin Taper (smooth)</option>
+                <option value="sinTaperBoth">Sin Taper (both ends)</option>
+                <option value="exponentialTaper">Exponential Taper</option>
+                <option value="easeInOut">Ease In-Out</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="control-group">
           <h3>Line Weight Settings</h3>
 
           <!-- Live Parameter Preview -->
