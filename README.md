@@ -98,6 +98,7 @@ node process-svg.js input.svg output.svg \
   --max-passes 20 \        # Maximum passes
   --curve exponential \    # Curve type: linear, exponential, logarithmic
   --exponent 2 \           # Exponent for exponential curve
+  --bins 4                 # Group output into N length quantile bins (optional)
   --min-length 10 \        # Min path length (auto-detect if omitted)
   --max-length 100 \       # Max path length (auto-detect if omitted)
   --offset-mode normal \   # Offset mode: legacy or normal
@@ -119,6 +120,8 @@ node process-svg.js input.svg output.svg \
 | `maxLength` | auto | Maximum path length (auto-detected) |
 | `offsetMode` | legacy | Offset algorithm: `legacy` or `normal` |
 | `envelope` | flat | Taper envelope (normal mode only) |
+| `bins` | null | Group output by length quantiles (e.g., 4 for quartiles) |
+| `sampleRate` | 2 | Sample interval in mm (lower = smoother, slower) |
 
 ### Curve Types
 
@@ -147,6 +150,61 @@ node process-svg.js artwork.svg output/artwork-thick.svg \
 3. **Map to weight**: Determines number of passes based on length
 4. **Generate duplicates**: Creates offset copies with noise
 5. **Export SVG**: Flat structure, plotter-ready
+
+### Length-Based Binning
+
+For large or complex SVGs, you can organize output paths into groups by length:
+
+```bash
+# Group paths into 4 quartile bands (0-25%, 25-50%, 50-75%, 75-100%)
+node process-svg.js input.svg output.svg --bins 4
+
+# Or use 8 bins for finer control
+node process-svg.js input.svg output.svg --bins 8
+```
+
+**Benefits:**
+- Makes large files manageable in Inkscape or other SVG editors
+- Each band wrapped in `<g>` with descriptive IDs (e.g., `length-band-0-25pct`)
+- Includes `data-length-range` attributes for easy identification
+- Toggle visibility or apply edits band-by-band in your editor
+
+**Output structure:**
+```xml
+<g id="length-band-0-25pct" data-length-range="10.5-25.3">
+  <!-- Shortest paths (0-25 percentile) -->
+</g>
+<g id="length-band-25-50pct" data-length-range="25.3-42.1">
+  <!-- Medium-short paths (25-50 percentile) -->
+</g>
+<!-- etc... -->
+```
+
+### Performance Optimization
+
+For large or complex SVG files, you can significantly improve processing speed by adjusting the sample rate:
+
+```bash
+# Faster processing with 3mm sampling (default is 2mm)
+node process-svg.js large-file.svg output.svg --sample-rate 3
+
+# Balance between quality and speed
+node process-svg.js large-file.svg output.svg --sample-rate 2.5 --max-passes 15
+
+# High quality but slower (1mm sampling)
+node process-svg.js large-file.svg output.svg --sample-rate 1 --max-passes 30
+```
+
+**Sample Rate Guide:**
+- **0.5-1mm**: Highest quality, smoothest curves, ~4x slower
+- **2mm** (default): Good balance of quality and speed
+- **3-5mm**: Faster processing, slightly more angular curves, ~2-3x faster
+
+**Tips for large files:**
+1. Use `--sample-rate 3` for initial tests
+2. Reduce `--max-passes` to speed up processing
+3. Use `--bins 4` to organize output for easier editing
+4. Process on subset of paths first to test settings
 
 ---
 

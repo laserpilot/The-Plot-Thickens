@@ -365,15 +365,18 @@ class SVGParser {
       let maxSamples, stride, numSamples;
 
       if (highQuality) {
-        // High-quality export: much denser sampling for smooth curves
-        maxSamples = 800; // 8x more detail than preview
-        stride = Math.max(1, totalLength / maxSamples);
-        numSamples = Math.min(2000, Math.ceil(totalLength / stride));
+        // High-quality export: use sample rate from UI (default 2mm)
+        // Get sample rate from UI if available, otherwise use 2mm default
+        const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
+        const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
+
+        stride = Math.max(sampleRate, totalLength / 100);
+        numSamples = Math.min(200, Math.ceil(totalLength / stride));
       } else {
-        // Preview mode: reduced sampling for speed
-        maxSamples = 100;
-        stride = Math.max(10, totalLength / maxSamples);
-        numSamples = Math.min(500, Math.ceil(totalLength / stride));
+        // Preview mode: faster sampling for speed (20mm stride)
+        maxSamples = 50;
+        stride = Math.max(20, totalLength / maxSamples);
+        numSamples = Math.min(200, Math.ceil(totalLength / stride));
       }
 
       for (let i = 0; i <= numSamples; i++) {

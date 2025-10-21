@@ -119,9 +119,12 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
     }
 
     // Sample points uniformly by arc length
-    // Adaptive sampling: 1mm intervals or 100 samples, whichever is less dense
-    const sampleInterval = Math.min(1, totalLength / 100);
-    const numSamples = Math.min(500, Math.ceil(totalLength / sampleInterval));
+    // Get sample rate from UI if available, otherwise use 2mm default
+    const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
+    const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
+
+    const sampleInterval = Math.min(sampleRate, totalLength / 100);
+    const numSamples = Math.min(200, Math.ceil(totalLength / sampleInterval));
     const offsetPoints = [];
 
     for (let i = 0; i <= numSamples; i++) {

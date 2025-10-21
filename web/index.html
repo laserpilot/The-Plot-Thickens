@@ -180,6 +180,21 @@
         </section>
 
         <section class="control-group">
+          <h3>Advanced Settings</h3>
+
+          <label title="Spacing between sample points when converting curves. Lower = smoother but slower. Higher = faster but more angular.">
+            Sample Rate (mm):
+            <input type="range" id="sample-rate" min="0.5" max="5" step="0.5" value="2">
+            <span id="sample-rate-value">2</span>
+            <span class="hint-icon" title="Point spacing for curve conversion">?</span>
+          </label>
+          <div style="font-size: 0.75em; color: #888; margin-top: 4px;">
+            Lower = smoother curves, larger files, slower processing<br>
+            Higher = faster processing, smaller files, more angular
+          </div>
+        </section>
+
+        <section class="control-group">
           <h3>Display</h3>
 
           <label>
@@ -205,6 +220,27 @@
 
         <section class="control-group">
           <h3>Export</h3>
+
+          <div style="margin-bottom: 12px; padding: 10px; background: #f8f8f8; border-radius: 4px;">
+            <label title="Group output paths by length into bins for easier management in editors">
+              <input type="checkbox" id="enable-binning">
+              Enable Length Binning
+              <span class="hint-icon" title="Organizes paths into groups by length">?</span>
+            </label>
+
+            <div id="binning-controls" style="display: none; margin-top: 8px;">
+              <label title="Number of bins to divide paths into (e.g., 4 = quartiles)">
+                Number of Bins:
+                <input type="range" id="bin-count" min="2" max="10" step="1" value="4">
+                <span id="bin-count-value">4</span>
+                <span class="hint-icon" title="How many length bands to create">?</span>
+              </label>
+              <div style="font-size: 0.8em; color: #666; margin-top: 4px;">
+                Paths will be grouped: <span id="bin-preview">0-25%, 25-50%, 50-75%, 75-100%</span>
+              </div>
+            </div>
+          </div>
+
           <button id="export-svg" class="primary-button">Export SVG</button>
           <button id="save-preset">Save Preset</button>
           <button id="load-preset">Load Preset</button>

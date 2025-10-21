@@ -23,6 +23,8 @@ const DEFAULT_CONFIG = {
   maxLength: null, // auto-detect if null
   offsetMode: 'legacy', // 'legacy' or 'normal'
   envelope: 'flat', // envelope preset name
+  bins: null, // null = no binning, number = number of length quantile bins
+  sampleRate: 2, // mm - spacing between sample points when converting curves
 };
 
 // CLI setup
@@ -46,6 +48,8 @@ program
   .option('--max-length <number>', 'Maximum path length (auto-detect if omitted)', parseFloat)
   .option('--offset-mode <mode>', 'Offset mode (legacy|normal)', 'legacy')
   .option('--envelope <preset>', 'Envelope preset for normal mode (flat|linearTaper|sinTaper|etc)', 'flat')
+  .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
+  .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -75,6 +79,8 @@ program
     if (options.maxLength !== undefined) config.maxLength = options.maxLength;
     if (options.offsetMode !== undefined) config.offsetMode = options.offsetMode;
     if (options.envelope !== undefined) config.envelope = options.envelope;
+    if (options.bins !== undefined) config.bins = options.bins;
+    if (options.sampleRate !== undefined) config.sampleRate = options.sampleRate;
 
     // Determine output path
     const outputPath = output || input.replace(/\.svg$/, '-processed.svg');

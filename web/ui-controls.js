@@ -149,6 +149,41 @@ function initializeControls() {
     updateCLICommand();
   });
 
+  // Sample rate slider
+  setupSlider('sample-rate', (value) => {
+    // Sample rate will be used during export
+    // No need to redraw preview (it uses different sampling)
+    updateCLICommand();
+  });
+
+  // Binning controls
+  const enableBinning = document.getElementById('enable-binning');
+  const binningControls = document.getElementById('binning-controls');
+  const binCount = document.getElementById('bin-count');
+  const binCountValue = document.getElementById('bin-count-value');
+  const binPreview = document.getElementById('bin-preview');
+
+  enableBinning.addEventListener('change', (e) => {
+    binningControls.style.display = e.target.checked ? 'block' : 'none';
+    updateCLICommand();
+  });
+
+  binCount.addEventListener('input', (e) => {
+    const count = parseInt(e.target.value);
+    binCountValue.textContent = count;
+
+    // Update preview text
+    const bands = [];
+    for (let i = 0; i < count; i++) {
+      const start = Math.round((i / count) * 100);
+      const end = Math.round(((i + 1) / count) * 100);
+      bands.push(`${start}-${end}%`);
+    }
+    binPreview.textContent = bands.join(', ');
+
+    updateCLICommand();
+  });
+
   // Display toggles
   document.getElementById('show-attractors').addEventListener('change', (e) => {
     showAttractors = e.target.checked;
@@ -273,6 +308,10 @@ async function prepareExport() {
   console.log('Generating processed SVG...');
   updateStatus('Exporting SVG...');
 
+  // Check binning settings
+  const enableBinning = document.getElementById('enable-binning')?.checked || false;
+  const binCount = parseInt(document.getElementById('bin-count')?.value) || 4;
+
   // Generate processed paths
   const processedPaths = [];
 
@@ -295,6 +334,9 @@ async function prepareExport() {
 
   // Re-process paths with high quality for export
   console.log('Re-processing paths with high resolution for export...');
+
+  // If binning is enabled, collect paths with metadata for binning
+  const pathsWithMetadata = [];
 
   svgData.paths.forEach((path, index) => {
     // Re-sample path with high quality for export
@@ -334,6 +376,9 @@ async function prepareExport() {
     // Get envelope function if using normal mode
     const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
 
+    // Collect all paths for this source path
+    const sourcePaths = [];
+
     // Generate offset duplicates with centered distribution
     for (let i = 0; i < passes; i++) {
       const passIndex = Math.floor(i / 2); // Distance from center
@@ -355,22 +400,41 @@ async function prepareExport() {
 
       if (offsetPoints) {
         const offsetPathData = pointsToPathString(offsetPoints);
-        processedPaths.push({
+        const pathData = {
           d: offsetPathData,
           stroke: path.stroke,
           fill: path.fill,
           strokeWidth: path.strokeWidth,
-        });
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          // If not binning, add directly to output
+          processedPaths.push(pathData);
+        }
       }
+    }
+
+    // If binning, store with metadata
+    if (enableBinning && sourcePaths.length > 0) {
+      pathsWithMetadata.push({
+        length: path.length || 0,
+        paths: sourcePaths
+      });
     }
   });
 
-  console.log(`Generated ${processedPaths.length} total processed paths from ${svgData.paths.length} source paths`);
+  console.log(`Generated ${enableBinning ? pathsWithMetadata.reduce((sum, p) => sum + p.paths.length, 0) : processedPaths.length} total processed paths from ${svgData.paths.length} source paths`);
 
   // Build SVG with error handling
   let svgContent;
   try {
-    svgContent = buildSVGContent(processedPaths);
+    if (enableBinning) {
+      svgContent = buildBinnedSVGContent(pathsWithMetadata, binCount);
+    } else {
+      svgContent = buildSVGContent(processedPaths);
+    }
 
     if (!svgContent || svgContent.length === 0) {
       alert('Failed to generate SVG content - result is empty');
@@ -477,6 +541,106 @@ function buildSVGContent(paths) {
 }
 
 /**
+ * Build SVG content with binning (grouped by length)
+ */
+function buildBinnedSVGContent(pathsWithMetadata, binCount) {
+  // Validate svgData exists and has required properties
+  if (!svgData) {
+    throw new Error('svgData is not defined');
+  }
+
+  if (!svgData.viewBox) {
+    throw new Error('svgData.viewBox is not defined');
+  }
+
+  // Use fallback values if dimensions are missing
+  const width = svgData.width || 100;
+  const height = svgData.height || 100;
+  const vbX = svgData.viewBox.x ?? 0;
+  const vbY = svgData.viewBox.y ?? 0;
+  const vbWidth = svgData.viewBox.width ?? width;
+  const vbHeight = svgData.viewBox.height ?? height;
+
+  console.log(`Building binned SVG: ${width}x${height}mm, ${binCount} bins`);
+
+  // Compute quantile boundaries
+  const sortedLengths = pathsWithMetadata.map(p => p.length).sort((a, b) => a - b);
+  const boundaries = [];
+  for (let i = 0; i <= binCount; i++) {
+    const quantile = i / binCount;
+    const index = Math.floor(quantile * (sortedLengths.length - 1));
+    boundaries.push(sortedLengths[index]);
+  }
+  boundaries[boundaries.length - 1] = sortedLengths[sortedLengths.length - 1];
+
+  console.log(`Bin boundaries: ${boundaries.map(b => b.toFixed(2)).join(', ')}`);
+
+  // Assign paths to bins
+  const bins = Array.from({ length: binCount }, () => []);
+  pathsWithMetadata.forEach(item => {
+    let binIndex = 0;
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      if (item.length >= boundaries[i] && item.length <= boundaries[i + 1]) {
+        binIndex = i;
+        break;
+      }
+    }
+    bins[binIndex].push(item);
+  });
+
+  // Build SVG
+  const parts = [];
+  parts.push('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
+  parts.push(`<svg width="${width}mm" height="${height}mm" viewBox="${vbX} ${vbY} ${vbWidth} ${vbHeight}" xmlns="http://www.w3.org/2000/svg">`);
+  parts.push(`  <!-- Generated by plotter-line-thickener (${useAttractors ? 'Attractor-based' : 'Length-based'}, ${binCount} bins) -->`);
+  parts.push('  <g id="processed-paths">');
+
+  // Write each bin as a group
+  bins.forEach((bin, binIndex) => {
+    const minVal = boundaries[binIndex];
+    const maxVal = boundaries[binIndex + 1];
+    const minPct = Math.round((binIndex / binCount) * 100);
+    const maxPct = Math.round(((binIndex + 1) / binCount) * 100);
+
+    const groupId = `length-band-${minPct}-${maxPct}pct`;
+    const groupLabel = `Length: ${minVal.toFixed(2)} - ${maxVal.toFixed(2)} (${minPct}-${maxPct}%, ${bin.length} source paths)`;
+
+    parts.push(`    <g id="${groupId}" data-length-range="${minVal.toFixed(2)}-${maxVal.toFixed(2)}">`);
+    parts.push(`      <!-- ${groupLabel} -->`);
+
+    // Write all paths in this bin
+    let pathCount = 0;
+    bin.forEach(item => {
+      item.paths.forEach(path => {
+        if (!path.d || typeof path.d !== 'string') {
+          return;
+        }
+
+        const escapedD = path.d.replace(/[<>&"']/g, char => {
+          const escapeMap = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
+          return escapeMap[char];
+        });
+
+        const fill = path.fill || 'none';
+        const stroke = path.stroke || 'black';
+        const strokeWidth = path.strokeWidth || 0.1;
+
+        parts.push(`      <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+        pathCount++;
+      });
+    });
+
+    parts.push(`    </g>`);
+    console.log(`  Band ${minPct}-${maxPct}%: ${bin.length} source paths, ${pathCount} total paths`);
+  });
+
+  parts.push('  </g>');
+  parts.push('</svg>');
+
+  return parts.join('\n');
+}
+
+/**
  * Save current attractor configuration as preset
  */
 function savePreset() {
@@ -565,6 +729,7 @@ function generateCLICommand() {
   const noiseFreq = parseInt(document.getElementById('noise-frequency')?.value) || 50;
   const minPasses = parseInt(document.getElementById('min-passes')?.value) || 1;
   const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 20;
+  const sampleRate = parseFloat(document.getElementById('sample-rate')?.value) || 2;
 
   // Get offset mode
   const offsetModeRadios = document.getElementsByName('offset-mode');
@@ -576,6 +741,10 @@ function generateCLICommand() {
   // Get envelope preset
   const envelopeSelect = document.getElementById('envelope-preset');
   const envelope = envelopeSelect?.value || 'flat';
+
+  // Get binning settings
+  const enableBinning = document.getElementById('enable-binning')?.checked || false;
+  const binCount = parseInt(document.getElementById('bin-count')?.value) || 4;
 
   // Build command
   params.push(`--offset ${offset}`);
@@ -591,6 +760,16 @@ function generateCLICommand() {
 
   params.push(`--min-passes ${minPasses}`);
   params.push(`--max-passes ${maxPasses}`);
+
+  // Add sample rate if not default
+  if (sampleRate !== 2) {
+    params.push(`--sample-rate ${sampleRate}`);
+  }
+
+  // Add binning if enabled
+  if (enableBinning) {
+    params.push(`--bins ${binCount}`);
+  }
 
   // Format as multi-line command for readability
   const command = `node process-svg.js input.svg output.svg \\\n  ${params.join(' \\\n  ')}`;
