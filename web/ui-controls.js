@@ -59,6 +59,7 @@ function initializeControls() {
       updateStatus(useNormalOffset ? 'Normal offset mode (arc-length based)' : 'Legacy offset mode');
       needsRedraw = true;
       redraw();
+      updateCLICommand();
     });
   });
 
@@ -69,6 +70,7 @@ function initializeControls() {
       envelopePreset = e.target.value;
       needsRedraw = true;
       redraw();
+      updateCLICommand();
     });
   }
 
@@ -116,30 +118,35 @@ function initializeControls() {
     baseOffset = value;
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   setupSlider('noise', (value) => {
     noise = value;
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   setupSlider('noise-frequency', (value) => {
     noiseFrequency = value;
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   setupSlider('min-passes', (value) => {
     attractorSystem.updateConfig({ minPasses: value });
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   setupSlider('max-passes', (value) => {
     attractorSystem.updateConfig({ maxPasses: value });
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   // Display toggles
@@ -174,6 +181,12 @@ function initializeControls() {
       loadPreset(file);
     }
   });
+
+  // CLI command generator
+  document.getElementById('copy-cli').addEventListener('click', copyCLICommand);
+
+  // Update CLI command on parameter changes
+  updateCLICommand();
 }
 
 /**
@@ -534,6 +547,80 @@ function updateUIFromConfig() {
 
   document.getElementById('max-passes').value = config.maxPasses;
   document.getElementById('max-passes-value').textContent = config.maxPasses;
+}
+
+/**
+ * Generate CLI command from current settings
+ */
+function generateCLICommand() {
+  const params = [];
+
+  // Get current parameter values
+  const offset = parseFloat(document.getElementById('base-offset')?.value) || 0.2;
+  const noise = parseFloat(document.getElementById('noise')?.value) || 0.1;
+  const noiseFreq = parseInt(document.getElementById('noise-frequency')?.value) || 50;
+  const minPasses = parseInt(document.getElementById('min-passes')?.value) || 1;
+  const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 20;
+
+  // Get offset mode
+  const offsetModeRadios = document.getElementsByName('offset-mode');
+  let offsetMode = 'legacy';
+  offsetModeRadios.forEach(radio => {
+    if (radio.checked) offsetMode = radio.value;
+  });
+
+  // Get envelope preset
+  const envelopeSelect = document.getElementById('envelope-preset');
+  const envelope = envelopeSelect?.value || 'flat';
+
+  // Build command
+  params.push(`--offset ${offset}`);
+  params.push(`--noise ${noise}`);
+
+  if (offsetMode === 'normal') {
+    params.push(`--noise-frequency ${noiseFreq}`);
+    params.push(`--offset-mode normal`);
+    if (envelope !== 'flat') {
+      params.push(`--envelope ${envelope}`);
+    }
+  }
+
+  params.push(`--min-passes ${minPasses}`);
+  params.push(`--max-passes ${maxPasses}`);
+
+  // Format as multi-line command for readability
+  const command = `node process-svg.js input.svg output.svg \\\n  ${params.join(' \\\n  ')}`;
+
+  return command;
+}
+
+/**
+ * Update CLI command display
+ */
+function updateCLICommand() {
+  const textarea = document.getElementById('cli-command');
+  if (textarea) {
+    textarea.value = generateCLICommand();
+  }
+}
+
+/**
+ * Copy CLI command to clipboard
+ */
+function copyCLICommand() {
+  const textarea = document.getElementById('cli-command');
+  if (textarea) {
+    textarea.select();
+    document.execCommand('copy');
+
+    // Visual feedback
+    const button = document.getElementById('copy-cli');
+    const originalText = button.textContent;
+    button.textContent = '✓ Copied!';
+    setTimeout(() => {
+      button.textContent = originalText;
+    }, 2000);
+  }
 }
 
 /**

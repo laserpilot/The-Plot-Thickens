@@ -19,6 +19,9 @@ class ParameterPreview {
     this.baseOffset = 0.2;
     this.noise = 0.1;
     this.passes = 10;
+    this.noiseFrequency = 50;
+    this.envelope = 'flat';
+    this.offsetMode = 'legacy';
 
     // Scale factor for visualization (pixels per mm)
     this.scale = 15;
@@ -29,11 +32,29 @@ class ParameterPreview {
   /**
    * Update parameters and redraw
    */
-  update(baseOffset, noise, passes) {
+  update(baseOffset, noise, passes, noiseFrequency = 50, envelope = 'flat', offsetMode = 'legacy') {
     this.baseOffset = baseOffset;
     this.noise = noise;
     this.passes = passes;
+    this.noiseFrequency = noiseFrequency;
+    this.envelope = envelope;
+    this.offsetMode = offsetMode;
     this.draw();
+  }
+
+  /**
+   * Get envelope multiplier at position t
+   */
+  getEnvelopeMultiplier(t) {
+    switch (this.envelope) {
+      case 'linearTaper': return 1.0 - t;
+      case 'linearTaperBoth': return 1.0 - Math.abs(2 * t - 1);
+      case 'sinTaper': return Math.sin(Math.PI * t);
+      case 'sinTaperBoth': return Math.sin(Math.PI * t);
+      case 'exponentialTaper': return Math.pow(1.0 - t, 2);
+      case 'easeInOut': return 1.0 - Math.pow(2 * t - 1, 2);
+      default: return 1.0; // flat
+    }
   }
 
   /**
@@ -49,53 +70,152 @@ class ParameterPreview {
     // Clear canvas
     ctx.clearRect(0, 0, w, h);
 
-    // Draw sample circle in center
-    const centerX = w / 2;
-    const centerY = h / 2;
-    const baseRadius = 20; // pixels
-
     ctx.strokeStyle = '#2c3e50';
     ctx.lineWidth = 1;
 
-    // Draw multiple passes with offset and noise
+    // Layout: Circle | Line | Curve
+    const sectionWidth = w / 3;
+
+    // 1. CIRCLE (left third)
+    this.drawCircle(ctx, sectionWidth / 2, h / 2, 18);
+
+    // 2. LINE (middle third)
+    this.drawLine(ctx, sectionWidth, w - sectionWidth, 15, h - 15);
+
+    // 3. CURVE (right third)
+    this.drawCurve(ctx, sectionWidth * 2, sectionWidth * 3);
+
+    // Draw label
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    const modeLabel = this.offsetMode === 'normal' ? `${this.envelope}, freq=${this.noiseFrequency}` : 'legacy';
+    ctx.fillText(`${this.passes} passes @ ${this.baseOffset}mm ± ${this.noise}mm | ${modeLabel}`, 3, h - 3);
+  }
+
+  /**
+   * Draw circle preview
+   */
+  drawCircle(ctx, centerX, centerY, baseRadius) {
     for (let i = 0; i < this.passes; i++) {
       const passIndex = Math.floor(i / 2);
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
-
-      // Calculate offset in pixels
       const offsetDistance = direction * passIndex * this.baseOffset * this.scale;
 
       ctx.beginPath();
+      const numPoints = 72;
+      for (let j = 0; j <= numPoints; j++) {
+        const angle = (j / numPoints) * Math.PI * 2;
+        const t = j / numPoints; // Normalized position
 
-      // Draw circle with noise
-      const numPoints = 72; // Number of points around circle
-      for (let angle = 0; angle <= Math.PI * 2; angle += (Math.PI * 2) / numPoints) {
-        // Add noise based on angle (deterministic for smooth look)
+        // Apply envelope (for normal mode)
+        const env = this.offsetMode === 'normal' ? this.getEnvelopeMultiplier(t) : 1.0;
+
+        // Apply noise (frequency-aware for normal mode)
+        const arcLength = t * (Math.PI * 2 * baseRadius);
+        const freq = this.offsetMode === 'normal' ? this.noiseFrequency : 10;
         const noiseValue = this.noise > 0 ?
-          (Math.sin(angle * 3 + i * 0.5) * 0.5 + Math.cos(angle * 5 + i * 0.3) * 0.5) * this.noise * this.scale :
+          Math.sin(arcLength / freq + i * 0.5) * this.noise * this.scale :
           0;
 
-        const radius = baseRadius + offsetDistance + noiseValue;
+        const radius = baseRadius + (offsetDistance + noiseValue) * env;
         const x = centerX + Math.cos(angle) * radius;
         const y = centerY + Math.sin(angle) * radius;
 
-        if (angle === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-
       ctx.closePath();
       ctx.stroke();
     }
+  }
 
-    // Draw label
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${this.passes} passes @ ${this.baseOffset}mm ± ${this.noise}mm`, 5, h - 5);
+  /**
+   * Draw line preview (shows taper clearly)
+   */
+  drawLine(ctx, startX, endX, y, endY) {
+    const lineLength = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - y, 2));
+
+    for (let i = 0; i < this.passes; i++) {
+      const passIndex = Math.floor(i / 2);
+      const isRight = i % 2 === 0;
+      const direction = isRight ? 1 : -1;
+      const baseOffsetPx = direction * passIndex * this.baseOffset * this.scale;
+
+      ctx.beginPath();
+      const numPoints = 40;
+      for (let j = 0; j <= numPoints; j++) {
+        const t = j / numPoints;
+        const x = startX + (endX - startX) * t;
+        const yBase = y + (endY - y) * t;
+
+        // Apply envelope
+        const env = this.offsetMode === 'normal' ? this.getEnvelopeMultiplier(t) : 1.0;
+
+        // Apply noise
+        const arcLength = t * lineLength;
+        const freq = this.offsetMode === 'normal' ? this.noiseFrequency : 10;
+        const noiseValue = this.noise > 0 ?
+          Math.sin(arcLength / freq + i * 0.5) * this.noise * this.scale :
+          0;
+
+        const offsetPx = (baseOffsetPx + noiseValue) * env;
+        const yFinal = yBase + offsetPx;
+
+        if (j === 0) ctx.moveTo(x, yFinal);
+        else ctx.lineTo(x, yFinal);
+      }
+      ctx.stroke();
+    }
+  }
+
+  /**
+   * Draw S-curve preview (shows noise frequency on curves)
+   */
+  drawCurve(ctx, startX, endX) {
+    const h = this.height;
+    const w = endX - startX;
+
+    for (let i = 0; i < this.passes; i++) {
+      const passIndex = Math.floor(i / 2);
+      const isRight = i % 2 === 0;
+      const direction = isRight ? 1 : -1;
+      const baseOffsetPx = direction * passIndex * this.baseOffset * this.scale;
+
+      ctx.beginPath();
+      const numPoints = 40;
+      for (let j = 0; j <= numPoints; j++) {
+        const t = j / numPoints;
+        const x = startX + w * 0.2 + w * 0.6 * t;
+
+        // S-curve using sine
+        const yBase = h / 2 + Math.sin(t * Math.PI * 2 - Math.PI / 2) * h * 0.25;
+
+        // Apply envelope
+        const env = this.offsetMode === 'normal' ? this.getEnvelopeMultiplier(t) : 1.0;
+
+        // Apply noise (along curve)
+        const arcLength = t * 60; // Approximate curve length
+        const freq = this.offsetMode === 'normal' ? this.noiseFrequency : 10;
+        const noiseValue = this.noise > 0 ?
+          Math.sin(arcLength / freq + i * 0.5) * this.noise * this.scale :
+          0;
+
+        // Offset perpendicular to curve (approximated)
+        const angle = Math.cos(t * Math.PI * 2 - Math.PI / 2) * Math.PI * 2;
+        const nx = -Math.sin(angle);
+        const ny = Math.cos(angle);
+
+        const offsetDist = (baseOffsetPx + noiseValue) * env;
+        const xFinal = x + nx * offsetDist * 0.5; // Scale down for visibility
+        const yFinal = yBase + ny * offsetDist;
+
+        if (j === 0) ctx.moveTo(xFinal, yFinal);
+        else ctx.lineTo(xFinal, yFinal);
+      }
+      ctx.stroke();
+    }
   }
 }
 
@@ -107,18 +227,42 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update preview when parameters change
   function updatePreview() {
     if (paramPreview) {
-      const offset = parseFloat(document.getElementById('base-offset').value) || 0.2;
-      const noiseVal = parseFloat(document.getElementById('noise').value) || 0.1;
-      const maxPasses = parseInt(document.getElementById('max-passes').value) || 10;
-      paramPreview.update(offset, noiseVal, Math.min(maxPasses, 15)); // Cap at 15 for preview
+      const offset = parseFloat(document.getElementById('base-offset')?.value) || 0.2;
+      const noiseVal = parseFloat(document.getElementById('noise')?.value) || 0.1;
+      const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 10;
+      const noiseFreq = parseInt(document.getElementById('noise-frequency')?.value) || 50;
+
+      // Get offset mode
+      const offsetModeRadios = document.getElementsByName('offset-mode');
+      let offsetMode = 'legacy';
+      offsetModeRadios.forEach(radio => {
+        if (radio.checked) offsetMode = radio.value;
+      });
+
+      // Get envelope preset
+      const envelopeSelect = document.getElementById('envelope-preset');
+      const envelope = envelopeSelect?.value || 'flat';
+
+      paramPreview.update(offset, noiseVal, Math.min(maxPasses, 15), noiseFreq, envelope, offsetMode);
     }
   }
 
-  // Listen to slider changes
-  ['base-offset', 'noise', 'max-passes'].forEach(id => {
+  // Listen to all relevant parameter changes
+  ['base-offset', 'noise', 'max-passes', 'noise-frequency'].forEach(id => {
     const elem = document.getElementById(id);
     if (elem) {
       elem.addEventListener('input', updatePreview);
     }
   });
+
+  // Listen to offset mode radio buttons
+  document.getElementsByName('offset-mode').forEach(radio => {
+    radio.addEventListener('change', updatePreview);
+  });
+
+  // Listen to envelope selector
+  const envelopeSelect = document.getElementById('envelope-preset');
+  if (envelopeSelect) {
+    envelopeSelect.addEventListener('change', updatePreview);
+  }
 });
