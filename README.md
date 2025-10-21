@@ -44,12 +44,33 @@ CLI tool that processes existing SVG files, making longer paths thicker by dupli
 ### Quick Start
 
 ```bash
-# Process an SVG with default settings
-node process-svg.js input.svg output.svg
+# Step 1: Flatten SVG (converts all shapes to paths - recommended for complex files)
+node flatten-svg.js input.svg
+# Output: input-flattened.svg
 
-# Or use npm script
-npm run process -- input.svg output.svg
+# Step 2: Process the flattened SVG
+node process-svg.js input-flattened.svg
+
+# Or process directly (only works if SVG has only <path> elements)
+node process-svg.js input.svg output.svg
 ```
+
+### When to Flatten First
+
+**Use `flatten-svg.js` if your SVG contains:**
+- `<polygon>`, `<polyline>`, `<line>`, `<rect>`, `<circle>`, or `<ellipse>` elements
+- Nested groups or layers with transforms
+- Files exported from Inkscape or Illustrator with multiple element types
+
+The flattening tool will:
+- Convert ALL shapes to `<path>` elements
+- Apply group/layer transforms to nested paths
+- Ensure consistent path counting (no surprises!)
+- Output: `[filename]-flattened.svg`
+
+**Skip flattening if:**
+- Your SVG only contains `<path>` elements already
+- File was exported specifically for plotters (e.g., from vpype)
 
 ### Configuration
 
@@ -211,7 +232,29 @@ python3 -m http.server 8000
 
 ## Performance
 
-The web interface is optimized for large SVG files:
+### CLI Performance (Phase 2)
+
+Optimized for very large SVG files:
+
+- **Streaming output**: No memory limits, handles 500k+ paths
+- **Smart sampling**: Caps at 500 samples per path (prevents slowdown on very long paths)
+- **Zero-offset skip**: Skips resampling when offset=0 and noise=0
+- **Progress logging**: Reports every 1000 paths instead of spamming console
+
+**Example:** AG_stroke_length_combine_6_3.svg (93,137 paths, longest 11,377mm)
+- Flattens in ~2 seconds
+- Processes in ~10 minutes
+- Generates 483,828 output paths
+- Output streams directly to disk (no memory issues)
+
+**Performance tips:**
+- Use `--max-length` to cap very long paths (e.g., `--max-length 50`)
+- Run `flatten-svg.js` first for consistent performance
+- For files with 100k+ paths, expect ~10-20 minutes processing time
+
+### Web Interface Performance (Phase 3)
+
+Optimized for interactive editing:
 
 - **Adaptive sampling:** Automatically adjusts point density based on path length
 - **Efficient parsing:** Handles 200+ paths without UI freezing
@@ -250,6 +293,7 @@ For parser testing, use `test-parser.html` to verify SVG parsing performance.
 
 - `svg-path-commander`: SVG path parsing and manipulation
 - `commander`: CLI argument parsing
+- `svgson`: SVG parsing and tree traversal (for flattening)
 
 ## License
 

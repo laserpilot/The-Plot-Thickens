@@ -5,6 +5,7 @@
   "main": "test-pattern-generator.js",
   "scripts": {
     "generate-test": "node test-pattern-generator.js > output/test-pattern.svg",
+    "flatten": "node flatten-svg.js",
     "process": "node process-svg.js",
     "init-config": "node process-svg.js init-config",
     "test": "node test-pattern-generator.js"
@@ -19,6 +20,7 @@
   "license": "MIT",
   "dependencies": {
     "commander": "^14.0.1",
-    "svg-path-commander": "^2.1.11"
+    "svg-path-commander": "^2.1.11",
+    "svgson": "^5.3.1"
   }
 }

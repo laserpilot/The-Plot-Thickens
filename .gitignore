@@ -2,6 +2,8 @@ node_modules/
 .DS_Store
 *.log
 .env
-output/*.svg
-!output/.gitkeep
 config.json
+
+# Ignore all SVG files (working files, test files, outputs)
+*.svg
+!output/.gitkeep
