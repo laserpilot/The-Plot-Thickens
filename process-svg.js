@@ -13,16 +13,16 @@ const { processFile } = require('./lib/svg-processor');
 // Default configuration
 const DEFAULT_CONFIG = {
   baseOffset: 0.25, // mm
-  noise: 0.05, // mm
+  noise: 0.0, // mm
   noiseFrequency: 50, // mm (wavelength for smooth variation)
   minPasses: 1,
-  maxPasses: 20,
+  maxPasses: 10,
   curve: 'linear', // 'linear', 'exponential', 'logarithmic'
   exponent: 2, // for exponential curve
   minLength: null, // auto-detect if null
   maxLength: null, // auto-detect if null
-  offsetMode: 'legacy', // 'legacy' or 'normal'
-  envelope: 'flat', // envelope preset name
+  offsetMode: 'normal', // 'legacy' or 'normal'
+  envelope: 'sinTaperBoth', // envelope preset name
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
 };
