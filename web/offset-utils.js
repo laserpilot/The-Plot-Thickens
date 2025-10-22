@@ -124,7 +124,8 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
     const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
 
     const sampleInterval = Math.min(sampleRate, totalLength / 100);
-    const numSamples = Math.min(200, Math.ceil(totalLength / sampleInterval));
+    // Always generate at least 2 samples (start and end) to prevent single-point paths
+    const numSamples = Math.max(2, Math.min(200, Math.ceil(totalLength / sampleInterval)));
     const offsetPoints = [];
 
     for (let i = 0; i <= numSamples; i++) {
@@ -149,14 +150,38 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
       const ty = p2.y - p1.y;
       const tLen = Math.sqrt(tx * tx + ty * ty);
 
-      if (tLen === 0) continue;
+      let nx, ny;
 
-      // Unit normal (perpendicular to tangent, pointing "right")
-      const nx = -ty / tLen;
-      const ny = tx / tLen;
+      if (tLen < 0.001) {
+        // Tangent collapsed - use overall path direction as fallback
+        const startPt = SVGPathCommander.getPointAtLength(absolutePath, 0);
+        const endPt = SVGPathCommander.getPointAtLength(absolutePath, totalLength);
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+        const dLen = Math.sqrt(dx * dx + dy * dy);
+
+        if (dLen < 0.001) {
+          // Path is essentially a point - skip offset (can't compute normal)
+          continue;
+        }
+
+        // Use overall direction as normal
+        nx = -dy / dLen;
+        ny = dx / dLen;
+      } else {
+        // Unit normal (perpendicular to tangent, pointing "right")
+        nx = -ty / tLen;
+        ny = tx / tLen;
+      }
 
       // Apply envelope function
-      const envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
+      // For very short paths, maintain minimum envelope multiplier to prevent complete disappearance
+      let envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
+
+      // If path is short (< 2x sample rate) and envelope would zero it out, apply floor
+      if (totalLength < sampleRate * 2 && envelopeMultiplier < 0.1) {
+        envelopeMultiplier = 0.1; // Minimum 10% offset for visibility
+      }
 
       // Apply noise modulated along the normal
       // Lower frequency = smoother (50mm+), higher = more texture (5-10mm)
@@ -204,6 +229,13 @@ function generateOffsetPath(pathPointsOrData, offset, noise, seed, pathId = '', 
  */
 function pointsToPathString(points) {
   if (!points || points.length === 0) return '';
+
+  // Handle single-point edge case: emit a tiny line segment so it's not invisible
+  if (points.length === 1) {
+    const pt = points[0];
+    // Create a minimal line segment (0.001mm) to ensure visibility
+    return `M ${pt.x.toFixed(3)} ${pt.y.toFixed(3)} L ${(pt.x + 0.001).toFixed(3)} ${pt.y.toFixed(3)}`;
+  }
 
   let pathStr = '';
   let firstInSubpath = true;
