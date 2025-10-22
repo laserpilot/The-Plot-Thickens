@@ -279,6 +279,12 @@ function initializeControls() {
   // CLI command generator
   document.getElementById('copy-cli').addEventListener('click', copyCLICommand);
 
+  // CLI single-line toggle
+  const cliSingleLineCheckbox = document.getElementById('cli-single-line');
+  if (cliSingleLineCheckbox) {
+    cliSingleLineCheckbox.addEventListener('change', updateCLICommand);
+  }
+
   // Update CLI command on parameter changes
   updateCLICommand();
 }
@@ -801,7 +807,9 @@ function generateCLICommand() {
 
   // Get current parameter values
   const offset = parseFloat(document.getElementById('base-offset')?.value) || 0.2;
-  const noise = parseFloat(document.getElementById('noise')?.value) || 0.1;
+  // Use ?? instead of || to allow 0 as a valid value
+  const noiseValue = document.getElementById('noise')?.value;
+  const noise = noiseValue !== undefined && noiseValue !== null ? parseFloat(noiseValue) : 0.1;
   const noiseFreq = parseInt(document.getElementById('noise-frequency')?.value) || 50;
   const minPasses = parseInt(document.getElementById('min-passes')?.value) || 1;
   const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 20;
@@ -847,8 +855,17 @@ function generateCLICommand() {
     params.push(`--bins ${binCount}`);
   }
 
-  // Format as multi-line command for readability
-  const command = `node process-svg.js input.svg output.svg \\\n  ${params.join(' \\\n  ')}`;
+  // Check if single-line format is requested
+  const singleLine = document.getElementById('cli-single-line')?.checked ?? true;
+
+  let command;
+  if (singleLine) {
+    // Single-line format (ready to paste in terminal)
+    command = `node process-svg.js input.svg output.svg ${params.join(' ')}`;
+  } else {
+    // Multi-line format with backslashes for readability
+    command = `node process-svg.js input.svg output.svg \\\n  ${params.join(' \\\n  ')}`;
+  }
 
   return command;
 }

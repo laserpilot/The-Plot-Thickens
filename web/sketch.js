@@ -24,9 +24,9 @@ let weightMode = 'length'; // 'length' or 'attractor'
 let pathsProcessed = false; // Track if paths have been converted to points
 
 // Offset mode state
-let offsetMode = 'legacy'; // 'legacy' or 'normal'
-let useNormalOffset = false; // Use normal-based offset
-let envelopePreset = 'flat'; // Envelope preset name
+let offsetMode = 'normal'; // 'legacy' or 'normal'
+let useNormalOffset = true; // Use normal-based offset
+let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 
 // Drag state
 let draggedAttractor = null;
@@ -39,8 +39,8 @@ let panStartX = 0;
 let panStartY = 0;
 
 // Processing settings
-let baseOffset = 0.2;
-let noise = 0.1;
+let baseOffset = 0.25;
+let noise = 0.0;
 let noiseFrequency = 50; // Noise wavelength in mm
 
 // Render control

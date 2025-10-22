@@ -109,6 +109,14 @@ label span {
   cursor: help;
   margin-left: 0.5rem;
   min-width: auto;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.hint-icon:hover {
+  background: #2980b9;
+  transform: scale(1.1);
 }
 
 .parameter-preview {

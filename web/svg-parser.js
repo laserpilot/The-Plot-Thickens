@@ -370,7 +370,9 @@ class SVGParser {
         const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
         const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
 
-        stride = Math.max(sampleRate, totalLength / 100);
+        // Use minimum of sampleRate and adaptive stride to ensure short paths get enough points
+        // This prevents short paths from disappearing due to under-sampling
+        stride = Math.min(sampleRate, totalLength / 10);
         numSamples = Math.min(200, Math.ceil(totalLength / stride));
       } else {
         // Preview mode: faster sampling for speed (20mm stride)

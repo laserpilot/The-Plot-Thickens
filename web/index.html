@@ -137,11 +137,11 @@
             </select>
           </label>
 
-          <label title="Spacing between sample points for weight calculation">
+          <label>
             Arc-Length Sample Interval (mm):
             <input type="range" id="arc-sample-interval" min="1" max="20" step="1" value="5">
             <span id="arc-sample-interval-value">5</span>
-            <span class="hint-icon" title="Smaller = more accurate but slower">?</span>
+            <span class="hint-icon" title="Spacing between sample points for weight calculation. Smaller = more accurate but slower">?</span>
           </label>
         </section>
 
@@ -149,12 +149,12 @@
           <h3>Offset Mode</h3>
 
           <label>
-            <input type="radio" name="offset-mode" value="legacy" checked>
+            <input type="radio" name="offset-mode" value="legacy">
             Legacy (point-based)
           </label>
 
           <label>
-            <input type="radio" name="offset-mode" value="normal">
+            <input type="radio" name="offset-mode" value="normal" checked>
             Normal (arc-length based, with taper)
           </label>
 
@@ -166,7 +166,7 @@
                 <option value="linearTaper">Linear Taper (start → end)</option>
                 <option value="linearTaperBoth">Linear Taper (both ends)</option>
                 <option value="sinTaper">Sin Taper (smooth)</option>
-                <option value="sinTaperBoth">Sin Taper (both ends)</option>
+                <option value="sinTaperBoth" selected>Sin Taper (both ends)</option>
                 <option value="exponentialTaper">Exponential Taper</option>
                 <option value="easeInOut">Ease In-Out</option>
               </select>
@@ -183,62 +183,64 @@
             <canvas id="param-preview-canvas" width="280" height="80"></canvas>
           </div>
 
-          <label title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">
+          <label>
             Base Offset (mm):
-            <input type="range" id="base-offset" min="0.01" max="3" step="0.05" value="0.2">
-            <span id="base-offset-value">0.2</span>
-            <span class="hint-icon" title="Distance between duplicate lines">?</span>
+            <input type="range" id="base-offset" min="0.01" max="3" step="0.05" value="0.25">
+            <span id="base-offset-value">0.25</span>
+            <span class="hint-icon" title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">?</span>
           </label>
 
-          <label title="Random variation added to each line. Creates organic, hand-drawn look. 0 = perfectly parallel lines.">
+          <label>
             Noise (mm):
-            <input type="range" id="noise" min="0" max="3" step="0.05" value="0.1">
-            <span id="noise-value">0.1</span>
-            <span class="hint-icon" title="Random variation for organic look">?</span>
+            <input type="range" id="noise" min="0" max="3" step="0.05" value="0">
+            <span id="noise-value">0</span>
+            <span class="hint-icon" title="Random variation added to each line. Creates organic, hand-drawn look. 0 = perfectly parallel lines.">?</span>
           </label>
 
-          <label title="Controls smoothness of noise. Lower = smoother organic curves (50-100mm), higher = more texture/detail (5-20mm).">
+          <label>
             Noise Frequency (mm):
             <input type="range" id="noise-frequency" min="5" max="200" step="5" value="50">
             <span id="noise-frequency-value">50</span>
-            <span class="hint-icon" title="Wavelength of noise variation">?</span>
+            <span class="hint-icon" title="Controls smoothness of noise. Lower = smoother organic curves (50-100mm), higher = more texture/detail (5-20mm).">?</span>
           </label>
 
-          <label title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">
+          <label>
             Min Passes:
             <input type="range" id="min-passes" min="1" max="10" step="1" value="1">
             <span id="min-passes-value">1</span>
-            <span class="hint-icon" title="Minimum line duplicates (thinnest)">?</span>
+            <span class="hint-icon" title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">?</span>
           </label>
 
-          <label title="Maximum number of duplicate lines for thickest paths. Higher = thicker, but slower plotting.">
+          <label>
             Max Passes:
-            <input type="range" id="max-passes" min="5" max="50" step="1" value="20">
-            <span id="max-passes-value">20</span>
-            <span class="hint-icon" title="Maximum line duplicates (thickest)">?</span>
+            <input type="range" id="max-passes" min="5" max="50" step="1" value="10">
+            <span id="max-passes-value">10</span>
+            <span class="hint-icon" title="Maximum number of duplicate lines for thickest paths. Higher = thicker, but slower plotting.">?</span>
           </label>
 
-          <label title="Paths shorter than this get minimum passes">
+          <label>
             Min Length Threshold (mm):
             <input type="number" id="min-length-threshold" min="0" step="10" value="0" placeholder="Auto">
             <span id="min-length-info" style="font-size: 0.8em; color: #666;"></span>
+            <span class="hint-icon" title="Paths shorter than this get minimum passes">?</span>
           </label>
 
-          <label title="Paths longer than this get maximum passes">
+          <label>
             Max Length Threshold (mm):
             <input type="number" id="max-length-threshold" min="0" step="10" value="0" placeholder="Auto">
             <span id="max-length-info" style="font-size: 0.8em; color: #666;"></span>
+            <span class="hint-icon" title="Paths longer than this get maximum passes">?</span>
           </label>
         </section>
 
         <section class="control-group">
           <h3>Advanced Settings</h3>
 
-          <label title="Spacing between sample points when converting curves. Lower = smoother but slower. Higher = faster but more angular.">
+          <label>
             Sample Rate (mm):
             <input type="range" id="sample-rate" min="0.5" max="5" step="0.5" value="2">
             <span id="sample-rate-value">2</span>
-            <span class="hint-icon" title="Point spacing for curve conversion">?</span>
+            <span class="hint-icon" title="Spacing between sample points when converting curves. Lower = smoother but slower. Higher = faster but more angular.">?</span>
           </label>
           <div style="font-size: 0.75em; color: #888; margin-top: 4px;">
             Lower = smoother curves, larger files, slower processing<br>
@@ -274,18 +276,18 @@
           <h3>Export</h3>
 
           <div style="margin-bottom: 12px; padding: 10px; background: #f8f8f8; border-radius: 4px;">
-            <label title="Group output paths by length into bins for easier management in editors">
+            <label>
               <input type="checkbox" id="enable-binning">
               Enable Length Binning
-              <span class="hint-icon" title="Organizes paths into groups by length">?</span>
+              <span class="hint-icon" title="Group output paths by length into bins for easier management in editors. Organizes paths into groups by length.">?</span>
             </label>
 
             <div id="binning-controls" style="display: none; margin-top: 8px;">
-              <label title="Number of bins to divide paths into (e.g., 4 = quartiles)">
+              <label>
                 Number of Bins:
                 <input type="range" id="bin-count" min="2" max="10" step="1" value="4">
                 <span id="bin-count-value">4</span>
-                <span class="hint-icon" title="How many length bands to create">?</span>
+                <span class="hint-icon" title="Number of bins to divide paths into (e.g., 4 = quartiles). How many length bands to create.">?</span>
               </label>
               <div style="font-size: 0.8em; color: #666; margin-top: 4px;">
                 Paths will be grouped: <span id="bin-preview">0-25%, 25-50%, 50-75%, 75-100%</span>
@@ -302,6 +304,12 @@
 
           <div style="margin-top: 10px;">
             <label style="font-size: 0.85rem; font-weight: bold; color: #555;">CLI Command:</label>
+            <div style="margin: 4px 0;">
+              <label style="font-size: 0.8rem;">
+                <input type="checkbox" id="cli-single-line" checked>
+                Single-line format (ready to paste)
+              </label>
+            </div>
             <textarea id="cli-command" readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 0.75rem; padding: 6px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; resize: vertical; margin-top: 4px;"></textarea>
             <button id="copy-cli" style="margin-top: 4px; width: 100%; padding: 6px; font-size: 0.85rem;">📋 Copy to Clipboard</button>
           </div>
