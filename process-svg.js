@@ -50,6 +50,7 @@ program
   .option('--envelope <preset>', 'Envelope preset for normal mode (flat|linearTaper|sinTaper|etc)', 'flat')
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
+  .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -81,6 +82,19 @@ program
     if (options.envelope !== undefined) config.envelope = options.envelope;
     if (options.bins !== undefined) config.bins = options.bins;
     if (options.sampleRate !== undefined) config.sampleRate = options.sampleRate;
+
+    // Load attractors preset if provided
+    if (options.attractors) {
+      try {
+        const attractorFile = fs.readFileSync(options.attractors, 'utf-8');
+        const attractorPreset = JSON.parse(attractorFile);
+        config.attractorPreset = attractorPreset;
+        console.log(`Loaded ${attractorPreset.attractors?.length || 0} attractors from: ${options.attractors}`);
+      } catch (error) {
+        console.error(`Failed to load attractor file: ${error.message}`);
+        process.exit(1);
+      }
+    }
 
     // Determine output path
     const outputPath = output || input.replace(/\.svg$/, '-processed.svg');
