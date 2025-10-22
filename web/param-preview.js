@@ -244,6 +244,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const envelope = envelopeSelect?.value || 'flat';
 
       paramPreview.update(offset, noiseVal, Math.min(maxPasses, 15), noiseFreq, envelope, offsetMode);
+
+      // Invalidate focus window cache when parameters change
+      if (typeof offsetCache !== 'undefined') {
+        offsetCache.clear();
+        // Hide "Show Computed Detail" checkbox and show compute button instead
+        const showDetailLabel = document.getElementById('show-detail-label');
+        const computeBtn = document.getElementById('compute-focus');
+        if (showDetailLabel) showDetailLabel.style.display = 'none';
+        if (computeBtn && focusWindow) computeBtn.style.display = 'block';
+      }
     }
   }
 

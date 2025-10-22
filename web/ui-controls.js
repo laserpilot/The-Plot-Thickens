@@ -287,8 +287,18 @@ function initializeControls() {
   if (clearFocusButton) {
     clearFocusButton.addEventListener('click', () => {
       focusWindow = null;
+      offsetCache.clear();
+      document.getElementById('compute-focus').style.display = 'none';
+      document.getElementById('show-detail-label').style.display = 'none';
       needsRedraw = true;
       redraw();
+    });
+  }
+
+  const computeFocusButton = document.getElementById('compute-focus');
+  if (computeFocusButton) {
+    computeFocusButton.addEventListener('click', () => {
+      computeFocusOffsets();
     });
   }
 

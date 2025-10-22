@@ -41,9 +41,17 @@ let panStartY = 0;
 // Focus window state
 let focusModeEnabled = false;
 let focusWindow = null; // {x1, y1, x2, y2} in SVG coordinates
-let showFocusDetail = true;
+let showFocusDetail = false;
 let isDraggingFocus = false;
 let focusDragStart = null; // {x, y} in SVG coordinates
+
+// Focus window offset cache
+let offsetCache = new Map(); // Key: pathId+passes+settings -> value: Array of offset path arrays
+let focusPathsCache = null; // Cache of paths in current focus window
+let isComputingFocus = false;
+let focusComputeProgress = 0;
+let lastFocusWindow = null;
+let lastOffsetSettings = null;
 
 // Processing settings
 let baseOffset = 0.25;
@@ -277,20 +285,33 @@ function calculateLengthBasedWeight(pathLength) {
 }
 
 /**
- * Render with focus window: fast preview outside, high-res inside
+ * Render with focus window: fast preview outside, cached high-res inside
  */
 function renderWithFocusWindow() {
   svgData.paths.forEach((path) => {
     const inFocus = boundsIntersectFocus(path.bounds);
 
-    if (inFocus) {
-      // Inside focus window: render with full offset detail
-      renderPathWithOffsets(path);
+    if (inFocus && showFocusDetail && offsetCache.has(path.id)) {
+      // Inside focus window: render cached offset detail
+      renderCachedOffsets(path);
     } else {
-      // Outside focus window: fast weight preview
+      // Outside focus window OR no cache: fast weight preview
       renderPathWeightOnly(path);
     }
   });
+
+  // Show "computing" message if in progress
+  if (isComputingFocus && focusWindow) {
+    push();
+    fill(0);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(14 / zoomScale);
+    const centerX = (focusWindow.x1 + focusWindow.x2) / 2;
+    const centerY = (focusWindow.y1 + focusWindow.y2) / 2;
+    text(`Computing: ${focusComputeProgress}%`, centerX, centerY);
+    pop();
+  }
 }
 
 /**
@@ -326,48 +347,135 @@ function renderPathWeightOnly(path) {
 }
 
 /**
- * Render a single path with full offset passes (accurate but slower)
+ * Render cached offset paths (fast, from pre-computed data)
  */
-function renderPathWithOffsets(path) {
-  // Calculate weight
-  let weight;
-  if (useAttractors) {
-    weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
-  } else {
-    weight = calculateLengthBasedWeight(path.length);
-  }
+function renderCachedOffsets(path) {
+  const cachedOffsets = offsetCache.get(path.id);
+  if (!cachedOffsets) return;
 
-  // Generate deterministic seed
-  const seed = hashString(path.d);
+  // Render each cached offset path
+  stroke(100);
+  strokeWeight(0.5 / zoomScale);
+  noFill();
 
-  // Get envelope function if using normal mode
-  const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
-
-  // Generate offset duplicates
-  for (let i = 0; i < weight; i++) {
-    const passIndex = Math.floor(i / 2);
-    const isRight = i % 2 === 0;
-    const direction = isRight ? 1 : -1;
-
-    const offsetDistance = direction * passIndex * baseOffset;
-    const passSeed = seed + i;
-
-    let offsetPoints;
-    if (useNormalOffset) {
-      offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
-    } else {
-      offsetPoints = generateOffsetPath(path.points, offsetDistance, noise, passSeed, path.id, null, false);
-    }
-
-    if (offsetPoints) {
-      stroke(100);
-      strokeWeight(0.5 / zoomScale);
-      noFill();
+  cachedOffsets.forEach(offsetPoints => {
+    if (offsetPoints && offsetPoints.length > 0) {
       beginShape();
       offsetPoints.forEach(pt => vertex(pt.x, pt.y));
       endShape();
     }
+  });
+}
+
+/**
+ * Compute high-resolution offsets for paths in focus window (async)
+ */
+async function computeFocusOffsets() {
+  if (!focusWindow || !svgData) {
+    console.warn('Cannot compute focus offsets: no focus window or SVG data');
+    return;
   }
+
+  isComputingFocus = true;
+  focusComputeProgress = 0;
+
+  // Update UI
+  document.getElementById('compute-focus').style.display = 'none';
+  document.getElementById('focus-progress').style.display = 'block';
+
+  // Find paths in focus window
+  const pathsInFocus = svgData.paths.filter(path => boundsIntersectFocus(path.bounds));
+  console.log(`Computing offsets for ${pathsInFocus.length} paths in focus window...`);
+
+  // Get current settings
+  const currentSettings = {
+    baseOffset,
+    noise,
+    noiseFrequency,
+    offsetMode,
+    envelopePreset
+  };
+
+  // Store for dirty tracking
+  lastFocusWindow = { ...focusWindow };
+  lastOffsetSettings = { ...currentSettings };
+
+  // Clear old cache
+  offsetCache.clear();
+
+  const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
+
+  // Process in chunks to avoid blocking
+  const chunkSize = 5;
+  let processed = 0;
+
+  for (let i = 0; i < pathsInFocus.length; i += chunkSize) {
+    const chunk = pathsInFocus.slice(i, Math.min(i + chunkSize, pathsInFocus.length));
+
+    // Process chunk
+    chunk.forEach(path => {
+      // Calculate weight
+      let weight;
+      if (useAttractors) {
+        weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+      } else {
+        weight = calculateLengthBasedWeight(path.length);
+      }
+
+      // Generate deterministic seed
+      const seed = hashString(path.d);
+
+      // Generate all offset paths for this path
+      const offsetPaths = [];
+
+      for (let j = 0; j < weight; j++) {
+        const passIndex = Math.floor(j / 2);
+        const isRight = j % 2 === 0;
+        const direction = isRight ? 1 : -1;
+        const offsetDistance = direction * passIndex * currentSettings.baseOffset;
+        const passSeed = seed + j;
+
+        let offsetPoints;
+        if (useNormalOffset) {
+          offsetPoints = generateOffsetPath(path.d, offsetDistance, currentSettings.noise, passSeed, path.id, envelope, true, currentSettings.noiseFrequency);
+        } else {
+          offsetPoints = generateOffsetPath(path.points, offsetDistance, currentSettings.noise, passSeed, path.id, null, false);
+        }
+
+        if (offsetPoints) {
+          offsetPaths.push(offsetPoints);
+        }
+      }
+
+      // Cache the offset paths
+      offsetCache.set(path.id, offsetPaths);
+    });
+
+    processed += chunk.length;
+    focusComputeProgress = Math.round((processed / pathsInFocus.length) * 100);
+
+    // Update progress bar
+    document.getElementById('focus-progress-bar').style.width = `${focusComputeProgress}%`;
+    document.getElementById('focus-progress-text').textContent = `${focusComputeProgress}% (${processed}/${pathsInFocus.length} paths)`;
+
+    needsRedraw = true;
+    redraw();
+
+    // Yield to UI thread
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  isComputingFocus = false;
+  console.log(`✓ Computed offsets for ${pathsInFocus.length} paths`);
+
+  // Update UI
+  document.getElementById('focus-progress').style.display = 'none';
+  document.getElementById('show-detail-label').style.display = 'block';
+  document.getElementById('show-focus-detail').checked = true;
+  showFocusDetail = true;
+
+  needsRedraw = true;
+  redraw();
 }
 
 /**
@@ -581,6 +689,13 @@ function mouseReleased() {
     isDraggingFocus = false;
     focusDragStart = null;
     cursor('default');
+
+    // Show compute button when focus rectangle is drawn
+    if (focusWindow) {
+      const computeBtn = document.getElementById('compute-focus');
+      if (computeBtn) computeBtn.style.display = 'block';
+    }
+
     needsRedraw = true;
     redraw();
   }
