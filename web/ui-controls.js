@@ -82,6 +82,35 @@ function initializeControls() {
     redraw();
   });
 
+  // Manual attractor entry
+  document.getElementById('add-manual-attractor').addEventListener('click', () => {
+    const x = parseFloat(document.getElementById('manual-x').value);
+    const y = parseFloat(document.getElementById('manual-y').value);
+    const strengthInput = document.getElementById('manual-strength').value;
+    const radiusInput = document.getElementById('manual-radius').value;
+
+    if (isNaN(x) || isNaN(y)) {
+      alert('Please enter valid X and Y coordinates');
+      return;
+    }
+
+    const strength = strengthInput ? parseFloat(strengthInput) : null;
+    const radius = radiusInput ? parseFloat(radiusInput) : null;
+
+    const attractor = attractorSystem.addAttractor(x, y, strength, radius);
+    if (attractor) {
+      updateAttractorList();
+      needsRedraw = true;
+      redraw();
+
+      // Clear form
+      document.getElementById('manual-x').value = '';
+      document.getElementById('manual-y').value = '';
+      document.getElementById('manual-strength').value = '';
+      document.getElementById('manual-radius').value = '';
+    }
+  });
+
   // Attractor settings
   setupSlider('strength', (value) => {
     attractorSystem.updateConfig({ strength: value });
@@ -96,7 +125,21 @@ function initializeControls() {
   });
 
   document.getElementById('falloff-curve').addEventListener('change', (e) => {
-    attractorSystem.updateConfig({ falloffCurve: e.target.value });
+    const curve = e.target.value;
+    attractorSystem.updateConfig({ falloffCurve: curve });
+
+    // Show/hide exponent control
+    const exponentControl = document.getElementById('falloff-exponent-control');
+    if (exponentControl) {
+      exponentControl.style.display = (curve === 'power' || curve === 'gaussian') ? 'block' : 'none';
+    }
+
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('falloff-exponent', (value) => {
+    attractorSystem.updateConfig({ falloffExponent: value });
     needsRedraw = true;
     redraw();
   });
@@ -109,6 +152,18 @@ function initializeControls() {
 
   document.getElementById('multi-mode').addEventListener('change', (e) => {
     attractorSystem.updateConfig({ multiMode: e.target.value });
+    needsRedraw = true;
+    redraw();
+  });
+
+  document.getElementById('weight-blend-mode').addEventListener('change', (e) => {
+    attractorSystem.updateConfig({ weightBlendMode: e.target.value });
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('arc-sample-interval', (value) => {
+    attractorSystem.updateConfig({ arcLengthSampleInterval: value });
     needsRedraw = true;
     redraw();
   });
@@ -707,8 +762,29 @@ function updateUIFromConfig() {
   document.getElementById('falloff-radius-value').textContent = config.falloffRadius;
 
   document.getElementById('falloff-curve').value = config.falloffCurve;
+
+  if (config.falloffExponent !== undefined) {
+    document.getElementById('falloff-exponent').value = config.falloffExponent;
+    document.getElementById('falloff-exponent-value').textContent = config.falloffExponent;
+  }
+
+  // Show/hide exponent control based on curve type
+  const exponentControl = document.getElementById('falloff-exponent-control');
+  if (exponentControl) {
+    exponentControl.style.display = (config.falloffCurve === 'power' || config.falloffCurve === 'gaussian') ? 'block' : 'none';
+  }
+
   document.getElementById('attractor-mode').value = config.mode;
   document.getElementById('multi-mode').value = config.multiMode;
+
+  if (config.weightBlendMode !== undefined) {
+    document.getElementById('weight-blend-mode').value = config.weightBlendMode;
+  }
+
+  if (config.arcLengthSampleInterval !== undefined) {
+    document.getElementById('arc-sample-interval').value = config.arcLengthSampleInterval;
+    document.getElementById('arc-sample-interval-value').textContent = config.arcLengthSampleInterval;
+  }
 
   document.getElementById('min-passes').value = config.minPasses;
   document.getElementById('min-passes-value').textContent = config.minPasses;

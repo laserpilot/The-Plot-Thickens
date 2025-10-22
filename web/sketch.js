@@ -122,8 +122,8 @@ function renderWeightPreview() {
     let weight;
 
     if (useAttractors) {
-      // Attractor-based weight
-      weight = attractorSystem.calculatePathWeight(path.points);
+      // Attractor-based weight - prefer path data string for arc-length sampling
+      weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
     } else {
       // Length-based weight
       weight = calculateLengthBasedWeight(path.length);
@@ -133,12 +133,13 @@ function renderWeightPreview() {
       // Color-code by weight (HSB: hue 120=green, 0=red)
       const hue = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 120, 0);
       stroke(hue, 80, 60);
-      // Wider stroke range for visibility, scaled by zoom
-      const visualWeight = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 0.5, 15);
-      strokeWeight(visualWeight);
+      // Map weight to visual thickness, scaled by zoom for accuracy
+      const baseVisualWeight = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 0.5, 15);
+      const scaledWeight = baseVisualWeight / zoomScale; // Scale by zoom so visual thickness matches actual
+      strokeWeight(scaledWeight);
     } else {
       stroke(path.stroke || 0);
-      strokeWeight(path.strokeWidth || 1);
+      strokeWeight((path.strokeWidth || 1) / zoomScale);
     }
 
     // Draw path, handling subpath breaks (multiple M commands)
@@ -163,14 +164,14 @@ function renderWeightPreview() {
  */
 function renderOffsetPreview() {
   stroke(100); // Gray color
-  strokeWeight(0.5);
+  strokeWeight(0.5 / zoomScale); // Scale stroke weight by zoom
   noFill();
 
   svgData.paths.forEach((path, pathIndex) => {
     // Calculate weight
     let weight;
     if (useAttractors) {
-      weight = attractorSystem.calculatePathWeight(path.points);
+      weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
     } else {
       weight = calculateLengthBasedWeight(path.length);
     }
@@ -252,15 +253,17 @@ function calculateLengthBasedWeight(pathLength) {
 function drawAttractors() {
   attractorSystem.attractors.forEach(attractor => {
     const isDragging = draggedAttractor && draggedAttractor.id === attractor.id;
+    const radius = attractor.radius !== null ? attractor.radius : attractorSystem.config.falloffRadius;
+    const hasCustom = attractor.strength !== null || attractor.radius !== null;
 
     // Falloff radius circle
     noFill();
-    stroke(100, 150, 255, isDragging ? 100 : 50);
+    stroke(hasCustom ? 255 : 100, 150, 255, isDragging ? 100 : 50);
     strokeWeight(isDragging ? 2 : 1);
-    circle(attractor.x, attractor.y, attractorSystem.config.falloffRadius * 2);
+    circle(attractor.x, attractor.y, radius * 2);
 
     // Attractor point
-    fill(isDragging ? 255 : 100, 150, 255);
+    fill(isDragging ? 255 : (hasCustom ? 255 : 100), 150, 255);
     noStroke();
     circle(attractor.x, attractor.y, isDragging ? 10 : 8);
 
@@ -268,7 +271,8 @@ function drawAttractors() {
     fill(50);
     textAlign(CENTER, CENTER);
     textSize(10);
-    text(`#${attractor.id}`, attractor.x, attractor.y - 15);
+    const label = hasCustom ? `#${attractor.id}★` : `#${attractor.id}`;
+    text(label, attractor.x, attractor.y - radius - 10);
   });
 }
 
@@ -596,6 +600,12 @@ function updateStatus(message) {
  */
 function updateAttractorList() {
   const listEl = document.getElementById('attractor-list');
+  const countEl = document.getElementById('attractor-count');
+
+  if (countEl) {
+    countEl.textContent = `(${attractorSystem.attractors.length}/${attractorSystem.maxAttractors})`;
+  }
+
   if (!listEl) return;
 
   if (attractorSystem.attractors.length === 0) {
@@ -603,12 +613,42 @@ function updateAttractorList() {
     return;
   }
 
-  listEl.innerHTML = attractorSystem.attractors.map(a => `
-    <div class="attractor-item">
-      <span>#${a.id}: (${a.x.toFixed(1)}, ${a.y.toFixed(1)})</span>
-      <button onclick="removeAttractor(${a.id})">Remove</button>
+  listEl.innerHTML = attractorSystem.attractors.map(a => {
+    const strength = a.strength !== null ? a.strength : attractorSystem.config.strength;
+    const radius = a.radius !== null ? a.radius : attractorSystem.config.falloffRadius;
+    const hasCustom = a.strength !== null || a.radius !== null;
+
+    return `
+    <div class="attractor-item" style="border: 1px solid #ddd; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 4px; background: ${hasCustom ? '#fffacd' : '#fff'};">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+        <strong>#${a.id}</strong>
+        <button onclick="removeAttractor(${a.id})" style="padding: 2px 8px; font-size: 0.8em;">Remove</button>
+      </div>
+      <div style="font-size: 0.85em; color: #666;">
+        Position: (${a.x.toFixed(1)}, ${a.y.toFixed(1)})
+      </div>
+      <details style="margin-top: 0.25rem;">
+        <summary style="cursor: pointer; font-size: 0.85em; color: #0066cc;">⚙️ Settings ${hasCustom ? '(custom)' : '(using defaults)'}</summary>
+        <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f8f8; border-radius: 4px;">
+          <label style="display: block; font-size: 0.8em; margin-bottom: 0.25rem;">
+            Strength: <span id="attractor-${a.id}-strength-value">${strength.toFixed(1)}</span>
+            <input type="range" id="attractor-${a.id}-strength" min="0" max="5" step="0.1" value="${strength}"
+              onchange="updateAttractorProperty(${a.id}, 'strength', parseFloat(this.value))"
+              oninput="document.getElementById('attractor-${a.id}-strength-value').textContent = parseFloat(this.value).toFixed(1)"
+              style="width: 100%;">
+          </label>
+          <label style="display: block; font-size: 0.8em; margin-bottom: 0.25rem;">
+            Radius (mm): <span id="attractor-${a.id}-radius-value">${radius.toFixed(0)}</span>
+            <input type="range" id="attractor-${a.id}-radius" min="10" max="300" step="5" value="${radius}"
+              onchange="updateAttractorProperty(${a.id}, 'radius', parseFloat(this.value))"
+              oninput="document.getElementById('attractor-${a.id}-radius-value').textContent = parseFloat(this.value).toFixed(0)"
+              style="width: 100%;">
+          </label>
+          <button onclick="resetAttractorToDefaults(${a.id})" style="width: 100%; padding: 4px; font-size: 0.75em; margin-top: 0.25rem;">Reset to Defaults</button>
+        </div>
+      </details>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 /**
@@ -616,6 +656,28 @@ function updateAttractorList() {
  */
 function removeAttractor(id) {
   attractorSystem.removeAttractor(id);
+  updateAttractorList();
+  needsRedraw = true;
+  redraw();
+}
+
+/**
+ * Update attractor property (called from HTML)
+ */
+function updateAttractorProperty(id, property, value) {
+  const updates = {};
+  updates[property] = value;
+  attractorSystem.updateAttractor(id, updates);
+  updateAttractorList(); // Refresh to update the "(custom)" indicator
+  needsRedraw = true;
+  redraw();
+}
+
+/**
+ * Reset attractor to use global defaults (called from HTML)
+ */
+function resetAttractorToDefaults(id) {
+  attractorSystem.updateAttractor(id, { strength: null, radius: null });
   updateAttractorList();
   needsRedraw = true;
   redraw();

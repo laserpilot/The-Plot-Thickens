@@ -45,14 +45,36 @@
         </section>
 
         <section class="control-group attractor-controls" style="display: none;">
-          <h3>Attractors</h3>
-          <p class="hint">Click canvas to place attractors</p>
+          <h3>Attractors <span style="font-size: 0.8em; color: #666;" id="attractor-count">(0/10)</span></h3>
+          <p class="hint">Click canvas to place attractors (max 10)</p>
+
+          <!-- Manual entry form -->
+          <details style="margin-bottom: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em;">➕ Add Attractor Manually</summary>
+            <div style="margin-top: 0.5rem;">
+              <label style="font-size: 0.85em;">
+                Position (x, y):
+                <input type="number" id="manual-x" placeholder="X" style="width: 45%; margin-right: 2%;" step="1">
+                <input type="number" id="manual-y" placeholder="Y" style="width: 45%;" step="1">
+              </label>
+              <label style="font-size: 0.85em; margin-top: 0.25rem;">
+                Strength (optional):
+                <input type="number" id="manual-strength" placeholder="Auto" style="width: 100%;" step="0.1" min="0" max="5">
+              </label>
+              <label style="font-size: 0.85em; margin-top: 0.25rem;">
+                Radius (optional):
+                <input type="number" id="manual-radius" placeholder="Auto" style="width: 100%;" step="5" min="5" max="300">
+              </label>
+              <button id="add-manual-attractor" style="margin-top: 0.5rem; width: 100%; padding: 6px; font-size: 0.85rem;">Add Attractor</button>
+            </div>
+          </details>
+
           <button id="clear-attractors">Clear All Attractors</button>
           <div id="attractor-list"></div>
         </section>
 
         <section class="control-group attractor-controls" style="display: none;">
-          <h3>Attractor Settings</h3>
+          <h3>Attractor Settings (Global Defaults)</h3>
 
           <label>
             Mode:
@@ -63,14 +85,14 @@
           </label>
 
           <label>
-            Strength:
-            <input type="range" id="strength" min="0" max="2" step="0.1" value="1">
+            Default Strength:
+            <input type="range" id="strength" min="0" max="5" step="0.1" value="1">
             <span id="strength-value">1.0</span>
           </label>
 
           <label>
-            Falloff Radius (mm):
-            <input type="range" id="falloff-radius" min="10" max="200" step="5" value="50">
+            Default Falloff Radius (mm):
+            <input type="range" id="falloff-radius" min="10" max="300" step="5" value="50">
             <span id="falloff-radius-value">50</span>
           </label>
 
@@ -78,18 +100,48 @@
             Falloff Curve:
             <select id="falloff-curve">
               <option value="linear">Linear</option>
-              <option value="exponential">Exponential</option>
+              <option value="exponential">Exponential (x²)</option>
+              <option value="power">Power (configurable)</option>
+              <option value="gaussian">Gaussian (smooth)</option>
               <option value="inverse-square">Inverse Square</option>
             </select>
           </label>
 
+          <div id="falloff-exponent-control" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+            <label>
+              Falloff Exponent:
+              <input type="range" id="falloff-exponent" min="1" max="10" step="0.5" value="2">
+              <span id="falloff-exponent-value">2.0</span>
+            </label>
+            <div style="font-size: 0.75em; color: #666; margin-top: 4px;">
+              Higher = sharper center, steeper falloff
+            </div>
+          </div>
+
           <label>
             Multiple Attractor Mode:
             <select id="multi-mode">
-              <option value="additive">Additive</option>
+              <option value="additive">Additive (sum influences)</option>
               <option value="strongest">Strongest Only</option>
               <option value="average">Average</option>
+              <option value="soft">Soft (averaged by count)</option>
+              <option value="weighted-average">Weighted Average (by distance)</option>
             </select>
+          </label>
+
+          <label>
+            Weight Blend Mode:
+            <select id="weight-blend-mode">
+              <option value="replace">Replace (attractor only)</option>
+              <option value="blend">Blend (with length-based)</option>
+            </select>
+          </label>
+
+          <label title="Spacing between sample points for weight calculation">
+            Arc-Length Sample Interval (mm):
+            <input type="range" id="arc-sample-interval" min="1" max="20" step="1" value="5">
+            <span id="arc-sample-interval-value">5</span>
+            <span class="hint-icon" title="Smaller = more accurate but slower">?</span>
           </label>
         </section>
 
