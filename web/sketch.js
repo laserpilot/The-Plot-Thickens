@@ -427,35 +427,40 @@ function drawInfluenceField() {
 function drawFocusWindow() {
   if (!focusWindow) return;
 
-  // Draw semi-transparent blue rectangle for focus area
-  fill(200, 100, 100, 15); // HSB: light blue, 15% opacity
-  stroke(200, 100, 60); // HSB: blue border
-  strokeWeight(2 / zoomScale);
-  rect(focusWindow.x1, focusWindow.y1,
-       focusWindow.x2 - focusWindow.x1,
-       focusWindow.y2 - focusWindow.y1);
-
-  // Draw corner handles
+  // Draw just the border (no fill) so paths underneath are visible
   noFill();
-  stroke(200, 100, 80);
-  strokeWeight(1 / zoomScale);
-  const handleSize = 10 / zoomScale;
+  stroke(200, 80, 80); // HSB: bright blue border
+  strokeWeight(3 / zoomScale);
+
+  // Draw dashed rectangle effect by drawing the border in segments
+  const x1 = focusWindow.x1;
+  const y1 = focusWindow.y1;
+  const x2 = focusWindow.x2;
+  const y2 = focusWindow.y2;
+
+  // Solid border
+  rect(x1, y1, x2 - x1, y2 - y1);
+
+  // Draw corner handles for visibility
+  stroke(200, 100, 100);
+  strokeWeight(2 / zoomScale);
+  const handleSize = 15 / zoomScale;
 
   // Top-left corner
-  line(focusWindow.x1, focusWindow.y1, focusWindow.x1 + handleSize, focusWindow.y1);
-  line(focusWindow.x1, focusWindow.y1, focusWindow.x1, focusWindow.y1 + handleSize);
+  line(x1, y1, x1 + handleSize, y1);
+  line(x1, y1, x1, y1 + handleSize);
 
   // Top-right corner
-  line(focusWindow.x2, focusWindow.y1, focusWindow.x2 - handleSize, focusWindow.y1);
-  line(focusWindow.x2, focusWindow.y1, focusWindow.x2, focusWindow.y1 + handleSize);
+  line(x2, y1, x2 - handleSize, y1);
+  line(x2, y1, x2, y1 + handleSize);
 
   // Bottom-left corner
-  line(focusWindow.x1, focusWindow.y2, focusWindow.x1 + handleSize, focusWindow.y2);
-  line(focusWindow.x1, focusWindow.y2, focusWindow.x1, focusWindow.y2 - handleSize);
+  line(x1, y2, x1 + handleSize, y2);
+  line(x1, y2, x1, y2 - handleSize);
 
   // Bottom-right corner
-  line(focusWindow.x2, focusWindow.y2, focusWindow.x2 - handleSize, focusWindow.y2);
-  line(focusWindow.x2, focusWindow.y2, focusWindow.x2, focusWindow.y2 - handleSize);
+  line(x2, y2, x2 - handleSize, y2);
+  line(x2, y2, x2, y2 - handleSize);
 }
 
 /**
