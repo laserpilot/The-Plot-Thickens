@@ -38,6 +38,13 @@ let isPanning = false;
 let panStartX = 0;
 let panStartY = 0;
 
+// Focus window state
+let focusModeEnabled = false;
+let focusWindow = null; // {x1, y1, x2, y2} in SVG coordinates
+let showFocusDetail = true;
+let isDraggingFocus = false;
+let focusDragStart = null; // {x, y} in SVG coordinates
+
 // Processing settings
 let baseOffset = 0.25;
 let noise = 0.0;
@@ -90,6 +97,11 @@ function draw() {
       drawAttractors();
     }
 
+    // Draw focus window if enabled
+    if (focusModeEnabled && focusWindow) {
+      drawFocusWindow();
+    }
+
     pop();
   } else {
     // Show prompt
@@ -102,14 +114,31 @@ function draw() {
 }
 
 /**
+ * Check if a bounding box intersects with the focus window
+ */
+function boundsIntersectFocus(bounds) {
+  if (!focusWindow || !bounds) return false;
+
+  return !(bounds.maxX < focusWindow.x1 ||
+           bounds.minX > focusWindow.x2 ||
+           bounds.maxY < focusWindow.y1 ||
+           bounds.minY > focusWindow.y2);
+}
+
+/**
  * Draw SVG paths with optional weight preview or offset rendering
+ * With focus window support for selective high-res rendering
  */
 function drawPaths() {
-  if (previewDisplayMode === 'offset') {
-    // Render actual offset paths
+  // If focus window is enabled and we have a focus region defined
+  if (focusModeEnabled && focusWindow && showFocusDetail) {
+    // Render with focus window: fast preview outside, high-res inside
+    renderWithFocusWindow();
+  } else if (previewDisplayMode === 'offset') {
+    // Render actual offset paths for all
     renderOffsetPreview();
   } else {
-    // Weight-only preview (fast)
+    // Weight-only preview (fast) for all
     renderWeightPreview();
   }
 }
@@ -248,6 +277,100 @@ function calculateLengthBasedWeight(pathLength) {
 }
 
 /**
+ * Render with focus window: fast preview outside, high-res inside
+ */
+function renderWithFocusWindow() {
+  svgData.paths.forEach((path) => {
+    const inFocus = boundsIntersectFocus(path.bounds);
+
+    if (inFocus) {
+      // Inside focus window: render with full offset detail
+      renderPathWithOffsets(path);
+    } else {
+      // Outside focus window: fast weight preview
+      renderPathWeightOnly(path);
+    }
+  });
+}
+
+/**
+ * Render a single path with weight-based color only (fast)
+ */
+function renderPathWeightOnly(path) {
+  let weight;
+
+  if (useAttractors) {
+    weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+  } else {
+    weight = calculateLengthBasedWeight(path.length);
+  }
+
+  // Color-code by weight (HSB: hue 120=green, 0=red)
+  const hue = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 120, 0);
+  stroke(hue, 80, 60);
+  const baseVisualWeight = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 0.5, 15);
+  const scaledWeight = baseVisualWeight / zoomScale;
+  strokeWeight(scaledWeight);
+
+  // Draw path
+  noFill();
+  beginShape();
+  path.points.forEach((pt, index) => {
+    if (pt.move && index > 0) {
+      endShape();
+      beginShape();
+    }
+    vertex(pt.x, pt.y);
+  });
+  endShape();
+}
+
+/**
+ * Render a single path with full offset passes (accurate but slower)
+ */
+function renderPathWithOffsets(path) {
+  // Calculate weight
+  let weight;
+  if (useAttractors) {
+    weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+  } else {
+    weight = calculateLengthBasedWeight(path.length);
+  }
+
+  // Generate deterministic seed
+  const seed = hashString(path.d);
+
+  // Get envelope function if using normal mode
+  const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
+
+  // Generate offset duplicates
+  for (let i = 0; i < weight; i++) {
+    const passIndex = Math.floor(i / 2);
+    const isRight = i % 2 === 0;
+    const direction = isRight ? 1 : -1;
+
+    const offsetDistance = direction * passIndex * baseOffset;
+    const passSeed = seed + i;
+
+    let offsetPoints;
+    if (useNormalOffset) {
+      offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+    } else {
+      offsetPoints = generateOffsetPath(path.points, offsetDistance, noise, passSeed, path.id, null, false);
+    }
+
+    if (offsetPoints) {
+      stroke(100);
+      strokeWeight(0.5 / zoomScale);
+      noFill();
+      beginShape();
+      offsetPoints.forEach(pt => vertex(pt.x, pt.y));
+      endShape();
+    }
+  }
+}
+
+/**
  * Draw attractors
  */
 function drawAttractors() {
@@ -299,6 +422,43 @@ function drawInfluenceField() {
 }
 
 /**
+ * Draw focus window rectangle
+ */
+function drawFocusWindow() {
+  if (!focusWindow) return;
+
+  // Draw semi-transparent blue rectangle for focus area
+  fill(200, 100, 100, 15); // HSB: light blue, 15% opacity
+  stroke(200, 100, 60); // HSB: blue border
+  strokeWeight(2 / zoomScale);
+  rect(focusWindow.x1, focusWindow.y1,
+       focusWindow.x2 - focusWindow.x1,
+       focusWindow.y2 - focusWindow.y1);
+
+  // Draw corner handles
+  noFill();
+  stroke(200, 100, 80);
+  strokeWeight(1 / zoomScale);
+  const handleSize = 10 / zoomScale;
+
+  // Top-left corner
+  line(focusWindow.x1, focusWindow.y1, focusWindow.x1 + handleSize, focusWindow.y1);
+  line(focusWindow.x1, focusWindow.y1, focusWindow.x1, focusWindow.y1 + handleSize);
+
+  // Top-right corner
+  line(focusWindow.x2, focusWindow.y1, focusWindow.x2 - handleSize, focusWindow.y1);
+  line(focusWindow.x2, focusWindow.y1, focusWindow.x2, focusWindow.y1 + handleSize);
+
+  // Bottom-left corner
+  line(focusWindow.x1, focusWindow.y2, focusWindow.x1 + handleSize, focusWindow.y2);
+  line(focusWindow.x1, focusWindow.y2, focusWindow.x1, focusWindow.y2 - handleSize);
+
+  // Bottom-right corner
+  line(focusWindow.x2, focusWindow.y2, focusWindow.x2 - handleSize, focusWindow.y2);
+  line(focusWindow.x2, focusWindow.y2, focusWindow.x2, focusWindow.y2 - handleSize);
+}
+
+/**
  * Handle mouse press - check if clicking on attractor or adding new one
  */
 function mousePressed() {
@@ -310,6 +470,18 @@ function mousePressed() {
 
   if (!svgData) return;
 
+  // Transform mouse coordinates to SVG space
+  const svgX = (mouseX - offsetX) / zoomScale;
+  const svgY = (mouseY - offsetY) / zoomScale;
+
+  // Shift+click = start focus window drag
+  if (focusModeEnabled && keyIsDown(SHIFT)) {
+    isDraggingFocus = true;
+    focusDragStart = { x: svgX, y: svgY };
+    cursor('crosshair');
+    return;
+  }
+
   // Right click or space+click = pan mode
   if (mouseButton === CENTER || (mouseButton === LEFT && keyIsDown(32))) {
     isPanning = true;
@@ -320,10 +492,6 @@ function mousePressed() {
   }
 
   if (!useAttractors) return;
-
-  // Transform mouse coordinates to SVG space
-  const svgX = (mouseX - offsetX) / zoomScale;
-  const svgY = (mouseY - offsetY) / zoomScale;
 
   // Check if clicking on existing attractor
   for (let attractor of attractorSystem.attractors) {
@@ -350,11 +518,29 @@ function mousePressed() {
 function mouseDragged() {
   // Allow dragging to continue even if mouse leaves canvas (for panning/dragging)
   // But only if we were already in a drag state
-  if (!isPanning && !draggedAttractor) {
+  if (!isPanning && !draggedAttractor && !isDraggingFocus) {
     // Not currently dragging, check if mouse is over canvas
     if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) {
       return;
     }
+  }
+
+  // Focus window drag
+  if (isDraggingFocus && focusDragStart) {
+    const svgX = (mouseX - offsetX) / zoomScale;
+    const svgY = (mouseY - offsetY) / zoomScale;
+
+    // Update focus window
+    focusWindow = {
+      x1: Math.min(focusDragStart.x, svgX),
+      y1: Math.min(focusDragStart.y, svgY),
+      x2: Math.max(focusDragStart.x, svgX),
+      y2: Math.max(focusDragStart.y, svgY)
+    };
+
+    needsRedraw = true;
+    redraw();
+    return;
   }
 
   if (isPanning) {
@@ -386,6 +572,14 @@ function mouseDragged() {
  * Handle mouse release - stop dragging or panning
  */
 function mouseReleased() {
+  if (isDraggingFocus) {
+    isDraggingFocus = false;
+    focusDragStart = null;
+    cursor('default');
+    needsRedraw = true;
+    redraw();
+  }
+
   if (isPanning) {
     isPanning = false;
     cursor('default');
@@ -624,8 +818,17 @@ function updateAttractorList() {
         <strong>#${a.id}</strong>
         <button onclick="removeAttractor(${a.id})" style="padding: 2px 8px; font-size: 0.8em;">Remove</button>
       </div>
-      <div style="font-size: 0.85em; color: #666;">
-        Position: (${a.x.toFixed(1)}, ${a.y.toFixed(1)})
+      <div style="font-size: 0.85em; color: #666; display: flex; gap: 0.5rem; align-items: center;">
+        <label style="margin: 0;">
+          X: <input type="number" id="attractor-${a.id}-x" value="${a.x.toFixed(1)}" step="0.1"
+            onchange="updateAttractorPosition(${a.id}, 'x', parseFloat(this.value))"
+            style="width: 70px; padding: 2px 4px; font-size: 0.85em;">
+        </label>
+        <label style="margin: 0;">
+          Y: <input type="number" id="attractor-${a.id}-y" value="${a.y.toFixed(1)}" step="0.1"
+            onchange="updateAttractorPosition(${a.id}, 'y', parseFloat(this.value))"
+            style="width: 70px; padding: 2px 4px; font-size: 0.85em;">
+        </label>
       </div>
       <details style="margin-top: 0.25rem;">
         <summary style="cursor: pointer; font-size: 0.85em; color: #0066cc;">⚙️ Settings ${hasCustom ? '(custom)' : '(using defaults)'}</summary>
@@ -657,6 +860,21 @@ function updateAttractorList() {
 function removeAttractor(id) {
   attractorSystem.removeAttractor(id);
   updateAttractorList();
+  needsRedraw = true;
+  redraw();
+}
+
+/**
+ * Update attractor position (called from HTML)
+ */
+function updateAttractorPosition(id, axis, value) {
+  if (isNaN(value)) {
+    console.warn('Invalid position value:', value);
+    return;
+  }
+  const updates = {};
+  updates[axis] = value;
+  attractorSystem.updateAttractor(id, updates);
   needsRedraw = true;
   redraw();
 }

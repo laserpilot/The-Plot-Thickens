@@ -262,6 +262,36 @@ function initializeControls() {
     });
   }
 
+  // Focus window controls
+  const focusModeCheckbox = document.getElementById('focus-mode-enabled');
+  const focusWindowControls = document.getElementById('focus-window-controls');
+  if (focusModeCheckbox && focusWindowControls) {
+    focusModeCheckbox.addEventListener('change', (e) => {
+      focusModeEnabled = e.target.checked;
+      focusWindowControls.style.display = focusModeEnabled ? 'block' : 'none';
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
+  const showFocusDetailCheckbox = document.getElementById('show-focus-detail');
+  if (showFocusDetailCheckbox) {
+    showFocusDetailCheckbox.addEventListener('change', (e) => {
+      showFocusDetail = e.target.checked;
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
+  const clearFocusButton = document.getElementById('clear-focus');
+  if (clearFocusButton) {
+    clearFocusButton.addEventListener('click', () => {
+      focusWindow = null;
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
   // Export controls - two-click pattern to avoid extension blocking
   document.getElementById('export-svg').addEventListener('click', handleExportClick);
   document.getElementById('save-preset').addEventListener('click', savePreset);

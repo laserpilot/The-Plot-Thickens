@@ -107,6 +107,7 @@ class SVGParser {
         const index = chunkStart + chunkIndex;
         const points = this.pathToPoints(path.d);
         const length = this.estimatePathLength(points);
+        const bounds = this.calculateBounds(points);
 
         // Debug logging for first few paths only
         if (index < 3) {
@@ -128,6 +129,7 @@ class SVGParser {
           ...path,
           points,
           length,
+          bounds,
         });
       });
 
@@ -616,6 +618,38 @@ class SVGParser {
     }
 
     return length;
+  }
+
+  /**
+   * Calculate bounding box from points
+   * @param {Array} points - Array of {x, y} points
+   * @returns {Object} - {minX, minY, maxX, maxY}
+   */
+  calculateBounds(points) {
+    if (!points || points.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const pt of points) {
+      if (isFinite(pt.x) && isFinite(pt.y)) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+      }
+    }
+
+    // If no valid points found, return zero bounds
+    if (!isFinite(minX)) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    }
+
+    return { minX, minY, maxX, maxY };
   }
 
   /**

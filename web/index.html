@@ -270,6 +270,33 @@
               Show Influence Field
             </label>
           </div>
+
+          <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
+
+          <div style="padding: 0.75rem; background: #f0f8ff; border-radius: 4px; border: 1px solid #b3d9ff;">
+            <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #0066cc;">🔍 Focus Window (large SVGs)</h4>
+            <p style="font-size: 0.8em; color: #666; margin: 0 0 0.5rem 0;">
+              Select a region for high-res preview while keeping rest in fast mode
+            </p>
+
+            <label>
+              <input type="checkbox" id="focus-mode-enabled">
+              Enable Focus Window
+            </label>
+
+            <div id="focus-window-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px;">
+              <p style="font-size: 0.8em; margin: 0 0 0.5rem 0; color: #666;">
+                <strong>Shift+Drag</strong> on canvas to define focus area
+              </p>
+
+              <label>
+                <input type="checkbox" id="show-focus-detail" checked>
+                Render High-Res in Focus Area
+              </label>
+
+              <button id="clear-focus" style="width: 100%; padding: 4px; font-size: 0.85em; margin-top: 0.5rem;">Clear Focus Rectangle</button>
+            </div>
+          </div>
         </section>
 
         <section class="control-group">
