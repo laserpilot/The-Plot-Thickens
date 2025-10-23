@@ -38,6 +38,11 @@ function initializeControls() {
         control.style.display = useAttractors ? 'block' : 'none';
       });
 
+      // Invalidate weight cache when switching modes
+      if (typeof invalidateWeightCache === 'function') {
+        invalidateWeightCache();
+      }
+
       updateStatus(useAttractors ? 'Attractor mode (click to place)' : 'Length-based mode');
       needsRedraw = true;
       redraw();

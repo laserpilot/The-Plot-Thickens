@@ -53,6 +53,9 @@ let focusComputeProgress = 0;
 let lastFocusWindow = null;
 let lastOffsetSettings = null;
 
+// Weight cache for attractor performance
+let weightsNeedRecalculation = true;
+
 // Processing settings
 let baseOffset = 0.25;
 let noise = 0.0;
@@ -156,14 +159,19 @@ function drawPaths() {
  */
 function renderWeightPreview() {
   svgData.paths.forEach(path => {
+    // Use cached weight if available, otherwise calculate
     let weight;
-
-    if (useAttractors) {
-      // Attractor-based weight - prefer path data string for arc-length sampling
-      weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+    if (path.cachedWeight !== undefined) {
+      weight = path.cachedWeight;
     } else {
-      // Length-based weight
-      weight = calculateLengthBasedWeight(path.length);
+      if (useAttractors) {
+        // Attractor-based weight - prefer path data string for arc-length sampling
+        weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+      } else {
+        // Length-based weight
+        weight = calculateLengthBasedWeight(path.length);
+      }
+      path.cachedWeight = weight; // Cache for next time
     }
 
     if (previewMode) {
@@ -205,12 +213,17 @@ function renderOffsetPreview() {
   noFill();
 
   svgData.paths.forEach((path, pathIndex) => {
-    // Calculate weight
+    // Use cached weight if available, otherwise calculate
     let weight;
-    if (useAttractors) {
-      weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+    if (path.cachedWeight !== undefined) {
+      weight = path.cachedWeight;
     } else {
-      weight = calculateLengthBasedWeight(path.length);
+      if (useAttractors) {
+        weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+      } else {
+        weight = calculateLengthBasedWeight(path.length);
+      }
+      path.cachedWeight = weight; // Cache for next time
     }
 
     // Generate deterministic seed
@@ -318,12 +331,17 @@ function renderWithFocusWindow() {
  * Render a single path with weight-based color only (fast)
  */
 function renderPathWeightOnly(path) {
+  // Use cached weight if available, otherwise calculate
   let weight;
-
-  if (useAttractors) {
-    weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+  if (path.cachedWeight !== undefined) {
+    weight = path.cachedWeight;
   } else {
-    weight = calculateLengthBasedWeight(path.length);
+    if (useAttractors) {
+      weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+    } else {
+      weight = calculateLengthBasedWeight(path.length);
+    }
+    path.cachedWeight = weight; // Cache for next time
   }
 
   // Color-code by weight (HSB: hue 120=green, 0=red)
@@ -418,12 +436,17 @@ async function computeFocusOffsets() {
 
     // Process chunk
     chunk.forEach(path => {
-      // Calculate weight
+      // Use cached weight if available, otherwise calculate
       let weight;
-      if (useAttractors) {
-        weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+      if (path.cachedWeight !== undefined) {
+        weight = path.cachedWeight;
       } else {
-        weight = calculateLengthBasedWeight(path.length);
+        if (useAttractors) {
+          weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
+        } else {
+          weight = calculateLengthBasedWeight(path.length);
+        }
+        path.cachedWeight = weight; // Cache for next time
       }
 
       // Generate deterministic seed
@@ -847,6 +870,9 @@ async function processPaths() {
     showProcessingProgress(false);
     pathsProcessed = true;
 
+    // Invalidate weight cache for new SVG data
+    invalidateWeightCache();
+
     // Hide process button
     const svgInfo = document.getElementById('svg-info');
     if (svgInfo) svgInfo.style.display = 'none';
@@ -917,9 +943,22 @@ function updateStatus(message) {
 }
 
 /**
+ * Invalidate cached weights (call when attractors change)
+ */
+function invalidateWeightCache() {
+  if (svgData && svgData.paths) {
+    svgData.paths.forEach(path => {
+      delete path.cachedWeight;
+    });
+  }
+}
+
+/**
  * Update attractor list in UI
  */
 function updateAttractorList() {
+  // Invalidate weight cache when attractors change
+  invalidateWeightCache();
   const listEl = document.getElementById('attractor-list');
   const countEl = document.getElementById('attractor-count');
 
