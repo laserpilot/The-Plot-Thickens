@@ -291,7 +291,7 @@ function renderWithFocusWindow() {
   svgData.paths.forEach((path) => {
     const inFocus = boundsIntersectFocus(path.bounds);
 
-    if (inFocus && showFocusDetail && offsetCache.has(path.id)) {
+    if (inFocus && showFocusDetail && offsetCache.has(path.d)) {
       // Inside focus window: render cached offset detail
       renderCachedOffsets(path);
     } else {
@@ -350,8 +350,12 @@ function renderPathWeightOnly(path) {
  * Render cached offset paths (fast, from pre-computed data)
  */
 function renderCachedOffsets(path) {
-  const cachedOffsets = offsetCache.get(path.id);
-  if (!cachedOffsets) return;
+  const cachedOffsets = offsetCache.get(path.d);
+  if (!cachedOffsets) {
+    console.warn('No cache found for path, falling back to weight preview');
+    renderPathWeightOnly(path);
+    return;
+  }
 
   // Render each cached offset path
   stroke(100);
@@ -437,9 +441,9 @@ async function computeFocusOffsets() {
 
         let offsetPoints;
         if (useNormalOffset) {
-          offsetPoints = generateOffsetPath(path.d, offsetDistance, currentSettings.noise, passSeed, path.id, envelope, true, currentSettings.noiseFrequency);
+          offsetPoints = generateOffsetPath(path.d, offsetDistance, currentSettings.noise, passSeed, path.d, envelope, true, currentSettings.noiseFrequency);
         } else {
-          offsetPoints = generateOffsetPath(path.points, offsetDistance, currentSettings.noise, passSeed, path.id, null, false);
+          offsetPoints = generateOffsetPath(path.points, offsetDistance, currentSettings.noise, passSeed, path.d, null, false);
         }
 
         if (offsetPoints) {
@@ -447,8 +451,9 @@ async function computeFocusOffsets() {
         }
       }
 
-      // Cache the offset paths
-      offsetCache.set(path.id, offsetPaths);
+      // Cache the offset paths using path data string as key
+      offsetCache.set(path.d, offsetPaths);
+      console.log(`Cached path (${path.d.substring(0, 20)}...): ${offsetPaths.length} offset paths`);
     });
 
     processed += chunk.length;
@@ -467,6 +472,8 @@ async function computeFocusOffsets() {
 
   isComputingFocus = false;
   console.log(`✓ Computed offsets for ${pathsInFocus.length} paths`);
+  console.log(`✓ Cache size: ${offsetCache.size} entries`);
+  console.log(`✓ Cache keys (first 3):`, Array.from(offsetCache.keys()).slice(0, 3).map(k => k.substring(0, 30) + '...'));
 
   // Update UI
   document.getElementById('focus-progress').style.display = 'none';
