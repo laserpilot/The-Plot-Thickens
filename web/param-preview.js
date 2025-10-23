@@ -98,7 +98,7 @@ class ParameterPreview {
    */
   drawCircle(ctx, centerX, centerY, baseRadius) {
     for (let i = 0; i < this.passes; i++) {
-      const passIndex = Math.floor(i / 2);
+      const passIndex = Math.floor(i / 2) + 1;
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
       const offsetDistance = direction * passIndex * this.baseOffset * this.scale;
@@ -138,7 +138,7 @@ class ParameterPreview {
     const lineLength = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - y, 2));
 
     for (let i = 0; i < this.passes; i++) {
-      const passIndex = Math.floor(i / 2);
+      const passIndex = Math.floor(i / 2) + 1;
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
       const baseOffsetPx = direction * passIndex * this.baseOffset * this.scale;
@@ -178,7 +178,7 @@ class ParameterPreview {
     const w = endX - startX;
 
     for (let i = 0; i < this.passes; i++) {
-      const passIndex = Math.floor(i / 2);
+      const passIndex = Math.floor(i / 2) + 1;
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
       const baseOffsetPx = direction * passIndex * this.baseOffset * this.scale;

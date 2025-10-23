@@ -546,7 +546,7 @@ async function prepareExport() {
 
     // Generate offset duplicates with centered distribution
     for (let i = 0; i < passes; i++) {
-      const passIndex = Math.floor(i / 2); // Distance from center
+      const passIndex = Math.floor(i / 2) + 1; // Distance from center (start at 1, not 0)
       const isRight = i % 2 === 0; // Alternate sides
       const direction = isRight ? 1 : -1;
 

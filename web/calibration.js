@@ -278,7 +278,7 @@ class CalibrationGenerator {
 
     // Generate offset duplicates
     for (let i = 0; i < passes; i++) {
-      const passIndex = Math.floor(i / 2);
+      const passIndex = Math.floor(i / 2) + 1;
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
 

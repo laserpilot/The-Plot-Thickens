@@ -240,7 +240,7 @@ function renderOffsetPreview() {
     const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
 
     for (let i = 0; i < maxPreviewPasses; i++) {
-      const passIndex = Math.floor(i / 2);
+      const passIndex = Math.floor(i / 2) + 1;
       const isRight = i % 2 === 0;
       const direction = isRight ? 1 : -1;
       const offsetDistance = direction * passIndex * baseOffset;
