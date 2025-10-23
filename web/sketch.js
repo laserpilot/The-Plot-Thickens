@@ -61,6 +61,9 @@ let baseOffset = 0.25;
 let noise = 0.0;
 let noiseFrequency = 50; // Noise wavelength in mm
 
+// Preview settings
+let previewEmphasis = 1.0; // Multiplier for preview line width (0.5-2.0)
+
 // Render control
 let needsRedraw = true;
 
@@ -178,9 +181,10 @@ function renderWeightPreview() {
       // Color-code by weight (HSB: hue 120=green, 0=red)
       const hue = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 120, 0);
       stroke(hue, 80, 60);
-      // Map weight to visual thickness, scaled by zoom for accuracy
-      const baseVisualWeight = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 0.5, 15);
-      const scaledWeight = baseVisualWeight / zoomScale; // Scale by zoom so visual thickness matches actual
+      // Calculate visual width based on actual output dimensions (weight × baseOffset)
+      // This makes the preview representative of the final result
+      const approximateWidthMM = weight * baseOffset;
+      const scaledWeight = (approximateWidthMM * previewEmphasis) / zoomScale;
       strokeWeight(scaledWeight);
     } else {
       stroke(path.stroke || 0);
@@ -347,8 +351,9 @@ function renderPathWeightOnly(path) {
   // Color-code by weight (HSB: hue 120=green, 0=red)
   const hue = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 120, 0);
   stroke(hue, 80, 60);
-  const baseVisualWeight = map(weight, attractorSystem.config.minPasses, attractorSystem.config.maxPasses, 0.5, 15);
-  const scaledWeight = baseVisualWeight / zoomScale;
+  // Calculate visual width based on actual output dimensions (weight × baseOffset)
+  const approximateWidthMM = weight * baseOffset;
+  const scaledWeight = (approximateWidthMM * previewEmphasis) / zoomScale;
   strokeWeight(scaledWeight);
 
   // Draw path

@@ -173,6 +173,37 @@ function initializeControls() {
     redraw();
   });
 
+  // Attractor path filtering controls
+  setupSlider('min-influence-threshold', (value) => {
+    attractorSystem.updateConfig({ minInfluenceThreshold: value });
+    // Invalidate weight cache since filtering affects weights
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('min-coverage-percent', (value) => {
+    attractorSystem.updateConfig({ minCoveragePercent: value });
+    // Invalidate weight cache since filtering affects weights
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+  });
+
+  document.getElementById('influence-calc-mode').addEventListener('change', (e) => {
+    attractorSystem.updateConfig({ influenceCalcMode: e.target.value });
+    // Invalidate weight cache since calculation mode affects weights
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+  });
+
   // Line weight settings
   setupSlider('base-offset', (value) => {
     baseOffset = value;
@@ -262,6 +293,18 @@ function initializeControls() {
   if (previewDisplayModeSelect) {
     previewDisplayModeSelect.addEventListener('change', (e) => {
       previewDisplayMode = e.target.value;
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
+  // Preview emphasis slider
+  const previewEmphasisSlider = document.getElementById('preview-emphasis');
+  const previewEmphasisValue = document.getElementById('preview-emphasis-value');
+  if (previewEmphasisSlider && previewEmphasisValue) {
+    previewEmphasisSlider.addEventListener('input', (e) => {
+      previewEmphasis = parseFloat(e.target.value);
+      previewEmphasisValue.textContent = previewEmphasis.toFixed(1);
       needsRedraw = true;
       redraw();
     });
@@ -860,6 +903,21 @@ function updateUIFromConfig() {
   if (config.arcLengthSampleInterval !== undefined) {
     document.getElementById('arc-sample-interval').value = config.arcLengthSampleInterval;
     document.getElementById('arc-sample-interval-value').textContent = config.arcLengthSampleInterval;
+  }
+
+  // Path filtering controls
+  if (config.minInfluenceThreshold !== undefined) {
+    document.getElementById('min-influence-threshold').value = config.minInfluenceThreshold;
+    document.getElementById('min-influence-threshold-value').textContent = config.minInfluenceThreshold.toFixed(2);
+  }
+
+  if (config.minCoveragePercent !== undefined) {
+    document.getElementById('min-coverage-percent').value = config.minCoveragePercent;
+    document.getElementById('min-coverage-percent-value').textContent = config.minCoveragePercent;
+  }
+
+  if (config.influenceCalcMode !== undefined) {
+    document.getElementById('influence-calc-mode').value = config.influenceCalcMode;
   }
 
   document.getElementById('min-passes').value = config.minPasses;

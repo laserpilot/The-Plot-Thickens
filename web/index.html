@@ -143,6 +143,33 @@
             <span id="arc-sample-interval-value">5</span>
             <span class="hint-icon" title="Spacing between sample points for weight calculation. Smaller = more accurate but slower">?</span>
           </label>
+
+          <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+          <div style="font-weight: bold; margin-bottom: 0.5rem;">Path Filtering</div>
+
+          <label>
+            Minimum Influence Threshold:
+            <input type="range" id="min-influence-threshold" min="0" max="1" step="0.05" value="0">
+            <span id="min-influence-threshold-value">0.00</span>
+            <span class="hint-icon" title="Only affect paths where max influence exceeds this value. 0 = all paths, 1 = only paths at attractor center.">?</span>
+          </label>
+
+          <label>
+            Minimum Coverage %:
+            <input type="range" id="min-coverage-percent" min="0" max="100" step="5" value="0">
+            <span id="min-coverage-percent-value">0</span>
+            <span class="hint-icon" title="Only affect paths where this % of sample points are inside attractor radius. 0 = all paths, 100 = only paths entirely inside.">?</span>
+          </label>
+
+          <label>
+            Influence Calculation:
+            <select id="influence-calc-mode">
+              <option value="average">Average (spread across path)</option>
+              <option value="maximum">Maximum (favor center pass)</option>
+            </select>
+            <span class="hint-icon" title="Average: weight based on average influence. Maximum: weight based on closest point to attractor center.">?</span>
+          </label>
         </section>
 
         <section class="control-group">
@@ -257,6 +284,13 @@
               <option value="weight">Weight Only (fast)</option>
               <option value="offset">Offset Rendering (accurate)</option>
             </select>
+          </label>
+
+          <label>
+            Preview Line Emphasis:
+            <input type="range" id="preview-emphasis" min="0.5" max="2.0" step="0.1" value="1.0">
+            <span id="preview-emphasis-value">1.0</span>
+            <span class="hint-icon" title="Adjust visibility of preview lines. 1.0 = accurate to final output width (weight × offset). Increase to make thin lines more visible.">?</span>
           </label>
 
           <div class="attractor-controls" style="display: none;">
