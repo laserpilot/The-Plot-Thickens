@@ -433,7 +433,7 @@ async function computeFocusOffsets() {
       const offsetPaths = [];
 
       for (let j = 0; j < weight; j++) {
-        const passIndex = Math.floor(j / 2);
+        const passIndex = Math.floor(j / 2) + 1;
         const isRight = j % 2 === 0;
         const direction = isRight ? 1 : -1;
         const offsetDistance = direction * passIndex * currentSettings.baseOffset;
