@@ -240,6 +240,83 @@ function initializeControls() {
     updateCLICommand();
   });
 
+  // Length mapping curve controls
+  const lengthMappingCurveSelect = document.getElementById('length-mapping-curve');
+  const powerCurveControls = document.getElementById('power-curve-controls');
+  const percentileCurveControls = document.getElementById('percentile-curve-controls');
+
+  if (lengthMappingCurveSelect) {
+    lengthMappingCurveSelect.addEventListener('change', (e) => {
+      const curve = e.target.value;
+      attractorSystem.updateConfig({ lengthMappingCurve: curve });
+
+      // Show/hide curve-specific controls
+      if (powerCurveControls) {
+        powerCurveControls.style.display = (curve === 'power') ? 'block' : 'none';
+      }
+      if (percentileCurveControls) {
+        percentileCurveControls.style.display = (curve === 'percentile') ? 'block' : 'none';
+      }
+
+      // Invalidate weight cache
+      if (typeof invalidateWeightCache === 'function') {
+        invalidateWeightCache();
+      }
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
+  setupSlider('length-mapping-exponent', (value) => {
+    attractorSystem.updateConfig({ lengthMappingExponent: value });
+    // Invalidate weight cache
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('length-percentile-clamp', (value) => {
+    attractorSystem.updateConfig({ lengthPercentileClamp: value });
+    // Invalidate weight cache
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+  });
+
+  // Min/max length threshold inputs (now work in both preview and export)
+  const minLengthInput = document.getElementById('min-length-threshold');
+  const maxLengthInput = document.getElementById('max-length-threshold');
+
+  if (minLengthInput) {
+    minLengthInput.addEventListener('change', (e) => {
+      const value = parseFloat(e.target.value);
+      attractorSystem.updateConfig({ minLengthOverride: (value > 0 ? value : null) });
+      // Invalidate weight cache
+      if (typeof invalidateWeightCache === 'function') {
+        invalidateWeightCache();
+      }
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
+  if (maxLengthInput) {
+    maxLengthInput.addEventListener('change', (e) => {
+      const value = parseFloat(e.target.value);
+      attractorSystem.updateConfig({ maxLengthOverride: (value > 0 ? value : null) });
+      // Invalidate weight cache
+      if (typeof invalidateWeightCache === 'function') {
+        invalidateWeightCache();
+      }
+      needsRedraw = true;
+      redraw();
+    });
+  }
+
   // Sample rate slider
   setupSlider('sample-rate', (value) => {
     // Sample rate will be used during export
@@ -472,23 +549,6 @@ async function prepareExport() {
   // Generate processed paths
   const processedPaths = [];
 
-  // Calculate min/max lengths for normalization
-  const lengths = svgData.paths.map(p => p.length || 0).filter(l => l > 0);
-  const autoMinLength = lengths.length > 0 ? Math.min(...lengths) : 0;
-  const autoMaxLength = lengths.length > 0 ? Math.max(...lengths) : 100;
-
-  // Check for manual overrides
-  const minLengthInput = document.getElementById('min-length-threshold');
-  const maxLengthInput = document.getElementById('max-length-threshold');
-  const minLength = (minLengthInput && minLengthInput.value && parseFloat(minLengthInput.value) > 0)
-    ? parseFloat(minLengthInput.value)
-    : autoMinLength;
-  const maxLength = (maxLengthInput && maxLengthInput.value && parseFloat(maxLengthInput.value) > 0)
-    ? parseFloat(maxLengthInput.value)
-    : autoMaxLength;
-
-  console.log(`Using length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)}mm`);
-
   // Re-process paths with high quality for export
   console.log('Re-processing paths with high resolution for export...');
 
@@ -507,24 +567,14 @@ async function prepareExport() {
     // Re-sample path with high quality for export
     const highQualityPoints = svgParser.pathToPoints(path.d, true);
 
+    // Calculate weight using the same logic as preview
+    // This respects all mapping curve settings
     let passes;
-
     if (useAttractors) {
       passes = attractorSystem.calculatePathWeight(highQualityPoints);
     } else {
-      // Length-based weight calculation (inline to avoid scope issues)
-      const pathLength = path.length || 0;
-
-      if (pathLength === 0 || maxLength === minLength) {
-        passes = attractorSystem.config.minPasses;
-      } else {
-        const normalized = (pathLength - minLength) / (maxLength - minLength);
-        passes = Math.round(
-          attractorSystem.config.minPasses +
-          normalized * (attractorSystem.config.maxPasses - attractorSystem.config.minPasses)
-        );
-        passes = Math.max(attractorSystem.config.minPasses, Math.min(attractorSystem.config.maxPasses, passes));
-      }
+      // Use the shared calculateLengthBasedWeight function from sketch.js
+      passes = calculateLengthBasedWeight(path.length || 0);
     }
 
     // Only log first 5 and last 5 paths to avoid console spam

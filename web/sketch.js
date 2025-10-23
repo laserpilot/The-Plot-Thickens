@@ -273,7 +273,7 @@ function renderOffsetPreview() {
 }
 
 /**
- * Calculate weight based on path length
+ * Calculate weight based on path length with configurable mapping curves
  */
 function calculateLengthBasedWeight(pathLength) {
   if (!svgData || svgData.paths.length === 0) {
@@ -282,16 +282,61 @@ function calculateLengthBasedWeight(pathLength) {
 
   // Find min/max lengths in current SVG
   const lengths = svgData.paths.map(p => p.length);
-  const minLength = Math.min(...lengths);
-  const maxLength = Math.max(...lengths);
+
+  // Apply manual overrides if set
+  let minLength = attractorSystem.config.minLengthOverride !== null
+    ? attractorSystem.config.minLengthOverride
+    : Math.min(...lengths);
+  let maxLength = attractorSystem.config.maxLengthOverride !== null
+    ? attractorSystem.config.maxLengthOverride
+    : Math.max(...lengths);
+
+  // Apply percentile clamping if configured
+  if (attractorSystem.config.lengthMappingCurve === 'percentile' &&
+      attractorSystem.config.lengthPercentileClamp < 100) {
+    const sortedLengths = [...lengths].sort((a, b) => a - b);
+    const percentileIndex = Math.floor((attractorSystem.config.lengthPercentileClamp / 100) * (sortedLengths.length - 1));
+    maxLength = sortedLengths[percentileIndex];
+  }
+
+  // Clamp path length to range
+  const clampedLength = Math.max(minLength, Math.min(maxLength, pathLength));
 
   // Avoid division by zero
   if (maxLength === minLength) {
     return attractorSystem.config.minPasses;
   }
 
-  // Normalize length to 0-1
-  const normalized = (pathLength - minLength) / (maxLength - minLength);
+  // Normalize length to 0-1 using selected curve
+  let normalized;
+  const curve = attractorSystem.config.lengthMappingCurve;
+
+  switch (curve) {
+    case 'logarithmic':
+      // Logarithmic mapping - compresses high values
+      const logMin = Math.log(Math.max(minLength, 0.1)); // Avoid log(0)
+      const logMax = Math.log(maxLength);
+      const logLength = Math.log(Math.max(clampedLength, 0.1));
+      normalized = (logLength - logMin) / (logMax - logMin);
+      break;
+
+    case 'power':
+      // Power curve - adjustable bias
+      const linearNorm = (clampedLength - minLength) / (maxLength - minLength);
+      normalized = Math.pow(linearNorm, attractorSystem.config.lengthMappingExponent);
+      break;
+
+    case 'percentile':
+      // Percentile already handled above, use linear mapping
+      normalized = (clampedLength - minLength) / (maxLength - minLength);
+      break;
+
+    case 'linear':
+    default:
+      // Linear mapping
+      normalized = (clampedLength - minLength) / (maxLength - minLength);
+      break;
+  }
 
   // Map to pass range
   const passes = Math.round(

@@ -100,6 +100,12 @@ class AttractorSystem {
       minInfluenceThreshold: 0, // Only affect paths with max influence > this (0-1)
       minCoveragePercent: 0, // Only affect if this % of sample points are inside radius (0-100)
       influenceCalcMode: 'average', // 'average' or 'maximum'
+      // Length-based weight mapping options
+      lengthMappingCurve: 'linear', // 'linear', 'logarithmic', 'power', 'percentile'
+      lengthMappingExponent: 1.0, // Power curve exponent (0.1-3.0)
+      lengthPercentileClamp: 100, // Percentile to use as max (50-100)
+      minLengthOverride: null, // Manual min length (null = auto)
+      maxLengthOverride: null, // Manual max length (null = auto)
     };
   }
 
