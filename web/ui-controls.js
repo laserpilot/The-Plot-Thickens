@@ -414,6 +414,10 @@ async function prepareExport() {
   console.log('Generating processed SVG...');
   updateStatus('Exporting SVG...');
 
+  // Show export progress UI
+  showExportProgress(true);
+  const startTime = Date.now();
+
   // Check binning settings
   const enableBinning = document.getElementById('enable-binning')?.checked || false;
   const binCount = parseInt(document.getElementById('bin-count')?.value) || 4;
@@ -444,7 +448,15 @@ async function prepareExport() {
   // If binning is enabled, collect paths with metadata for binning
   const pathsWithMetadata = [];
 
-  svgData.paths.forEach((path, index) => {
+  const totalPaths = svgData.paths.length;
+  const chunkSize = 50; // Process 50 paths at a time
+
+  for (let chunkStart = 0; chunkStart < totalPaths; chunkStart += chunkSize) {
+    const chunkEnd = Math.min(chunkStart + chunkSize, totalPaths);
+    const chunk = svgData.paths.slice(chunkStart, chunkEnd);
+
+    chunk.forEach((path, chunkIndex) => {
+      const index = chunkStart + chunkIndex;
     // Re-sample path with high quality for export
     const highQualityPoints = svgParser.pathToPoints(path.d, true);
 
@@ -529,7 +541,20 @@ async function prepareExport() {
         paths: sourcePaths
       });
     }
-  });
+    });
+
+    // Update progress after each chunk
+    const processed = chunkEnd;
+    const percent = Math.round((processed / totalPaths) * 100);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    updateExportProgress(processed, totalPaths, percent, elapsed);
+
+    // Yield to UI thread to keep interface responsive
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  // Hide export progress
+  showExportProgress(false);
 
   console.log(`Generated ${enableBinning ? pathsWithMetadata.reduce((sum, p) => sum + p.paths.length, 0) : processedPaths.length} total processed paths from ${svgData.paths.length} source paths`);
 
@@ -1000,4 +1025,27 @@ function triggerDownload(content, filename) {
     console.error('Error in downloadFile:', error);
     throw new Error(`Download failed: ${error.message}`);
   }
+}
+
+/**
+ * Show/hide export progress UI
+ */
+function showExportProgress(show) {
+  const progressEl = document.getElementById('export-progress');
+  if (progressEl) {
+    progressEl.style.display = show ? 'block' : 'none';
+  }
+}
+
+/**
+ * Update export progress UI
+ */
+function updateExportProgress(processed, total, percent, elapsed) {
+  const fillEl = document.getElementById('export-progress-fill');
+  const textEl = document.getElementById('export-progress-text');
+  const timeEl = document.getElementById('export-progress-time');
+
+  if (fillEl) fillEl.style.width = `${percent}%`;
+  if (textEl) textEl.textContent = `Exporting ${processed}/${total} paths (${percent}%)`;
+  if (timeEl) timeEl.textContent = `Elapsed: ${elapsed}s`;
 }
