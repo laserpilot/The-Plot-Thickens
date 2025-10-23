@@ -459,6 +459,10 @@ async function prepareExport() {
 
   // Show export progress UI
   showExportProgress(true);
+
+  // Yield to UI thread to allow progress bar to render before starting heavy processing
+  await new Promise(resolve => setTimeout(resolve, 50));
+
   const startTime = Date.now();
 
   // Check binning settings
@@ -492,7 +496,7 @@ async function prepareExport() {
   const pathsWithMetadata = [];
 
   const totalPaths = svgData.paths.length;
-  const chunkSize = 50; // Process 50 paths at a time
+  const chunkSize = 10; // Process 10 paths at a time for better UI responsiveness
 
   for (let chunkStart = 0; chunkStart < totalPaths; chunkStart += chunkSize) {
     const chunkEnd = Math.min(chunkStart + chunkSize, totalPaths);
@@ -593,7 +597,8 @@ async function prepareExport() {
     updateExportProgress(processed, totalPaths, percent, elapsed);
 
     // Yield to UI thread to keep interface responsive
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // Use 10ms delay to ensure UI actually updates
+    await new Promise(resolve => setTimeout(resolve, 10));
   }
 
   // Hide export progress
