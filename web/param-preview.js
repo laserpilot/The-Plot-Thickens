@@ -219,10 +219,405 @@ class ParameterPreview {
   }
 }
 
+/**
+ * Crosshatch preview widget
+ * Shows sample shapes filled with crosshatch pattern
+ */
+class CrosshatchPreview {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) {
+      console.warn('Crosshatch preview canvas not found');
+      return;
+    }
+
+    this.ctx = this.canvas.getContext('2d');
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
+
+    // Default parameters
+    this.hatchAngles = [45, -45];
+    this.hatchSpacing = 1.0;
+    this.organicEnabled = false;
+    this.wiggle = 0;
+    this.wiggleFreq = 20;
+    this.angleJitter = 0;
+    this.lengthJitter = 0;
+    this.positionJitter = 0;
+    this.spacingJitter = 0;
+
+    // Scale factor (pixels per mm)
+    this.scale = 15;
+
+    this.draw();
+  }
+
+  /**
+   * Update parameters and redraw
+   */
+  update(hatchAngles, hatchSpacing, organicEnabled, wiggle, wiggleFreq, angleJitter, lengthJitter, positionJitter, spacingJitter) {
+    this.hatchAngles = hatchAngles;
+    this.hatchSpacing = hatchSpacing;
+    this.organicEnabled = organicEnabled;
+    this.wiggle = wiggle;
+    this.wiggleFreq = wiggleFreq;
+    this.angleJitter = angleJitter;
+    this.lengthJitter = lengthJitter;
+    this.positionJitter = positionJitter;
+    this.spacingJitter = spacingJitter;
+    this.draw();
+  }
+
+  /**
+   * Simple seeded random number generator
+   */
+  seededRandom(seed) {
+    const x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+  }
+
+  /**
+   * Generate a wiggly line (simplified version)
+   */
+  generateWigglyLine(x1, y1, x2, y2, seed) {
+    if (!this.organicEnabled || this.wiggle === 0) {
+      return [[x1, y1], [x2, y2]];
+    }
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(3, Math.floor(length / (this.wiggleFreq * this.scale / 5)));
+
+    const points = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = x1 + dx * t;
+      const y = y1 + dy * t;
+
+      // Perpendicular offset
+      const perpX = -dy / length;
+      const perpY = dx / length;
+
+      const phase = (t * length) / (this.wiggleFreq * this.scale);
+      const noise = this.seededRandom(seed + i * 0.1) * 0.3 - 0.15;
+      const wiggleAmount = Math.sin(phase * Math.PI * 2 + noise) * this.wiggle * this.scale;
+
+      points.push([
+        x + perpX * wiggleAmount,
+        y + perpY * wiggleAmount
+      ]);
+    }
+    return points;
+  }
+
+  /**
+   * Draw the preview
+   */
+  draw() {
+    if (!this.ctx) return;
+
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 1;
+
+    // Layout: Circle | Rectangle | Curve
+    const sectionWidth = w / 3;
+
+    // 1. CIRCLE (left third)
+    this.drawCircle(ctx, sectionWidth / 2, h / 2, 20);
+
+    // 2. RECTANGLE (middle third)
+    this.drawRectangle(ctx, sectionWidth + 20, h / 2 - 20, sectionWidth - 40, 40);
+
+    // 3. CURVE (right third) - draw a curved band
+    this.drawCurve(ctx, sectionWidth * 2, w);
+
+    // Draw label
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    const anglesStr = this.hatchAngles.join('°, ') + '°';
+    const organicLabel = this.organicEnabled ? ` | wiggle=${this.wiggle}mm` : '';
+    ctx.fillText(`${anglesStr} @ ${this.hatchSpacing}mm${organicLabel}`, 3, h - 3);
+  }
+
+  /**
+   * Draw hatches inside a circle
+   */
+  drawCircle(ctx, centerX, centerY, radius) {
+    const spacingPx = this.hatchSpacing * this.scale;
+
+    this.hatchAngles.forEach((baseAngle, angleIndex) => {
+      // Apply angle jitter
+      const jitter = this.organicEnabled ? (this.seededRandom(angleIndex * 100) - 0.5) * this.angleJitter : 0;
+      const angle = (baseAngle + jitter) * Math.PI / 180;
+      const perpAngle = angle + Math.PI / 2;
+
+      // Hatch direction
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+
+      // Perpendicular direction for spacing
+      const px = Math.cos(perpAngle);
+      const py = Math.sin(perpAngle);
+
+      // Determine hatch line range
+      const numLines = Math.ceil((radius * 2) / this.hatchSpacing);
+
+      for (let i = -numLines; i <= numLines; i++) {
+        // Apply spacing jitter
+        const spacingMult = this.organicEnabled ? 1 + (this.seededRandom(angleIndex * 1000 + i) - 0.5) * this.spacingJitter : 1;
+        const offset = i * spacingPx * spacingMult;
+
+        // Apply position jitter
+        const posJitter = this.organicEnabled ? (this.seededRandom(angleIndex * 2000 + i) - 0.5) * this.positionJitter * this.scale : 0;
+
+        const lineX = centerX + px * (offset + posJitter);
+        const lineY = centerY + py * (offset + posJitter);
+
+        // Find intersections with circle
+        const intersections = this.lineCircleIntersection(lineX, lineY, dx, dy, centerX, centerY, radius);
+        if (intersections.length === 2) {
+          const [p1, p2] = intersections;
+
+          // Apply length jitter
+          let x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+          if (this.organicEnabled && this.lengthJitter > 0) {
+            const jitterAmount = this.lengthJitter * this.seededRandom(angleIndex * 3000 + i);
+            const segLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const shortenPx = segLength * jitterAmount;
+            const ratio = (segLength - shortenPx) / segLength;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            x1 = midX + (x1 - midX) * ratio;
+            y1 = midY + (y1 - midY) * ratio;
+            x2 = midX + (x2 - midX) * ratio;
+            y2 = midY + (y2 - midY) * ratio;
+          }
+
+          // Draw line (potentially wiggly)
+          const points = this.generateWigglyLine(x1, y1, x2, y2, angleIndex * 5000 + i);
+          ctx.beginPath();
+          points.forEach((pt, idx) => {
+            if (idx === 0) ctx.moveTo(pt[0], pt[1]);
+            else ctx.lineTo(pt[0], pt[1]);
+          });
+          ctx.stroke();
+        }
+      }
+    });
+  }
+
+  /**
+   * Draw hatches inside a rectangle
+   */
+  drawRectangle(ctx, x, y, width, height) {
+    const spacingPx = this.hatchSpacing * this.scale;
+
+    this.hatchAngles.forEach((baseAngle, angleIndex) => {
+      // Apply angle jitter
+      const jitter = this.organicEnabled ? (this.seededRandom(angleIndex * 100) - 0.5) * this.angleJitter : 0;
+      const angle = (baseAngle + jitter) * Math.PI / 180;
+      const perpAngle = angle + Math.PI / 2;
+
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const px = Math.cos(perpAngle);
+      const py = Math.sin(perpAngle);
+
+      const diagonal = Math.sqrt(width * width + height * height);
+      const numLines = Math.ceil(diagonal / this.hatchSpacing);
+
+      for (let i = -numLines; i <= numLines; i++) {
+        const spacingMult = this.organicEnabled ? 1 + (this.seededRandom(angleIndex * 1000 + i) - 0.5) * this.spacingJitter : 1;
+        const offset = i * spacingPx * spacingMult;
+        const posJitter = this.organicEnabled ? (this.seededRandom(angleIndex * 2000 + i) - 0.5) * this.positionJitter * this.scale : 0;
+
+        const lineX = x + width / 2 + px * (offset + posJitter);
+        const lineY = y + height / 2 + py * (offset + posJitter);
+
+        // Find intersections with rectangle
+        const intersections = this.lineRectIntersection(lineX, lineY, dx, dy, x, y, width, height);
+        if (intersections.length === 2) {
+          let [p1, p2] = intersections;
+
+          // Apply length jitter
+          if (this.organicEnabled && this.lengthJitter > 0) {
+            const jitterAmount = this.lengthJitter * this.seededRandom(angleIndex * 3000 + i);
+            const segLength = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+            const shortenPx = segLength * jitterAmount;
+            const ratio = (segLength - shortenPx) / segLength;
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            p1 = {
+              x: midX + (p1.x - midX) * ratio,
+              y: midY + (p1.y - midY) * ratio
+            };
+            p2 = {
+              x: midX + (p2.x - midX) * ratio,
+              y: midY + (p2.y - midY) * ratio
+            };
+          }
+
+          const points = this.generateWigglyLine(p1.x, p1.y, p2.x, p2.y, angleIndex * 5000 + i);
+          ctx.beginPath();
+          points.forEach((pt, idx) => {
+            if (idx === 0) ctx.moveTo(pt[0], pt[1]);
+            else ctx.lineTo(pt[0], pt[1]);
+          });
+          ctx.stroke();
+        }
+      }
+    });
+  }
+
+  /**
+   * Draw hatches inside a curved band
+   */
+  drawCurve(ctx, startX, endX) {
+    const h = this.height;
+    const w = endX - startX;
+    const bandHeight = 35;
+
+    // Define curve path (S-curve)
+    const curvePoints = [];
+    const numPoints = 50;
+    for (let i = 0; i <= numPoints; i++) {
+      const t = i / numPoints;
+      const x = startX + w * 0.15 + w * 0.7 * t;
+      const yCenter = h / 2 + Math.sin(t * Math.PI * 2 - Math.PI / 2) * h * 0.2;
+      curvePoints.push({ x, y: yCenter });
+    }
+
+    // Draw curve boundaries for context
+    ctx.strokeStyle = '#dfe6e9';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    curvePoints.forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt.x, pt.y - bandHeight / 2);
+      else ctx.lineTo(pt.x, pt.y - bandHeight / 2);
+    });
+    ctx.stroke();
+    ctx.beginPath();
+    curvePoints.forEach((pt, i) => {
+      if (i === 0) ctx.moveTo(pt.x, pt.y + bandHeight / 2);
+      else ctx.lineTo(pt.x, pt.y + bandHeight / 2);
+    });
+    ctx.stroke();
+
+    // Draw hatches (simplified - just draw at intervals along curve)
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 1;
+
+    const spacingPx = this.hatchSpacing * this.scale;
+    this.hatchAngles.forEach((baseAngle, angleIndex) => {
+      const jitter = this.organicEnabled ? (this.seededRandom(angleIndex * 100) - 0.5) * this.angleJitter : 0;
+      const angle = (baseAngle + jitter) * Math.PI / 180;
+
+      const numHatches = Math.floor(w / spacingPx);
+      for (let i = 0; i <= numHatches; i++) {
+        const t = i / numHatches;
+        const idx = Math.floor(t * (curvePoints.length - 1));
+        const pt = curvePoints[idx];
+
+        const hatchLength = bandHeight;
+        const lengthMult = this.organicEnabled ? 1 - this.lengthJitter * this.seededRandom(angleIndex * 3000 + i) : 1;
+        const actualLength = hatchLength * lengthMult;
+
+        const dx = Math.cos(angle) * actualLength;
+        const dy = Math.sin(angle) * actualLength;
+
+        const x1 = pt.x - dx / 2;
+        const y1 = pt.y - dy / 2;
+        const x2 = pt.x + dx / 2;
+        const y2 = pt.y + dy / 2;
+
+        const points = this.generateWigglyLine(x1, y1, x2, y2, angleIndex * 5000 + i);
+        ctx.beginPath();
+        points.forEach((p, pidx) => {
+          if (pidx === 0) ctx.moveTo(p[0], p[1]);
+          else ctx.lineTo(p[0], p[1]);
+        });
+        ctx.stroke();
+      }
+    });
+  }
+
+  /**
+   * Line-circle intersection
+   */
+  lineCircleIntersection(lineX, lineY, dx, dy, cx, cy, r) {
+    // Line: (lineX + t*dx, lineY + t*dy)
+    // Circle: (x - cx)^2 + (y - cy)^2 = r^2
+    const fx = lineX - cx;
+    const fy = lineY - cy;
+    const a = dx * dx + dy * dy;
+    const b = 2 * (fx * dx + fy * dy);
+    const c = fx * fx + fy * fy - r * r;
+    const discriminant = b * b - 4 * a * c;
+
+    if (discriminant < 0) return [];
+
+    const t1 = (-b - Math.sqrt(discriminant)) / (2 * a);
+    const t2 = (-b + Math.sqrt(discriminant)) / (2 * a);
+
+    return [
+      { x: lineX + t1 * dx, y: lineY + t1 * dy },
+      { x: lineX + t2 * dx, y: lineY + t2 * dy }
+    ];
+  }
+
+  /**
+   * Line-rectangle intersection
+   */
+  lineRectIntersection(lineX, lineY, dx, dy, rectX, rectY, rectW, rectH) {
+    const intersections = [];
+
+    // Four edges of rectangle
+    const edges = [
+      { x1: rectX, y1: rectY, x2: rectX + rectW, y2: rectY }, // top
+      { x1: rectX + rectW, y1: rectY, x2: rectX + rectW, y2: rectY + rectH }, // right
+      { x1: rectX, y1: rectY + rectH, x2: rectX + rectW, y2: rectY + rectH }, // bottom
+      { x1: rectX, y1: rectY, x2: rectX, y2: rectY + rectH }, // left
+    ];
+
+    edges.forEach(edge => {
+      const edgeDx = edge.x2 - edge.x1;
+      const edgeDy = edge.y2 - edge.y1;
+
+      // Solve: lineX + t1*dx = edge.x1 + t2*edgeDx
+      //        lineY + t1*dy = edge.y1 + t2*edgeDy
+      const denom = dx * edgeDy - dy * edgeDx;
+      if (Math.abs(denom) < 1e-10) return; // Parallel
+
+      const t1 = ((edge.x1 - lineX) * edgeDy - (edge.y1 - lineY) * edgeDx) / denom;
+      const t2 = ((edge.x1 - lineX) * dy - (edge.y1 - lineY) * dx) / denom;
+
+      if (t2 >= 0 && t2 <= 1) { // Intersection on edge
+        intersections.push({ x: lineX + t1 * dx, y: lineY + t1 * dy, t: t1 });
+      }
+    });
+
+    // Sort by t value and return first two
+    intersections.sort((a, b) => a.t - b.t);
+    return intersections.slice(0, 2);
+  }
+}
+
 // Initialize preview when DOM loads
 let paramPreview = null;
+let crosshatchPreview = null;
+
 document.addEventListener('DOMContentLoaded', () => {
   paramPreview = new ParameterPreview('param-preview-canvas');
+  crosshatchPreview = new CrosshatchPreview('crosshatch-preview-canvas');
 
   // Update preview when parameters change
   function updatePreview() {

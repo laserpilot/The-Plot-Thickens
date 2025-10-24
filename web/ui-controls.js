@@ -94,6 +94,7 @@ function initializeControls() {
       needsRedraw = true;
       redraw();
       updateCLICommand();
+      updateCrosshatchPreview();
     });
   }
 
@@ -105,6 +106,7 @@ function initializeControls() {
       needsRedraw = true;
       redraw();
       updateCLICommand();
+      updateCrosshatchPreview();
     });
   }
 
@@ -114,6 +116,76 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  // Organic hatch toggle
+  const organicHatchCheckbox = document.getElementById('organic-hatch-enabled');
+  if (organicHatchCheckbox) {
+    organicHatchCheckbox.addEventListener('change', (e) => {
+      organicHatchEnabled = e.target.checked;
+
+      // Show/hide organic controls
+      const organicControls = document.getElementById('organic-hatch-controls');
+      if (organicControls) {
+        organicControls.style.display = organicHatchEnabled ? 'block' : 'none';
+      }
+
+      updateStatus(organicHatchEnabled ? 'Organic crosshatch enabled' : 'Organic crosshatch disabled');
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateCrosshatchPreview();
+    });
+  }
+
+  // Organic hatch controls
+  setupSlider('hatch-wiggle', (value) => {
+    hatchWiggle = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('wiggle-frequency', (value) => {
+    wiggleFrequency = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('angle-jitter', (value) => {
+    angleJitter = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('length-jitter', (value) => {
+    lengthJitter = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('position-jitter', (value) => {
+    positionJitter = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('spacing-jitter', (value) => {
+    spacingJitter = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
   });
 
   // Offset mode toggle
@@ -524,6 +596,9 @@ function initializeControls() {
 
   // Update CLI command on parameter changes
   updateCLICommand();
+
+  // Initialize crosshatch preview
+  updateCrosshatchPreview();
 }
 
 /**
@@ -670,7 +745,19 @@ async function prepareExport() {
     if (fillMode === 'crosshatch') {
       // Crosshatch fill
       const baseWidth = baseOffset * Math.max(1, passes);
-      const hatchPathStrings = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency);
+
+      // Build organic options
+      const organicOptions = {
+        enabled: organicHatchEnabled,
+        wiggle: hatchWiggle,
+        wiggleFreq: wiggleFrequency,
+        angleJitter: angleJitter,
+        lengthJitter: lengthJitter,
+        positionJitter: positionJitter,
+        spacingJitter: spacingJitter
+      };
+
+      const hatchPathStrings = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions);
 
       hatchPathStrings.forEach(hatchPathD => {
         const pathData = {
@@ -1126,6 +1213,17 @@ function generateCLICommand() {
     const hatchAnglesStr = hatchAngles.join(',');
     params.push(`--hatch-angles "${hatchAnglesStr}"`);
     params.push(`--hatch-spacing ${hatchSpacing}`);
+
+    // Add organic hatch options if enabled
+    if (organicHatchEnabled) {
+      params.push(`--organic-hatch`);
+      if (hatchWiggle > 0) params.push(`--hatch-wiggle ${hatchWiggle}`);
+      if (wiggleFrequency !== 20) params.push(`--wiggle-frequency ${wiggleFrequency}`);
+      if (angleJitter > 0) params.push(`--angle-jitter ${angleJitter}`);
+      if (lengthJitter > 0) params.push(`--length-jitter ${lengthJitter}`);
+      if (positionJitter > 0) params.push(`--position-jitter ${positionJitter}`);
+      if (spacingJitter > 0) params.push(`--spacing-jitter ${spacingJitter}`);
+    }
   }
 
   if (offsetMode === 'normal') {
@@ -1223,6 +1321,25 @@ function copyCLICommand() {
     setTimeout(() => {
       button.textContent = originalText;
     }, 2000);
+  }
+}
+
+/**
+ * Update crosshatch preview
+ */
+function updateCrosshatchPreview() {
+  if (typeof crosshatchPreview !== 'undefined' && crosshatchPreview) {
+    crosshatchPreview.update(
+      hatchAngles,
+      hatchSpacing,
+      organicHatchEnabled,
+      hatchWiggle,
+      wiggleFrequency,
+      angleJitter,
+      lengthJitter,
+      positionJitter,
+      spacingJitter
+    );
   }
 }
 

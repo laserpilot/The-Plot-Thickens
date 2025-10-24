@@ -1,19 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plotter Line Thickener - Attractor Mode</title>
+  <title>The Plot Thickens</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/svg-path-commander@2.0.6/dist/svg-path-commander.min.js"></script>
 </head>
+
 <body>
   <div class="container">
     <!-- Header -->
     <header>
-      <h1>Plotter Line Thickener</h1>
-      <p>Phase 3: Attractor-Based Weight Control</p>
+      <h1>The Plot Thickens</h1>
+      <p>Tool for creating additional paths off single SVG strokes to create "filled" pen plotter work</p>
     </header>
 
     <!-- Main content -->
@@ -23,7 +25,8 @@
         <section class="control-group">
           <h3>File Input</h3>
           <input type="file" id="svg-upload" accept=".svg">
-          <div id="svg-info" style="display: none; margin: 0.5rem 0; padding: 0.5rem; background: #f0f8ff; border-radius: 4px; font-size: 0.85rem;">
+          <div id="svg-info"
+            style="display: none; margin: 0.5rem 0; padding: 0.5rem; background: #f0f8ff; border-radius: 4px; font-size: 0.85rem;">
             <p id="path-count-info" style="margin: 0 0 0.5rem 0;"></p>
             <button id="process-paths" class="primary-button">Process Paths</button>
           </div>
@@ -59,13 +62,16 @@
               </label>
               <label style="font-size: 0.85em; margin-top: 0.25rem;">
                 Strength (optional):
-                <input type="number" id="manual-strength" placeholder="Auto" style="width: 100%;" step="0.1" min="0" max="5">
+                <input type="number" id="manual-strength" placeholder="Auto" style="width: 100%;" step="0.1" min="0"
+                  max="5">
               </label>
               <label style="font-size: 0.85em; margin-top: 0.25rem;">
                 Radius (optional):
-                <input type="number" id="manual-radius" placeholder="Auto" style="width: 100%;" step="5" min="5" max="300">
+                <input type="number" id="manual-radius" placeholder="Auto" style="width: 100%;" step="5" min="5"
+                  max="300">
               </label>
-              <button id="add-manual-attractor" style="margin-top: 0.5rem; width: 100%; padding: 6px; font-size: 0.85rem;">Add Attractor</button>
+              <button id="add-manual-attractor"
+                style="margin-top: 0.5rem; width: 100%; padding: 6px; font-size: 0.85rem;">Add Attractor</button>
             </div>
           </details>
 
@@ -107,7 +113,8 @@
             </select>
           </label>
 
-          <div id="falloff-exponent-control" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+          <div id="falloff-exponent-control"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
               Falloff Exponent:
               <input type="range" id="falloff-exponent" min="1" max="10" step="0.5" value="2">
@@ -141,7 +148,8 @@
             Arc-Length Sample Interval (mm):
             <input type="range" id="arc-sample-interval" min="1" max="20" step="1" value="5">
             <span id="arc-sample-interval-value">5</span>
-            <span class="hint-icon" title="Spacing between sample points for weight calculation. Smaller = more accurate but slower">?</span>
+            <span class="hint-icon"
+              title="Spacing between sample points for weight calculation. Smaller = more accurate but slower">?</span>
           </label>
 
           <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
@@ -152,14 +160,16 @@
             Minimum Influence Threshold:
             <input type="range" id="min-influence-threshold" min="0" max="1" step="0.05" value="0">
             <span id="min-influence-threshold-value">0.00</span>
-            <span class="hint-icon" title="Only affect paths where max influence exceeds this value. 0 = all paths, 1 = only paths at attractor center.">?</span>
+            <span class="hint-icon"
+              title="Only affect paths where max influence exceeds this value. 0 = all paths, 1 = only paths at attractor center.">?</span>
           </label>
 
           <label>
             Minimum Coverage %:
             <input type="range" id="min-coverage-percent" min="0" max="100" step="5" value="0">
             <span id="min-coverage-percent-value">0</span>
-            <span class="hint-icon" title="Only affect paths where this % of sample points are inside attractor radius. 0 = all paths, 100 = only paths entirely inside.">?</span>
+            <span class="hint-icon"
+              title="Only affect paths where this % of sample points are inside attractor radius. 0 = all paths, 100 = only paths entirely inside.">?</span>
           </label>
 
           <label>
@@ -168,7 +178,8 @@
               <option value="average">Average (spread across path)</option>
               <option value="maximum">Maximum (favor center pass)</option>
             </select>
-            <span class="hint-icon" title="Average: weight based on average influence. Maximum: weight based on closest point to attractor center.">?</span>
+            <span class="hint-icon"
+              title="Average: weight based on average influence. Maximum: weight based on closest point to attractor center.">?</span>
           </label>
         </section>
 
@@ -185,7 +196,8 @@
             Crosshatch (angled fill)
           </label>
 
-          <div id="crosshatch-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+          <div id="crosshatch-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
               Hatch Preset:
               <select id="hatch-preset">
@@ -211,6 +223,74 @@
               <span id="hatch-spacing-value">1.0</span>
               <span class="hint-icon" title="Distance between hatch lines. Smaller = denser fill, more lines.">?</span>
             </label>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
+              <input type="checkbox" id="organic-hatch-enabled">
+              Enable Organic Mode (hand-drawn quality)
+              <span class="hint-icon"
+                title="Add wiggly lines, angle/spacing variation for Sendak-style pen-and-ink look. Disable for clean mechanical lines.">?</span>
+            </label>
+
+            <div id="organic-hatch-controls"
+              style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fffaeb; border-radius: 4px;">
+              <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9em;">Organic Texture Controls</div>
+
+              <label>
+                Line Wiggle (mm):
+                <input type="range" id="hatch-wiggle" min="0" max="2" step="0.1" value="0.5">
+                <span id="hatch-wiggle-value">0.5</span>
+                <span class="hint-icon" title="Amplitude of line waviness. 0 = straight, 2 = very wobbly.">?</span>
+              </label>
+
+              <label>
+                Wiggle Frequency (mm):
+                <input type="range" id="wiggle-frequency" min="5" max="50" step="5" value="20">
+                <span id="wiggle-frequency-value">20</span>
+                <span class="hint-icon"
+                  title="Wavelength of wiggle. Lower = tighter curves, higher = gentle waves.">?</span>
+              </label>
+
+              <label>
+                Angle Variation (degrees):
+                <input type="range" id="angle-jitter" min="0" max="15" step="1" value="5">
+                <span id="angle-jitter-value">5</span>
+                <span class="hint-icon"
+                  title="Random variation in hatch angle per line. 0 = uniform, 15 = very chaotic.">?</span>
+              </label>
+
+              <label>
+                Length Randomization:
+                <input type="range" id="length-jitter" min="0" max="0.5" step="0.05" value="0.1">
+                <span id="length-jitter-value">0.10</span>
+                <span class="hint-icon"
+                  title="Randomly shorten some hatch lines. 0 = all full length, 0.5 = up to 50% shorter.">?</span>
+              </label>
+
+              <label>
+                Position Jitter (mm):
+                <input type="range" id="position-jitter" min="0" max="2" step="0.1" value="0.2">
+                <span id="position-jitter-value">0.2</span>
+                <span class="hint-icon"
+                  title="Shift hatch lines perpendicular to path. Creates organic irregularity.">?</span>
+              </label>
+
+              <label>
+                Spacing Randomization:
+                <input type="range" id="spacing-jitter" min="0" max="1" step="0.05" value="0.2">
+                <span id="spacing-jitter-value">0.20</span>
+                <span class="hint-icon"
+                  title="Random variation in spacing between hatches. 0 = uniform, 1 = highly irregular.">?</span>
+              </label>
+            </div>
+
+            <div
+              style="margin-top: 1rem; padding: 0.5rem; background: white; border-radius: 4px; border: 1px solid #ddd;">
+              <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9em;">Crosshatch Preview</div>
+              <canvas id="crosshatch-preview-canvas" width="400" height="80"
+                style="width: 100%; height: auto; border: 1px solid #ccc; border-radius: 2px;"></canvas>
+            </div>
           </div>
         </section>
 
@@ -227,7 +307,8 @@
             Normal (arc-length based, with taper)
           </label>
 
-          <div id="envelope-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+          <div id="envelope-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
               Envelope Preset:
               <select id="envelope-preset">
@@ -256,35 +337,40 @@
             Base Offset (mm):
             <input type="range" id="base-offset" min="0.01" max="3" step="0.05" value="0.25">
             <span id="base-offset-value">0.25</span>
-            <span class="hint-icon" title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">?</span>
+            <span class="hint-icon"
+              title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">?</span>
           </label>
 
           <label>
             Noise (mm):
             <input type="range" id="noise" min="0" max="3" step="0.05" value="0">
             <span id="noise-value">0</span>
-            <span class="hint-icon" title="Random variation added to each line. Creates organic, hand-drawn look. 0 = perfectly parallel lines.">?</span>
+            <span class="hint-icon"
+              title="Random variation added to each line. Creates organic, hand-drawn look. 0 = perfectly parallel lines.">?</span>
           </label>
 
           <label>
             Noise Frequency (mm):
             <input type="range" id="noise-frequency" min="5" max="200" step="5" value="50">
             <span id="noise-frequency-value">50</span>
-            <span class="hint-icon" title="Controls smoothness of noise. Lower = smoother organic curves (50-100mm), higher = more texture/detail (5-20mm).">?</span>
+            <span class="hint-icon"
+              title="Controls smoothness of noise. Lower = smoother organic curves (50-100mm), higher = more texture/detail (5-20mm).">?</span>
           </label>
 
           <label>
             Min Passes:
             <input type="range" id="min-passes" min="1" max="10" step="1" value="1">
             <span id="min-passes-value">1</span>
-            <span class="hint-icon" title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">?</span>
+            <span class="hint-icon"
+              title="Minimum number of duplicate lines for thinnest paths. 1 = single line (thinnest).">?</span>
           </label>
 
           <label>
             Max Passes:
             <input type="range" id="max-passes" min="5" max="50" step="1" value="10">
             <span id="max-passes-value">10</span>
-            <span class="hint-icon" title="Maximum number of duplicate lines for thickest paths. Higher = thicker, but slower plotting.">?</span>
+            <span class="hint-icon"
+              title="Maximum number of duplicate lines for thickest paths. Higher = thicker, but slower plotting.">?</span>
           </label>
 
           <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
@@ -299,24 +385,29 @@
               <option value="power">Power (adjustable bias)</option>
               <option value="percentile">Percentile (ignore outliers)</option>
             </select>
-            <span class="hint-icon" title="How path length maps to weight. Linear = proportional. Log = compresses high values. Power = adjustable curve. Percentile = ignores longest X%.">?</span>
+            <span class="hint-icon"
+              title="How path length maps to weight. Linear = proportional. Log = compresses high values. Power = adjustable curve. Percentile = ignores longest X%.">?</span>
           </label>
 
-          <div id="power-curve-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+          <div id="power-curve-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
               Power Exponent:
               <input type="range" id="length-mapping-exponent" min="0.1" max="3" step="0.1" value="1.0">
               <span id="length-mapping-exponent-value">1.0</span>
-              <span class="hint-icon" title="< 1.0 = favor short paths. > 1.0 = favor long paths. Try 0.5 to boost short paths.">?</span>
+              <span class="hint-icon"
+                title="< 1.0 = favor short paths. > 1.0 = favor long paths. Try 0.5 to boost short paths.">?</span>
             </label>
           </div>
 
-          <div id="percentile-curve-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
+          <div id="percentile-curve-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
               Percentile Clamp:
               <input type="range" id="length-percentile-clamp" min="50" max="100" step="1" value="100">
               <span id="length-percentile-clamp-value">100</span>%
-              <span class="hint-icon" title="Use this percentile as max length. 95% = ignore top 5% longest paths. Good for outlier removal.">?</span>
+              <span class="hint-icon"
+                title="Use this percentile as max length. 95% = ignore top 5% longest paths. Good for outlier removal.">?</span>
             </label>
           </div>
 
@@ -324,14 +415,16 @@
             Min Length Override (mm):
             <input type="number" id="min-length-threshold" min="0" step="10" value="0" placeholder="Auto">
             <span id="min-length-info" style="font-size: 0.8em; color: #666;"></span>
-            <span class="hint-icon" title="Manual min length for normalization. Leave 0 for auto-detect. Works in both preview and export.">?</span>
+            <span class="hint-icon"
+              title="Manual min length for normalization. Leave 0 for auto-detect. Works in both preview and export.">?</span>
           </label>
 
           <label>
             Max Length Override (mm):
             <input type="number" id="max-length-threshold" min="0" step="10" value="0" placeholder="Auto">
             <span id="max-length-info" style="font-size: 0.8em; color: #666;"></span>
-            <span class="hint-icon" title="Manual max length for normalization. Leave 0 for auto-detect. Caps outliers. Works in both preview and export.">?</span>
+            <span class="hint-icon"
+              title="Manual max length for normalization. Leave 0 for auto-detect. Caps outliers. Works in both preview and export.">?</span>
           </label>
         </section>
 
@@ -342,7 +435,8 @@
             Sample Rate (mm):
             <input type="range" id="sample-rate" min="0.5" max="5" step="0.5" value="2">
             <span id="sample-rate-value">2</span>
-            <span class="hint-icon" title="Spacing between sample points when converting curves. Lower = smoother but slower. Higher = faster but more angular.">?</span>
+            <span class="hint-icon"
+              title="Spacing between sample points when converting curves. Lower = smoother but slower. Higher = faster but more angular.">?</span>
           </label>
           <div style="font-size: 0.75em; color: #888; margin-top: 4px;">
             Lower = smoother curves, larger files, slower processing<br>
@@ -365,7 +459,8 @@
             Preview Line Emphasis:
             <input type="range" id="preview-emphasis" min="0.5" max="2.0" step="0.1" value="1.0">
             <span id="preview-emphasis-value">1.0</span>
-            <span class="hint-icon" title="Adjust visibility of preview lines. 1.0 = accurate to final output width (weight × offset). Increase to make thin lines more visible.">?</span>
+            <span class="hint-icon"
+              title="Adjust visibility of preview lines. 1.0 = accurate to final output width (weight × offset). Increase to make thin lines more visible.">?</span>
           </label>
 
           <div class="attractor-controls" style="display: none;">
@@ -393,17 +488,23 @@
               Enable Focus Window
             </label>
 
-            <div id="focus-window-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px;">
+            <div id="focus-window-controls"
+              style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px;">
               <p style="font-size: 0.8em; margin: 0 0 0.5rem 0; color: #666;">
                 <strong>Shift+Drag</strong> on canvas to define focus area
               </p>
 
-              <button id="compute-focus" style="width: 100%; padding: 6px; font-size: 0.85em; margin-bottom: 0.5rem; display: none; background: #3498db; color: white; border-color: #2980b9;">⚡ Compute High-Res Detail</button>
+              <button id="compute-focus"
+                style="width: 100%; padding: 6px; font-size: 0.85em; margin-bottom: 0.5rem; display: none; background: #3498db; color: white; border-color: #2980b9;">⚡
+                Compute High-Res Detail</button>
 
-              <div id="focus-progress" style="display: none; margin-bottom: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px; border: 1px solid #b3d9ff;">
+              <div id="focus-progress"
+                style="display: none; margin-bottom: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px; border: 1px solid #b3d9ff;">
                 <div style="font-size: 0.8em; margin-bottom: 0.25rem;">Computing offset paths...</div>
                 <div style="background: #ddd; height: 20px; border-radius: 10px; overflow: hidden;">
-                  <div id="focus-progress-bar" style="background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                  <div id="focus-progress-bar"
+                    style="background: linear-gradient(90deg, #3498db, #2ecc71); height: 100%; width: 0%; transition: width 0.3s;">
+                  </div>
                 </div>
                 <div id="focus-progress-text" style="font-size: 0.75em; color: #666; margin-top: 0.25rem;">0%</div>
               </div>
@@ -413,7 +514,8 @@
                 Show Computed Detail
               </label>
 
-              <button id="clear-focus" style="width: 100%; padding: 4px; font-size: 0.85em; margin-top: 0.5rem;">Clear Focus Rectangle</button>
+              <button id="clear-focus" style="width: 100%; padding: 4px; font-size: 0.85em; margin-top: 0.5rem;">Clear
+                Focus Rectangle</button>
             </div>
           </div>
         </section>
@@ -425,7 +527,8 @@
             <label>
               <input type="checkbox" id="enable-binning">
               Enable Length Binning
-              <span class="hint-icon" title="Group output paths by length into bins for easier management in editors. Organizes paths into groups by length.">?</span>
+              <span class="hint-icon"
+                title="Group output paths by length into bins for easier management in editors. Organizes paths into groups by length.">?</span>
             </label>
 
             <div id="binning-controls" style="display: none; margin-top: 8px;">
@@ -433,7 +536,8 @@
                 Number of Bins:
                 <input type="range" id="bin-count" min="2" max="10" step="1" value="4">
                 <span id="bin-count-value">4</span>
-                <span class="hint-icon" title="Number of bins to divide paths into (e.g., 4 = quartiles). How many length bands to create.">?</span>
+                <span class="hint-icon"
+                  title="Number of bins to divide paths into (e.g., 4 = quartiles). How many length bands to create.">?</span>
               </label>
               <div style="font-size: 0.8em; color: #666; margin-top: 4px;">
                 Paths will be grouped: <span id="bin-preview">0-25%, 25-50%, 50-75%, 75-100%</span>
@@ -456,12 +560,15 @@
                 Single-line format (ready to paste)
               </label>
             </div>
-            <textarea id="cli-command" readonly style="width: 100%; height: 120px; font-family: monospace; font-size: 0.75rem; padding: 6px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; resize: vertical; margin-top: 4px;"></textarea>
-            <button id="copy-cli" style="margin-top: 4px; width: 100%; padding: 6px; font-size: 0.85rem;">📋 Copy to Clipboard</button>
+            <textarea id="cli-command" readonly
+              style="width: 100%; height: 120px; font-family: monospace; font-size: 0.75rem; padding: 6px; background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; resize: vertical; margin-top: 4px;"></textarea>
+            <button id="copy-cli" style="margin-top: 4px; width: 100%; padding: 6px; font-size: 0.85rem;">📋 Copy to
+              Clipboard</button>
           </div>
 
           <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
-          <a href="calibration.html" target="_blank" style="display: inline-block; padding: 8px 12px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px; text-decoration: none; color: #0066cc; font-size: 0.9rem; text-align: center; width: 100%; box-sizing: border-box;">
+          <a href="calibration.html" target="_blank"
+            style="display: inline-block; padding: 8px 12px; background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px; text-decoration: none; color: #0066cc; font-size: 0.9rem; text-align: center; width: 100%; box-sizing: border-box;">
             📐 Calibration Pattern Generator
           </a>
         </section>
@@ -510,4 +617,5 @@
   <script src="sketch.js"></script>
   <script src="ui-controls.js"></script>
 </body>
+
 </html>
