@@ -47,7 +47,7 @@ header p {
 
 /* Controls Panel */
 .controls-panel {
-  width: 320px;
+  width: 370px;
   background: white;
   border-right: 1px solid #ddd;
   overflow-y: auto;
