@@ -80,6 +80,9 @@ let noiseFrequency = 50; // Noise wavelength in mm
 // Preview settings
 let previewEmphasis = 1.0; // Multiplier for preview line width (0.5-2.0)
 
+// Export settings
+let addOutlineStroke = false; // Add outline strokes in export
+
 // Render control
 let needsRedraw = true;
 

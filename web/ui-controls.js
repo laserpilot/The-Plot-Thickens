@@ -507,6 +507,15 @@ function initializeControls() {
     updateCLICommand();
   });
 
+  // Add outline stroke checkbox
+  const addOutlineCheckbox = document.getElementById('add-outline-stroke');
+  if (addOutlineCheckbox) {
+    addOutlineCheckbox.addEventListener('change', (e) => {
+      addOutlineStroke = e.target.checked;
+      updateCLICommand();
+    });
+  }
+
   binCount.addEventListener('input', (e) => {
     const count = parseInt(e.target.value);
     binCountValue.textContent = count;
@@ -786,8 +795,19 @@ async function prepareExport() {
         spacingJitter: spacingJitter
       };
 
-      const hatchPathStrings = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions);
+      const hatchResult = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke);
 
+      // Handle result (either array or {fills, outlines} object)
+      let hatchPathStrings, outlinePathStrings;
+      if (addOutlineStroke && hatchResult.fills) {
+        hatchPathStrings = hatchResult.fills;
+        outlinePathStrings = hatchResult.outlines || [];
+      } else {
+        hatchPathStrings = Array.isArray(hatchResult) ? hatchResult : [];
+        outlinePathStrings = [];
+      }
+
+      // Add fill paths
       hatchPathStrings.forEach(hatchPathD => {
         const pathData = {
           d: hatchPathD,
@@ -802,8 +822,28 @@ async function prepareExport() {
           processedPaths.push(pathData);
         }
       });
+
+      // Add outline paths
+      outlinePathStrings.forEach(outlinePathD => {
+        const pathData = {
+          d: outlinePathD,
+          stroke: path.stroke,
+          fill: 'none',
+          strokeWidth: path.strokeWidth,
+          class: 'outline'
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          processedPaths.push(pathData);
+        }
+      });
     } else {
       // Offset fill (existing code)
+      let leftOutline = null;
+      let rightOutline = null;
+
       for (let i = 0; i < passes; i++) {
         const passIndex = Math.floor(i / 2) + 1; // Distance from center (start at 1, not 0)
         const isRight = i % 2 === 0; // Alternate sides
@@ -835,6 +875,49 @@ async function prepareExport() {
 
           if (!enableBinning) {
             // If not binning, add directly to output
+            processedPaths.push(pathData);
+          }
+
+          // Track outermost offsets for outline extraction
+          if (addOutlineStroke && passes > 0) {
+            const isLastRight = isRight && passIndex === Math.floor((passes - 1) / 2) + 1;
+            const isLastLeft = !isRight && passIndex === Math.floor((passes - 2) / 2) + 1 + 1;
+
+            if (passes === 1 || isLastRight) {
+              rightOutline = offsetPathData;
+            }
+            if (passes > 1 && isLastLeft) {
+              leftOutline = offsetPathData;
+            }
+          }
+        }
+      }
+
+      // Add outline paths if requested
+      if (addOutlineStroke) {
+        if (rightOutline) {
+          const pathData = {
+            d: rightOutline,
+            stroke: path.stroke,
+            fill: 'none',
+            strokeWidth: path.strokeWidth,
+            class: 'outline'
+          };
+          sourcePaths.push(pathData);
+          if (!enableBinning) {
+            processedPaths.push(pathData);
+          }
+        }
+        if (leftOutline) {
+          const pathData = {
+            d: leftOutline,
+            stroke: path.stroke,
+            fill: 'none',
+            strokeWidth: path.strokeWidth,
+            class: 'outline'
+          };
+          sourcePaths.push(pathData);
+          if (!enableBinning) {
             processedPaths.push(pathData);
           }
         }
@@ -1254,6 +1337,11 @@ function generateCLICommand() {
       if (positionJitter > 0) params.push(`--position-jitter ${positionJitter}`);
       if (spacingJitter > 0) params.push(`--spacing-jitter ${spacingJitter}`);
     }
+  }
+
+  // Add outline stroke option
+  if (addOutlineStroke) {
+    params.push(`--add-outline`);
   }
 
   if (offsetMode === 'normal') {

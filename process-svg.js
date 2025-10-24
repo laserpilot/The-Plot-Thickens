@@ -26,6 +26,7 @@ const DEFAULT_CONFIG = {
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
   fillMode: 'offset', // 'offset' or 'crosshatch'
+  addOutline: false, // Add outline strokes (furthermost boundaries)
   crosshatch: {
     angles: [90], // hatch angles in degrees
     spacing: 1, // spacing between hatch lines in mm
@@ -66,6 +67,7 @@ program
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
   .option('--fill-mode <mode>', 'Fill mode: offset or crosshatch (default: offset)')
+  .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
   .option('--hatch-angles <angles>', 'Crosshatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
   .option('--organic-hatch', 'Enable organic/hand-drawn crosshatch mode')
@@ -107,6 +109,7 @@ program
     if (options.bins !== undefined) config.bins = options.bins;
     if (options.sampleRate !== undefined) config.sampleRate = options.sampleRate;
     if (options.fillMode !== undefined) config.fillMode = options.fillMode;
+    if (options.addOutline) config.addOutline = true;
 
     // Handle crosshatch options
     if (options.hatchAngles !== undefined) {

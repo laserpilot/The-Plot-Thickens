@@ -433,9 +433,10 @@ function lineSegmentIntersection(a1, a2, b1, b2) {
  * @param {Function} offsetEnvelope - Envelope function for width taper
  * @param {number} noiseFrequency - Noise wavelength in mm
  * @param {Object} organicOptions - Organic/hand-drawn options: {enabled, wiggle, wiggleFreq, angleJitter, lengthJitter, positionJitter, spacingJitter}
- * @returns {Array<string>} Array of hatch line path strings
+ * @param {boolean} extractOutline - Return outline paths separately (default: false)
+ * @returns {Array<string>|Object} Array of hatch line path strings, or {fills: Array, outlines: Array} if extractOutline=true
  */
-function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50, organicOptions = {}) {
+function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50, organicOptions = {}, extractOutline = false) {
   // Extract organic options with defaults
   const {
     enabled: organicEnabled = false,
@@ -648,9 +649,33 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
       }
     }
 
+    // Extract outline if requested
+    if (extractOutline && leftBoundary.length > 0 && rightBoundary.length > 0) {
+      const outlines = [];
+
+      // Convert left boundary to path string
+      const leftPathParts = leftBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(leftPathParts.join(' '));
+
+      // Convert right boundary to path string
+      const rightPathParts = rightBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(rightPathParts.join(' '));
+
+      return { fills: hatchPaths, outlines };
+    }
+
     return hatchPaths;
   } catch (error) {
     console.warn('Failed to generate crosshatch fill:', error.message);
+    if (extractOutline) {
+      return { fills: [], outlines: [] };
+    }
     return [];
   }
 }
