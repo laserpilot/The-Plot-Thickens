@@ -1,4 +1,4 @@
-# Plotter Line Thickener
+# The Plot Thickens
 
 SVG line weight utility with attractor-based thickness control for pen plotters.
 
@@ -96,7 +96,7 @@ node process-svg.js input.svg output.svg \
   --offset 0.1 \           # Base offset distance (mm)
   --noise 0.05 \           # Noise amount (mm)
   --min-passes 1 \         # Minimum passes
-  --max-passes 20 \        # Maximum passes
+  --max-passes 10 \        # Maximum passes
   --curve exponential \    # Curve type: linear, exponential, logarithmic
   --exponent 2 \           # Exponent for exponential curve
   --bins 4                 # Group output into N length quantile bins (optional)
@@ -444,6 +444,125 @@ The web interface includes crosshatch controls:
 - Noise affects hatch spacing (creates organic variation in density)
 - Each angle pass generates separate hatch segments
 - Compatible with attractor-based weighting (ribbon width varies by influence)
+
+---
+
+## Organic Crosshatch Mode
+
+Add **hand-drawn, Maurice Sendak-style** pen-and-ink quality to crosshatching with wiggly lines, angle variation, and irregular spacing.
+
+### What It Does
+
+When organic mode is enabled, crosshatch lines become:
+- **Wiggly** - Sinusoidal perturbation creates hand-drawn waviness
+- **Varied angles** - Each line varies slightly from target angle
+- **Irregular spacing** - Random jitter creates organic density variation
+- **Random lengths** - Some lines are shorter, like sketchy pen strokes
+- **Position shifted** - Lines don't all start from exact centerline
+
+### Master Toggle
+
+**IMPORTANT:** Organic mode has a **master on/off toggle**. When disabled (default), all wiggle/jitter is bypassed and you get clean, mechanical crosshatch with zero overhead.
+
+### CLI Usage
+
+```bash
+# Enable organic mode with defaults
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --organic-hatch
+
+# Full Sendak-style organic crosshatch
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "45,-45" \
+  --hatch-spacing 1.5 \
+  --organic-hatch \
+  --hatch-wiggle 0.8 \
+  --wiggle-frequency 20 \
+  --angle-jitter 8 \
+  --length-jitter 0.2 \
+  --position-jitter 0.3 \
+  --spacing-jitter 0.3
+
+# Light hand-drawn effect
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --organic-hatch \
+  --hatch-wiggle 0.3 \
+  --angle-jitter 3
+
+# Mechanical crosshatch (organic mode OFF - fast)
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "45,-45"
+```
+
+### Organic Parameters
+
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| `--organic-hatch` | flag | off | **Master toggle** - enables all organic effects |
+| `--hatch-wiggle` | 0-2mm | 0 | Line waviness amplitude. 0=straight, 2=very wobbly |
+| `--wiggle-frequency` | 5-50mm | 20 | Wiggle wavelength. Lower=tight curves, higher=gentle waves |
+| `--angle-jitter` | 0-15° | 0 | Random angle variation per line. 0=uniform, 15=chaotic |
+| `--length-jitter` | 0-0.5 | 0 | Randomly shorten lines. 0=full length, 0.5=up to 50% shorter |
+| `--position-jitter` | 0-2mm | 0 | Shift line position perpendicular to path |
+| `--spacing-jitter` | 0-1 | 0 | Randomize spacing between lines. 0=uniform, 1=highly irregular |
+
+### Web Interface
+
+The web UI includes:
+1. **"Enable Organic Mode"** checkbox (master toggle)
+2. **Organic Texture Controls** panel (appears when enabled):
+   - Line Wiggle slider (0-2mm)
+   - Wiggle Frequency slider (5-50mm)
+   - Angle Variation slider (0-15°)
+   - Length Randomization slider (0-0.5)
+   - Position Jitter slider (0-2mm)
+   - Spacing Randomization slider (0-1)
+
+### Style Presets (Suggested Values)
+
+**Sendak-Style (Classic Pen & Ink):**
+```
+--organic-hatch --hatch-wiggle 0.8 --wiggle-frequency 20
+--angle-jitter 8 --length-jitter 0.2 --spacing-jitter 0.3
+```
+
+**Light Hand-Drawn:**
+```
+--organic-hatch --hatch-wiggle 0.3 --angle-jitter 3 --spacing-jitter 0.1
+```
+
+**Sketchy/Gestural:**
+```
+--organic-hatch --hatch-wiggle 1.2 --wiggle-frequency 15
+--angle-jitter 12 --length-jitter 0.3 --spacing-jitter 0.4
+```
+
+**Gentle Organic (Subtle):**
+```
+--organic-hatch --hatch-wiggle 0.2 --wiggle-frequency 30
+--angle-jitter 2 --spacing-jitter 0.15
+```
+
+### Performance Notes
+
+- **Organic OFF**: Zero overhead, generates straight lines (2 points per line)
+- **Organic ON**: ~5-10x more path data (5-10 points per wiggly line)
+- File size increases proportionally to wiggle detail
+- Preview can disable organic for speed even when export uses it
+- All effects use deterministic seeded randomness (reproducible results)
+
+### Technical Implementation
+
+- **Wiggle**: Sinusoidal perturbation + noise perpendicular to line direction
+- **Spacing Jitter**: Combines smooth noise with random variation
+- **Angle Jitter**: Per-line rotation applied before casting ray
+- **Length Jitter**: Scales intersection points toward line center
+- **Position Jitter**: Offsets sample point along path normal
+- **Deterministic**: Each line gets unique sub-seed for reproducibility
 
 ---
 

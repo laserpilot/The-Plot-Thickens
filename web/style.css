@@ -189,6 +189,31 @@ button.primary-button:hover {
   background: #2980b9;
 }
 
+/* Download ready state - green with pulse animation */
+button.download-ready {
+  background: #27ae60;
+  color: white;
+  border-color: #229954;
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+button.download-ready:hover {
+  background: #229954;
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px rgba(39, 174, 96, 0);
+  }
+}
+
 button#clear-attractors {
   background: #e74c3c;
   color: white;

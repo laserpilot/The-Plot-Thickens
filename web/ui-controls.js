@@ -49,6 +49,33 @@ function initializeControls() {
     });
   });
 
+  // Live preview toggle
+  const livePreviewCheckbox = document.getElementById('live-preview');
+  if (livePreviewCheckbox) {
+    livePreviewCheckbox.addEventListener('change', (e) => {
+      livePreview = e.target.checked;
+
+      // Show/hide manual update button
+      const updateButton = document.getElementById('update-preview');
+      if (updateButton) {
+        updateButton.style.display = livePreview ? 'none' : 'block';
+      }
+
+      updateStatus(livePreview ? 'Live preview enabled' : 'Live preview disabled (use Update Preview button)');
+    });
+  }
+
+  // Manual preview update button
+  const updatePreviewButton = document.getElementById('update-preview');
+  if (updatePreviewButton) {
+    updatePreviewButton.addEventListener('click', () => {
+      if (typeof manualPreviewUpdate === 'function') {
+        manualPreviewUpdate();
+        updateStatus('Preview updated');
+      }
+    });
+  }
+
   // Fill mode toggle
   document.querySelectorAll('input[name="fill-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
@@ -626,12 +653,14 @@ async function handleExportClick() {
     try {
       triggerDownload(preparedDownload.content, preparedDownload.filename);
       exportButton.textContent = 'Export SVG';
+      exportButton.classList.remove('download-ready');
       preparedDownload = null;
       updateStatus('Download complete');
     } catch (error) {
       console.error('Download failed:', error);
       alert(`Download failed: ${error.message}`);
       exportButton.textContent = 'Export SVG';
+      exportButton.classList.remove('download-ready');
       preparedDownload = null;
     }
     return;
@@ -877,6 +906,7 @@ async function prepareExport() {
   // Update UI to indicate download is ready
   const exportButton = document.getElementById('export-svg');
   exportButton.textContent = 'Download Ready – Click to Save';
+  exportButton.classList.add('download-ready');
 
   const message = `Export ready: ${processedPaths.length} paths (${(svgContent.length / 1024 / 1024).toFixed(2)} MB) - Click again to download`;
   console.log(message);
@@ -1178,7 +1208,7 @@ function generateCLICommand() {
   const noise = noiseValue !== undefined && noiseValue !== null ? parseFloat(noiseValue) : 0.1;
   const noiseFreq = parseInt(document.getElementById('noise-frequency')?.value) || 50;
   const minPasses = parseInt(document.getElementById('min-passes')?.value) || 1;
-  const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 20;
+  const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 10;
   const sampleRate = parseFloat(document.getElementById('sample-rate')?.value) || 2;
 
   // Get fill mode

@@ -313,6 +313,63 @@ function getEnvelopePreset(presetName) {
 }
 
 /**
+ * Generate a wiggly/hand-drawn line between two points
+ * @param {Object} p1 - Start point {x, y}
+ * @param {Object} p2 - End point {x, y}
+ * @param {number} wiggle - Amplitude of wiggle perpendicular to line (mm)
+ * @param {number} frequency - Wavelength of wiggle along line (mm)
+ * @param {number} seed - Random seed for deterministic wiggle
+ * @returns {Array} Array of points forming the wiggly line
+ */
+function generateWigglyLine(p1, p2, wiggle, frequency, seed) {
+  if (wiggle === 0 || frequency === 0) {
+    return [p1, p2]; // No wiggle - return straight line
+  }
+
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const lineLength = Math.sqrt(dx * dx + dy * dy);
+
+  if (lineLength < 0.1) {
+    return [p1, p2]; // Too short to wiggle
+  }
+
+  // Unit vector along line
+  const ux = dx / lineLength;
+  const uy = dy / lineLength;
+
+  // Perpendicular unit vector (for wiggle direction)
+  const px = -uy;
+  const py = ux;
+
+  // Generate wiggle points
+  const numSegments = Math.max(3, Math.ceil(lineLength / (frequency / 2)));
+  const points = [];
+
+  for (let i = 0; i <= numSegments; i++) {
+    const t = i / numSegments;
+    const alongDistance = t * lineLength;
+
+    // Base position along the line
+    const baseX = p1.x + ux * alongDistance;
+    const baseY = p1.y + uy * alongDistance;
+
+    // Sinusoidal wiggle with noise for variation
+    const phase = (alongDistance / frequency) * Math.PI * 2;
+    const noiseOffset = simpleNoise(alongDistance / 10 + seed * 100, seed) * 0.3; // Add some randomness
+    const wiggleAmount = Math.sin(phase + noiseOffset) * wiggle;
+
+    // Apply wiggle perpendicular to line
+    points.push({
+      x: baseX + px * wiggleAmount,
+      y: baseY + py * wiggleAmount
+    });
+  }
+
+  return points;
+}
+
+/**
  * Compute line-polyline intersection
  * Returns the intersection point where a line segment intersects a polyline
  * @param {Object} lineStart - {x, y} start point of line
@@ -375,9 +432,21 @@ function lineSegmentIntersection(a1, a2, b1, b2) {
  * @param {string} pathId - Path identifier for envelope
  * @param {Function} offsetEnvelope - Envelope function for width taper
  * @param {number} noiseFrequency - Noise wavelength in mm
+ * @param {Object} organicOptions - Organic/hand-drawn options: {enabled, wiggle, wiggleFreq, angleJitter, lengthJitter, positionJitter, spacingJitter}
  * @returns {Array<string>} Array of hatch line path strings
  */
-function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50) {
+function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50, organicOptions = {}) {
+  // Extract organic options with defaults
+  const {
+    enabled: organicEnabled = false,
+    wiggle: hatchWiggle = 0,
+    wiggleFreq: wiggleFrequency = 20,
+    angleJitter = 0,
+    lengthJitter = 0,
+    positionJitter = 0,
+    spacingJitter = 0
+  } = organicOptions;
+
   if (!pathData || typeof pathData !== 'string') {
     return [];
   }
@@ -485,9 +554,15 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
 
     // Generate hatch lines
     const hatchPaths = [];
+    let hatchIndex = 0; // For unique seeds per hatch
 
     for (const angleInDegrees of hatchAngles) {
-      const angleRad = (angleInDegrees * Math.PI) / 180;
+      // Apply angle jitter if organic mode enabled
+      const actualAngle = organicEnabled && angleJitter > 0
+        ? angleInDegrees + (simpleNoise(seed * 1000 + hatchIndex * 100, seed) * angleJitter * 2 - angleJitter)
+        : angleInDegrees;
+
+      const angleRad = (actualAngle * Math.PI) / 180;
 
       // March along centerline at spacing intervals
       let currentArcLength = 0;
@@ -498,6 +573,15 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
           Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
         );
 
+        // Apply position jitter if organic mode enabled
+        let sampleX = sample.x;
+        let sampleY = sample.y;
+        if (organicEnabled && positionJitter > 0) {
+          const jitterAmount = simpleNoise(currentArcLength / 20 + seed * 500, seed + hatchIndex) * positionJitter;
+          sampleX += sample.nx * jitterAmount;
+          sampleY += sample.ny * jitterAmount;
+        }
+
         // Rotate normal by hatch angle to get hatch direction
         const cos = Math.cos(angleRad);
         const sin = Math.sin(angleRad);
@@ -506,20 +590,59 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
 
         // Cast ray in both directions from center
         const rayLength = sample.halfWidth * 2; // Ensure we hit boundaries
-        const p1 = { x: sample.x - hatchDx * rayLength, y: sample.y - hatchDy * rayLength };
-        const p2 = { x: sample.x + hatchDx * rayLength, y: sample.y + hatchDy * rayLength };
+        const p1 = { x: sampleX - hatchDx * rayLength, y: sampleY - hatchDy * rayLength };
+        const p2 = { x: sampleX + hatchDx * rayLength, y: sampleY + hatchDy * rayLength };
 
         // Intersect with boundaries
-        const leftHit = linePolylineIntersection(p1, p2, leftBoundary);
-        const rightHit = linePolylineIntersection(p1, p2, rightBoundary);
+        let leftHit = linePolylineIntersection(p1, p2, leftBoundary);
+        let rightHit = linePolylineIntersection(p1, p2, rightBoundary);
 
         if (leftHit && rightHit) {
-          // Create hatch segment
-          hatchPaths.push(`M ${leftHit.x.toFixed(3)} ${leftHit.y.toFixed(3)} L ${rightHit.x.toFixed(3)} ${rightHit.y.toFixed(3)}`);
+          // Apply length randomization if organic mode enabled
+          if (organicEnabled && lengthJitter > 0) {
+            const shrinkFactor = 1 - (Math.abs(simpleNoise(hatchIndex * 50 + seed * 200, seed)) * lengthJitter);
+            const centerX = (leftHit.x + rightHit.x) / 2;
+            const centerY = (leftHit.y + rightHit.y) / 2;
+            leftHit = {
+              x: centerX + (leftHit.x - centerX) * shrinkFactor,
+              y: centerY + (leftHit.y - centerY) * shrinkFactor
+            };
+            rightHit = {
+              x: centerX + (rightHit.x - centerX) * shrinkFactor,
+              y: centerY + (rightHit.y - centerY) * shrinkFactor
+            };
+          }
+
+          // Generate wiggly or straight line
+          if (organicEnabled && hatchWiggle > 0) {
+            const wigglySeed = seed + hatchIndex;
+            const points = generateWigglyLine(leftHit, rightHit, hatchWiggle, wiggleFrequency, wigglySeed);
+
+            // Build path string from wiggly points
+            if (points.length > 0) {
+              let pathStr = `M ${points[0].x.toFixed(3)} ${points[0].y.toFixed(3)}`;
+              for (let i = 1; i < points.length; i++) {
+                pathStr += ` L ${points[i].x.toFixed(3)} ${points[i].y.toFixed(3)}`;
+              }
+              hatchPaths.push(pathStr);
+            }
+          } else {
+            // Straight line (fast path)
+            hatchPaths.push(`M ${leftHit.x.toFixed(3)} ${leftHit.y.toFixed(3)} L ${rightHit.x.toFixed(3)} ${rightHit.y.toFixed(3)}`);
+          }
         }
 
-        // Advance with noise
-        const noiseValue = noise > 0 ? simpleNoise(currentArcLength / noiseFrequency, seed) * noise : 0;
+        hatchIndex++;
+
+        // Advance with noise and optional spacing jitter
+        let noiseValue = noise > 0 ? simpleNoise(currentArcLength / noiseFrequency, seed) * noise : 0;
+
+        // Add random spacing jitter if organic mode enabled
+        if (organicEnabled && spacingJitter > 0) {
+          const randomJitter = (simpleNoise(hatchIndex * 30 + seed * 300, seed) - 0.5) * 2; // -1 to 1
+          noiseValue += randomJitter * spacingJitter * hatchSpacing;
+        }
+
         const spacing = Math.max(0.1, hatchSpacing + noiseValue);
         currentArcLength += spacing;
       }

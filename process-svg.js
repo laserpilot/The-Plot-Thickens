@@ -29,6 +29,15 @@ const DEFAULT_CONFIG = {
   crosshatch: {
     angles: [90], // hatch angles in degrees
     spacing: 1, // spacing between hatch lines in mm
+    organic: {
+      enabled: false,
+      wiggle: 0,
+      wiggleFreq: 20,
+      angleJitter: 0,
+      lengthJitter: 0,
+      positionJitter: 0,
+      spacingJitter: 0
+    }
   },
 };
 
@@ -59,6 +68,13 @@ program
   .option('--fill-mode <mode>', 'Fill mode: offset or crosshatch (default: offset)')
   .option('--hatch-angles <angles>', 'Crosshatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
+  .option('--organic-hatch', 'Enable organic/hand-drawn crosshatch mode')
+  .option('--hatch-wiggle <number>', 'Line wiggle amplitude in mm (default: 0)', parseFloat)
+  .option('--wiggle-frequency <number>', 'Wiggle wavelength in mm (default: 20)', parseFloat)
+  .option('--angle-jitter <number>', 'Random angle variation in degrees (default: 0)', parseFloat)
+  .option('--length-jitter <number>', 'Random length variation 0-1 (default: 0)', parseFloat)
+  .option('--position-jitter <number>', 'Position offset jitter in mm (default: 0)', parseFloat)
+  .option('--spacing-jitter <number>', 'Spacing randomization 0-1 (default: 0)', parseFloat)
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -101,6 +117,43 @@ program
     if (options.hatchSpacing !== undefined) {
       config.crosshatch = config.crosshatch || {};
       config.crosshatch.spacing = options.hatchSpacing;
+    }
+
+    // Handle organic crosshatch options
+    if (options.organicHatch) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.enabled = true;
+    }
+    if (options.hatchWiggle !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.wiggle = options.hatchWiggle;
+    }
+    if (options.wiggleFrequency !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.wiggleFreq = options.wiggleFrequency;
+    }
+    if (options.angleJitter !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.angleJitter = options.angleJitter;
+    }
+    if (options.lengthJitter !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.lengthJitter = options.lengthJitter;
+    }
+    if (options.positionJitter !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.positionJitter = options.positionJitter;
+    }
+    if (options.spacingJitter !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.organic = config.crosshatch.organic || {};
+      config.crosshatch.organic.spacingJitter = options.spacingJitter;
     }
 
     // Load attractors preset if provided

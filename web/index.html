@@ -49,6 +49,17 @@
 
         <section class="control-group attractor-controls" style="display: none;">
           <h3>Attractors <span style="font-size: 0.8em; color: #666;" id="attractor-count">(0/10)</span></h3>
+
+          <label>
+            <input type="checkbox" id="live-preview" checked>
+            Live Preview (auto-reprocess on changes)
+            <span class="hint-icon" title="Disable to improve performance when placing attractors. Original paths will show until you manually trigger preview.">?</span>
+          </label>
+
+          <button id="update-preview" style="display: none; margin-bottom: 0.5rem; width: 100%; padding: 0.5rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            🔄 Update Preview
+          </button>
+
           <p class="hint">Click canvas to place attractors (max 10)</p>
 
           <!-- Manual entry form -->

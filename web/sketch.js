@@ -23,6 +23,7 @@ let previewDisplayMode = 'weight'; // 'weight' or 'offset'
 let useAttractors = false; // Attractors disabled by default
 let weightMode = 'length'; // 'length' or 'attractor'
 let pathsProcessed = false; // Track if paths have been converted to points
+let livePreview = true; // Auto-reprocess on attractor changes
 
 // Offset mode state
 let offsetMode = 'normal'; // 'legacy' or 'normal'
@@ -33,6 +34,15 @@ let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 let fillMode = 'offset'; // 'offset' or 'crosshatch'
 let hatchAngles = [45, -45]; // Crosshatch angles in degrees
 let hatchSpacing = 1; // Spacing between hatch lines in mm
+
+// Organic crosshatch state
+let organicHatchEnabled = false;
+let hatchWiggle = 0.5;
+let wiggleFrequency = 20;
+let angleJitter = 5;
+let lengthJitter = 0.1;
+let positionJitter = 0.2;
+let spacingJitter = 0.2;
 
 // Drag state
 let draggedAttractor = null;
@@ -246,17 +256,34 @@ function renderOffsetPreview() {
     if (fillMode === 'crosshatch') {
       // Crosshatch fill
       const baseWidth = baseOffset * Math.max(1, weight);
-      const hatchPaths = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency);
+
+      // Build organic options
+      const organicOptions = {
+        enabled: organicHatchEnabled,
+        wiggle: hatchWiggle,
+        wiggleFreq: wiggleFrequency,
+        angleJitter: angleJitter,
+        lengthJitter: lengthJitter,
+        positionJitter: positionJitter,
+        spacingJitter: spacingJitter
+      };
+
+      const hatchPaths = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions);
 
       hatchPaths.forEach(hatchPath => {
-        // Parse and render hatch line
-        const matches = hatchPath.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+L\s*([\d.-]+)\s+([\d.-]+)/);
-        if (matches) {
-          const x1 = parseFloat(matches[1]);
-          const y1 = parseFloat(matches[2]);
-          const x2 = parseFloat(matches[3]);
-          const y2 = parseFloat(matches[4]);
-          line(x1, y1, x2, y2);
+        // Parse and render hatch line (can be straight or wiggly polyline)
+        const pathParts = hatchPath.split(/\s+/);
+        if (pathParts.length >= 4 && pathParts[0] === 'M') {
+          // Draw polyline
+          beginShape();
+          for (let i = 1; i < pathParts.length; i += 3) {
+            if (pathParts[i - 1] === 'M' || pathParts[i - 1] === 'L') {
+              const x = parseFloat(pathParts[i]);
+              const y = parseFloat(pathParts[i + 1]);
+              vertex(x, y);
+            }
+          }
+          endShape();
         }
       });
     } else {
@@ -726,8 +753,10 @@ function mousePressed() {
   // Not clicking on attractor - add new one
   attractorSystem.addAttractor(svgX, svgY);
   updateAttractorList();
-  needsRedraw = true;
-  redraw();
+  if (livePreview) {
+    needsRedraw = true;
+    redraw();
+  }
 }
 
 /**
@@ -781,8 +810,10 @@ function mouseDragged() {
     draggedAttractor.y = svgY - dragOffsetY;
 
     updateAttractorList();
-    needsRedraw = true;
-    redraw();
+    if (livePreview) {
+      needsRedraw = true;
+      redraw();
+    }
   }
 }
 
@@ -858,6 +889,9 @@ function mouseWheel(event) {
 function loadSVGFile(file) {
   // Store original filename for export
   originalFilename = file.name.replace(/\.svg$/i, ''); // Remove .svg extension
+
+  // Reset export button state
+  resetExportButton();
 
   // Show loading indicator
   updateStatus('Loading SVG...');
@@ -1001,8 +1035,25 @@ function clearSVG() {
   const svgInfo = document.getElementById('svg-info');
   if (svgInfo) svgInfo.style.display = 'none';
 
+  // Reset export button state
+  resetExportButton();
+
   needsRedraw = true;
   redraw();
+}
+
+/**
+ * Reset export button to initial state
+ */
+function resetExportButton() {
+  const exportButton = document.getElementById('export-svg');
+  if (exportButton) {
+    exportButton.textContent = 'Export SVG';
+    exportButton.classList.remove('download-ready');
+  }
+  if (typeof preparedDownload !== 'undefined') {
+    preparedDownload = null;
+  }
 }
 
 /**
@@ -1105,8 +1156,10 @@ function updateAttractorList() {
 function removeAttractor(id) {
   attractorSystem.removeAttractor(id);
   updateAttractorList();
-  needsRedraw = true;
-  redraw();
+  if (livePreview) {
+    needsRedraw = true;
+    redraw();
+  }
 }
 
 /**
@@ -1120,8 +1173,10 @@ function updateAttractorPosition(id, axis, value) {
   const updates = {};
   updates[axis] = value;
   attractorSystem.updateAttractor(id, updates);
-  needsRedraw = true;
-  redraw();
+  if (livePreview) {
+    needsRedraw = true;
+    redraw();
+  }
 }
 
 /**
@@ -1132,8 +1187,10 @@ function updateAttractorProperty(id, property, value) {
   updates[property] = value;
   attractorSystem.updateAttractor(id, updates);
   updateAttractorList(); // Refresh to update the "(custom)" indicator
-  needsRedraw = true;
-  redraw();
+  if (livePreview) {
+    needsRedraw = true;
+    redraw();
+  }
 }
 
 /**
@@ -1142,8 +1199,20 @@ function updateAttractorProperty(id, property, value) {
 function resetAttractorToDefaults(id) {
   attractorSystem.updateAttractor(id, { strength: null, radius: null });
   updateAttractorList();
-  needsRedraw = true;
-  redraw();
+  if (livePreview) {
+    needsRedraw = true;
+    redraw();
+  }
+}
+
+/**
+ * Manually trigger preview update (called when live preview is off)
+ */
+function manualPreviewUpdate() {
+  if (svgData) {
+    needsRedraw = true;
+    redraw();
+  }
 }
 
 /**
