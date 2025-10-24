@@ -264,6 +264,7 @@ function initializeControls() {
       }
       needsRedraw = true;
       redraw();
+      updateCLICommand();
     });
   }
 
@@ -275,6 +276,7 @@ function initializeControls() {
     }
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   setupSlider('length-percentile-clamp', (value) => {
@@ -285,6 +287,7 @@ function initializeControls() {
     }
     needsRedraw = true;
     redraw();
+    updateCLICommand();
   });
 
   // Min/max length threshold inputs (now work in both preview and export)
@@ -301,6 +304,7 @@ function initializeControls() {
       }
       needsRedraw = true;
       redraw();
+      updateCLICommand();
     });
   }
 
@@ -314,6 +318,7 @@ function initializeControls() {
       }
       needsRedraw = true;
       redraw();
+      updateCLICommand();
     });
   }
 
@@ -1027,6 +1032,39 @@ function generateCLICommand() {
 
   params.push(`--min-passes ${minPasses}`);
   params.push(`--max-passes ${maxPasses}`);
+
+  // Add length mapping curve if not default
+  const lengthCurve = document.getElementById('length-mapping-curve')?.value || 'linear';
+  if (lengthCurve !== 'linear') {
+    // Map web curve names to CLI curve names
+    let cliCurveName = lengthCurve;
+    if (lengthCurve === 'power') {
+      cliCurveName = 'exponential'; // CLI uses 'exponential' for power curve
+    } else if (lengthCurve === 'percentile') {
+      // Percentile mode: use linear curve with max-length set to percentile value
+      cliCurveName = 'linear';
+      // Note: percentile clamping will be handled by max-length parameter below
+    }
+    params.push(`--curve ${cliCurveName}`);
+
+    // Add exponent for power/exponential curve
+    if (lengthCurve === 'power') {
+      const exponent = parseFloat(document.getElementById('length-mapping-exponent')?.value) || 1.0;
+      if (exponent !== 1.0) {
+        params.push(`--exponent ${exponent}`);
+      }
+    }
+  }
+
+  // Add length thresholds if set
+  const minLengthValue = parseFloat(document.getElementById('min-length-threshold')?.value);
+  const maxLengthValue = parseFloat(document.getElementById('max-length-threshold')?.value);
+  if (minLengthValue && minLengthValue > 0) {
+    params.push(`--min-length ${minLengthValue}`);
+  }
+  if (maxLengthValue && maxLengthValue > 0) {
+    params.push(`--max-length ${maxLengthValue}`);
+  }
 
   // Add sample rate if not default
   if (sampleRate !== 2) {
