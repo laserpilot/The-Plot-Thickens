@@ -311,3 +311,223 @@ const EnvelopePresets = {
 function getEnvelopePreset(presetName) {
   return EnvelopePresets[presetName] || EnvelopePresets.flat;
 }
+
+/**
+ * Compute line-polyline intersection
+ * Returns the intersection point where a line segment intersects a polyline
+ * @param {Object} lineStart - {x, y} start point of line
+ * @param {Object} lineEnd - {x, y} end point of line
+ * @param {Array} polyline - Array of {x, y} points
+ * @returns {Object|null} Intersection point {x, y} or null if no intersection
+ */
+function linePolylineIntersection(lineStart, lineEnd, polyline) {
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const p1 = polyline[i];
+    const p2 = polyline[i + 1];
+
+    const intersection = lineSegmentIntersection(lineStart, lineEnd, p1, p2);
+    if (intersection) {
+      return intersection;
+    }
+  }
+  return null;
+}
+
+/**
+ * Compute line segment intersection
+ * @param {Object} a1 - First line start {x, y}
+ * @param {Object} a2 - First line end {x, y}
+ * @param {Object} b1 - Second line start {x, y}
+ * @param {Object} b2 - Second line end {x, y}
+ * @returns {Object|null} Intersection point {x, y} or null
+ */
+function lineSegmentIntersection(a1, a2, b1, b2) {
+  const dx1 = a2.x - a1.x;
+  const dy1 = a2.y - a1.y;
+  const dx2 = b2.x - b1.x;
+  const dy2 = b2.y - b1.y;
+
+  const denom = dx1 * dy2 - dy1 * dx2;
+  if (Math.abs(denom) < 1e-10) return null; // Parallel
+
+  const t1 = ((b1.x - a1.x) * dy2 - (b1.y - a1.y) * dx2) / denom;
+  const t2 = ((b1.x - a1.x) * dy1 - (b1.y - a1.y) * dx1) / denom;
+
+  if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+    return {
+      x: a1.x + t1 * dx1,
+      y: a1.y + t1 * dy1
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Generate crosshatch fill for a path
+ * Fills the path's ribbon with angled hatch lines instead of parallel offsets
+ * @param {string} pathData - Original SVG path
+ * @param {number} baseWidth - Base width of the ribbon (half-width on each side)
+ * @param {Array<number>} hatchAngles - Array of hatch angles in degrees (e.g., [45, -45])
+ * @param {number} hatchSpacing - Base spacing between hatch lines (mm)
+ * @param {number} noise - Noise amount to add to spacing
+ * @param {number} seed - Seed for deterministic noise
+ * @param {string} pathId - Path identifier for envelope
+ * @param {Function} offsetEnvelope - Envelope function for width taper
+ * @param {number} noiseFrequency - Noise wavelength in mm
+ * @returns {Array<string>} Array of hatch line path strings
+ */
+function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50) {
+  if (!pathData || typeof pathData !== 'string') {
+    return [];
+  }
+
+  try {
+    // Convert to absolute commands
+    const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+    const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return [];
+    }
+
+    // Get sample rate from UI if available, otherwise use 2mm default
+    const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
+    const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
+
+    // Sample centerline and compute offset boundaries
+    const sampleInterval = Math.min(sampleRate, totalLength / 100);
+    const numSamples = Math.max(2, Math.min(200, Math.ceil(totalLength / sampleInterval)));
+
+    // Build centerline and offset boundaries
+    const centerline = [];
+    const leftBoundary = [];
+    const rightBoundary = [];
+
+    for (let i = 0; i <= numSamples; i++) {
+      const arcLength = (i / numSamples) * totalLength;
+      const t = i / numSamples;
+
+      const point = SVGPathCommander.getPointAtLength(absolutePath, arcLength);
+      if (!point || isNaN(point.x) || isNaN(point.y)) continue;
+
+      // Calculate tangent from adjacent samples
+      const delta = Math.min(0.1, totalLength * 0.01);
+      const t1 = Math.max(0, arcLength - delta);
+      const t2 = Math.min(totalLength, arcLength + delta);
+
+      const p1 = SVGPathCommander.getPointAtLength(absolutePath, t1);
+      const p2 = SVGPathCommander.getPointAtLength(absolutePath, t2);
+
+      if (!p1 || !p2) continue;
+
+      // Tangent vector
+      const tx = p2.x - p1.x;
+      const ty = p2.y - p1.y;
+      const tLen = Math.sqrt(tx * tx + ty * ty);
+
+      let nx, ny;
+
+      if (tLen < 0.001) {
+        // Tangent collapsed - use overall path direction as fallback
+        const startPt = SVGPathCommander.getPointAtLength(absolutePath, 0);
+        const endPt = SVGPathCommander.getPointAtLength(absolutePath, totalLength);
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+        const dLen = Math.sqrt(dx * dx + dy * dy);
+
+        if (dLen < 0.001) {
+          continue;
+        }
+
+        nx = -dy / dLen;
+        ny = dx / dLen;
+      } else {
+        // Unit normal (perpendicular to tangent, pointing "right")
+        nx = -ty / tLen;
+        ny = tx / tLen;
+      }
+
+      // Apply envelope function
+      let envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
+
+      // If path is short (< 2x sample rate) and envelope would zero it out, apply floor
+      if (totalLength < sampleRate * 2 && envelopeMultiplier < 0.1) {
+        envelopeMultiplier = 0.1;
+      }
+
+      const halfWidth = baseWidth * envelopeMultiplier;
+
+      // Store centerline with metadata
+      centerline.push({
+        x: point.x,
+        y: point.y,
+        nx, ny,
+        tx, ty,
+        arcLength,
+        t,
+        halfWidth
+      });
+
+      // Build boundaries
+      leftBoundary.push({
+        x: point.x - nx * halfWidth,
+        y: point.y - ny * halfWidth
+      });
+
+      rightBoundary.push({
+        x: point.x + nx * halfWidth,
+        y: point.y + ny * halfWidth
+      });
+    }
+
+    if (centerline.length === 0) return [];
+
+    // Generate hatch lines
+    const hatchPaths = [];
+
+    for (const angleInDegrees of hatchAngles) {
+      const angleRad = (angleInDegrees * Math.PI) / 180;
+
+      // March along centerline at spacing intervals
+      let currentArcLength = 0;
+
+      while (currentArcLength <= totalLength) {
+        // Find closest centerline sample
+        const sample = centerline.reduce((closest, pt) =>
+          Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
+        );
+
+        // Rotate normal by hatch angle to get hatch direction
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        const hatchDx = sample.nx * cos - sample.ny * sin;
+        const hatchDy = sample.nx * sin + sample.ny * cos;
+
+        // Cast ray in both directions from center
+        const rayLength = sample.halfWidth * 2; // Ensure we hit boundaries
+        const p1 = { x: sample.x - hatchDx * rayLength, y: sample.y - hatchDy * rayLength };
+        const p2 = { x: sample.x + hatchDx * rayLength, y: sample.y + hatchDy * rayLength };
+
+        // Intersect with boundaries
+        const leftHit = linePolylineIntersection(p1, p2, leftBoundary);
+        const rightHit = linePolylineIntersection(p1, p2, rightBoundary);
+
+        if (leftHit && rightHit) {
+          // Create hatch segment
+          hatchPaths.push(`M ${leftHit.x.toFixed(3)} ${leftHit.y.toFixed(3)} L ${rightHit.x.toFixed(3)} ${rightHit.y.toFixed(3)}`);
+        }
+
+        // Advance with noise
+        const noiseValue = noise > 0 ? simpleNoise(currentArcLength / noiseFrequency, seed) * noise : 0;
+        const spacing = Math.max(0.1, hatchSpacing + noiseValue);
+        currentArcLength += spacing;
+      }
+    }
+
+    return hatchPaths;
+  } catch (error) {
+    console.warn('Failed to generate crosshatch fill:', error.message);
+    return [];
+  }
+}

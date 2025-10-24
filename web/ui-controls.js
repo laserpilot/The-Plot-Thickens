@@ -49,6 +49,73 @@ function initializeControls() {
     });
   });
 
+  // Fill mode toggle
+  document.querySelectorAll('input[name="fill-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      fillMode = e.target.value;
+
+      // Show/hide crosshatch controls
+      const crosshatchControls = document.getElementById('crosshatch-controls');
+      if (crosshatchControls) {
+        crosshatchControls.style.display = fillMode === 'crosshatch' ? 'block' : 'none';
+      }
+
+      updateStatus(fillMode === 'crosshatch' ? 'Crosshatch fill mode' : 'Offset fill mode');
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  });
+
+  // Hatch preset selector
+  const hatchPresetSelect = document.getElementById('hatch-preset');
+  if (hatchPresetSelect) {
+    hatchPresetSelect.addEventListener('change', (e) => {
+      const preset = e.target.value;
+      const customControl = document.getElementById('custom-angles-control');
+
+      if (preset === 'custom') {
+        customControl.style.display = 'block';
+        const customAngles = document.getElementById('custom-hatch-angles').value;
+        hatchAngles = customAngles.split(',').map(a => parseFloat(a.trim()));
+      } else {
+        customControl.style.display = 'none';
+        // Set predefined angles
+        const presets = {
+          'perpendicular': [90],
+          'cross-45': [45, -45],
+          'cross-60': [60, -60],
+          'parallel': [0],
+          'triple': [30, 90, 150]
+        };
+        hatchAngles = presets[preset] || [90];
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  }
+
+  // Custom hatch angles
+  const customAnglesInput = document.getElementById('custom-hatch-angles');
+  if (customAnglesInput) {
+    customAnglesInput.addEventListener('change', (e) => {
+      hatchAngles = e.target.value.split(',').map(a => parseFloat(a.trim())).filter(a => !isNaN(a));
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  }
+
+  // Hatch spacing
+  setupSlider('hatch-spacing', (value) => {
+    hatchSpacing = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
   // Offset mode toggle
   document.querySelectorAll('input[name="offset-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
@@ -599,29 +666,15 @@ async function prepareExport() {
     // Collect all paths for this source path
     const sourcePaths = [];
 
-    // Generate offset duplicates with centered distribution
-    for (let i = 0; i < passes; i++) {
-      const passIndex = Math.floor(i / 2) + 1; // Distance from center (start at 1, not 0)
-      const isRight = i % 2 === 0; // Alternate sides
-      const direction = isRight ? 1 : -1;
+    // Route to crosshatch or offset fill
+    if (fillMode === 'crosshatch') {
+      // Crosshatch fill
+      const baseWidth = baseOffset * Math.max(1, passes);
+      const hatchPathStrings = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency);
 
-      const offsetDistance = direction * passIndex * baseOffset;
-      const passSeed = seed + i;
-
-      // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
-      let offsetPoints;
-      if (useNormalOffset) {
-        // Normal mode: pass path data string directly with noise frequency
-        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
-      } else {
-        // Legacy mode: use high-quality points
-        offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);
-      }
-
-      if (offsetPoints) {
-        const offsetPathData = pointsToPathString(offsetPoints);
+      hatchPathStrings.forEach(hatchPathD => {
         const pathData = {
-          d: offsetPathData,
+          d: hatchPathD,
           stroke: path.stroke,
           fill: path.fill,
           strokeWidth: path.strokeWidth,
@@ -630,8 +683,44 @@ async function prepareExport() {
         sourcePaths.push(pathData);
 
         if (!enableBinning) {
-          // If not binning, add directly to output
           processedPaths.push(pathData);
+        }
+      });
+    } else {
+      // Offset fill (existing code)
+      for (let i = 0; i < passes; i++) {
+        const passIndex = Math.floor(i / 2) + 1; // Distance from center (start at 1, not 0)
+        const isRight = i % 2 === 0; // Alternate sides
+        const direction = isRight ? 1 : -1;
+
+        const offsetDistance = direction * passIndex * baseOffset;
+        const passSeed = seed + i;
+
+        // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
+        let offsetPoints;
+        if (useNormalOffset) {
+          // Normal mode: pass path data string directly with noise frequency
+          offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+        } else {
+          // Legacy mode: use high-quality points
+          offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);
+        }
+
+        if (offsetPoints) {
+          const offsetPathData = pointsToPathString(offsetPoints);
+          const pathData = {
+            d: offsetPathData,
+            stroke: path.stroke,
+            fill: path.fill,
+            strokeWidth: path.strokeWidth,
+          };
+
+          sourcePaths.push(pathData);
+
+          if (!enableBinning) {
+            // If not binning, add directly to output
+            processedPaths.push(pathData);
+          }
         }
       }
     }
@@ -686,10 +775,12 @@ async function prepareExport() {
   }
 
   // Store prepared download (don't execute yet - wait for second click)
-  // Add timestamp to filename for versioning
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
+  // Build filename with original name prefix
+  const baseFilename = originalFilename || 'processed';
   const mode = useAttractors ? 'attractor' : 'length';
-  const filename = `processed-${mode}-${timestamp}.svg`;
+  const fillSuffix = fillMode === 'crosshatch' ? '-crosshatch' : '';
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
+  const filename = `${baseFilename}-${mode}${fillSuffix}-${timestamp}.svg`;
 
   preparedDownload = {
     content: svgContent,
@@ -1003,6 +1094,13 @@ function generateCLICommand() {
   const maxPasses = parseInt(document.getElementById('max-passes')?.value) || 20;
   const sampleRate = parseFloat(document.getElementById('sample-rate')?.value) || 2;
 
+  // Get fill mode
+  const fillModeRadios = document.getElementsByName('fill-mode');
+  let fillModeValue = 'offset';
+  fillModeRadios.forEach(radio => {
+    if (radio.checked) fillModeValue = radio.value;
+  });
+
   // Get offset mode
   const offsetModeRadios = document.getElementsByName('offset-mode');
   let offsetMode = 'legacy';
@@ -1021,6 +1119,14 @@ function generateCLICommand() {
   // Build command
   params.push(`--offset ${offset}`);
   params.push(`--noise ${noise}`);
+
+  // Add fill mode and crosshatch options
+  if (fillModeValue === 'crosshatch') {
+    params.push(`--fill-mode crosshatch`);
+    const hatchAnglesStr = hatchAngles.join(',');
+    params.push(`--hatch-angles "${hatchAnglesStr}"`);
+    params.push(`--hatch-spacing ${hatchSpacing}`);
+  }
 
   if (offsetMode === 'normal') {
     params.push(`--noise-frequency ${noiseFreq}`);

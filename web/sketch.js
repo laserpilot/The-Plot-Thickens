@@ -6,6 +6,7 @@ let svgParser;
 let attractorSystem;
 let svgData = null;
 let svgRawData = null; // Raw SVG structure before processing
+let originalFilename = null; // Store original filename for export
 
 // Display settings
 let canvasWidth = 800;
@@ -27,6 +28,11 @@ let pathsProcessed = false; // Track if paths have been converted to points
 let offsetMode = 'normal'; // 'legacy' or 'normal'
 let useNormalOffset = true; // Use normal-based offset
 let envelopePreset = 'sinTaperBoth'; // Envelope preset name
+
+// Fill mode state
+let fillMode = 'offset'; // 'offset' or 'crosshatch'
+let hatchAngles = [45, -45]; // Crosshatch angles in degrees
+let hatchSpacing = 1; // Spacing between hatch lines in mm
 
 // Drag state
 let draggedAttractor = null;
@@ -236,37 +242,56 @@ function renderOffsetPreview() {
     // Get envelope function if using normal mode
     const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
 
-    // Generate offset passes (limit for performance)
-    const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
+    // Route to crosshatch or offset fill
+    if (fillMode === 'crosshatch') {
+      // Crosshatch fill
+      const baseWidth = baseOffset * Math.max(1, weight);
+      const hatchPaths = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency);
 
-    for (let i = 0; i < maxPreviewPasses; i++) {
-      const passIndex = Math.floor(i / 2) + 1;
-      const isRight = i % 2 === 0;
-      const direction = isRight ? 1 : -1;
-      const offsetDistance = direction * passIndex * baseOffset;
-      const passSeed = seed + i;
+      hatchPaths.forEach(hatchPath => {
+        // Parse and render hatch line
+        const matches = hatchPath.match(/M\s*([\d.-]+)\s+([\d.-]+)\s+L\s*([\d.-]+)\s+([\d.-]+)/);
+        if (matches) {
+          const x1 = parseFloat(matches[1]);
+          const y1 = parseFloat(matches[2]);
+          const x2 = parseFloat(matches[3]);
+          const y2 = parseFloat(matches[4]);
+          line(x1, y1, x2, y2);
+        }
+      });
+    } else {
+      // Offset fill (existing code)
+      const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
 
-      let offsetPoints;
+      for (let i = 0; i < maxPreviewPasses; i++) {
+        const passIndex = Math.floor(i / 2) + 1;
+        const isRight = i % 2 === 0;
+        const direction = isRight ? 1 : -1;
+        const offsetDistance = direction * passIndex * baseOffset;
+        const passSeed = seed + i;
 
-      if (useNormalOffset) {
-        // Normal mode: use path data string
-        offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
-      } else {
-        // Legacy mode: use points (low quality for speed)
-        const sampledPoints = path.points.filter((_, idx) => idx % 3 === 0); // Subsample for speed
-        offsetPoints = generateOffsetPath(sampledPoints, offsetDistance, noise, passSeed, path.id, null, false);
-      }
+        let offsetPoints;
 
-      if (offsetPoints && offsetPoints.length > 0) {
-        beginShape();
-        offsetPoints.forEach((pt, idx) => {
-          if (pt.move && idx > 0) {
-            endShape();
-            beginShape();
-          }
-          vertex(pt.x, pt.y);
-        });
-        endShape();
+        if (useNormalOffset) {
+          // Normal mode: use path data string
+          offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+        } else {
+          // Legacy mode: use points (low quality for speed)
+          const sampledPoints = path.points.filter((_, idx) => idx % 3 === 0); // Subsample for speed
+          offsetPoints = generateOffsetPath(sampledPoints, offsetDistance, noise, passSeed, path.id, null, false);
+        }
+
+        if (offsetPoints && offsetPoints.length > 0) {
+          beginShape();
+          offsetPoints.forEach((pt, idx) => {
+            if (pt.move && idx > 0) {
+              endShape();
+              beginShape();
+            }
+            vertex(pt.x, pt.y);
+          });
+          endShape();
+        }
       }
     }
   });
@@ -831,6 +856,9 @@ function mouseWheel(event) {
  * Load SVG file (Stage 1: Quick preview)
  */
 function loadSVGFile(file) {
+  // Store original filename for export
+  originalFilename = file.name.replace(/\.svg$/i, ''); // Remove .svg extension
+
   // Show loading indicator
   updateStatus('Loading SVG...');
   showLoadingSpinner(true);
@@ -963,6 +991,7 @@ function fitSVGToCanvas() {
 function clearSVG() {
   svgData = null;
   svgRawData = null;
+  originalFilename = null;
   pathsProcessed = false;
   attractorSystem.clearAll();
   updateAttractorList();

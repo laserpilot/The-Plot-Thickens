@@ -25,6 +25,11 @@ const DEFAULT_CONFIG = {
   envelope: 'sinTaperBoth', // envelope preset name
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
+  fillMode: 'offset', // 'offset' or 'crosshatch'
+  crosshatch: {
+    angles: [90], // hatch angles in degrees
+    spacing: 1, // spacing between hatch lines in mm
+  },
 };
 
 // CLI setup
@@ -51,6 +56,9 @@ program
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
+  .option('--fill-mode <mode>', 'Fill mode: offset or crosshatch (default: offset)')
+  .option('--hatch-angles <angles>', 'Crosshatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
+  .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -82,6 +90,18 @@ program
     if (options.envelope !== undefined) config.envelope = options.envelope;
     if (options.bins !== undefined) config.bins = options.bins;
     if (options.sampleRate !== undefined) config.sampleRate = options.sampleRate;
+    if (options.fillMode !== undefined) config.fillMode = options.fillMode;
+
+    // Handle crosshatch options
+    if (options.hatchAngles !== undefined) {
+      const angles = options.hatchAngles.split(',').map(a => parseFloat(a.trim()));
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.angles = angles;
+    }
+    if (options.hatchSpacing !== undefined) {
+      config.crosshatch = config.crosshatch || {};
+      config.crosshatch.spacing = options.hatchSpacing;
+    }
 
     // Load attractors preset if provided
     if (options.attractors) {

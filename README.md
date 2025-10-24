@@ -12,6 +12,7 @@ This tool manipulates SVG line weights by duplicating and offsetting paths with 
 - ✅ **Phase 2**: Path Length-Based Weight (complete)
 - ✅ **Phase 3**: Attractor-Based Weight System (complete)
 - ✅ **Phase 4**: Normal-Based Offsets with Taper (complete)
+- ✅ **Crosshatch Fill**: Alternative fill mode with angled hatches (complete)
 - ✅ **Performance**: Optimized for large SVG files (200+ paths)
 - ⏳ **Phase 5**: Combined System (pending)
 
@@ -356,6 +357,93 @@ python3 -m http.server 8000
 - **Depth effects**: Use attractors to simulate perspective
 - **Selective emphasis**: Highlight specific areas of artwork
 - **Organic variation**: Create natural-looking weight variations
+
+---
+
+## Crosshatch Fill Mode
+
+An alternative fill strategy that creates hatched fills instead of parallel offset lines. Perfect for creating shaded areas, texture effects, and traditional pen-and-ink style crosshatching.
+
+### How It Works
+
+Instead of duplicating paths with offsets, crosshatch mode:
+1. **Builds a ribbon** around each path using the same envelope/taper system
+2. **Fills the ribbon** with angled hatch lines at specified angles
+3. **Clips segments** to stay within the tapered boundary
+4. **Respects envelopes** - hatches automatically taper at path ends
+
+### CLI Usage
+
+```bash
+# Basic crosshatch with 45° angles
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "45,-45" \
+  --hatch-spacing 2
+
+# Perpendicular hatching (90° to path direction)
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "90" \
+  --hatch-spacing 1.5
+
+# Triple hatch with taper
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "30,90,150" \
+  --hatch-spacing 1 \
+  --offset-mode normal \
+  --envelope sinTaperBoth
+
+# Combine with noise for organic variation
+node process-svg.js input.svg output.svg \
+  --fill-mode crosshatch \
+  --hatch-angles "45,-45" \
+  --hatch-spacing 1.5 \
+  --noise 0.2 \
+  --noise-frequency 80
+```
+
+### Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--fill-mode` | `offset` or `crosshatch` | `offset` |
+| `--hatch-angles` | Comma-separated angles in degrees (e.g., "45,-45") | `90` |
+| `--hatch-spacing` | Distance between hatch lines in mm | `1` |
+| `--offset` | Controls ribbon width (baseWidth = offset × passes) | `0.25` |
+
+**Note:** In crosshatch mode, the `--offset` parameter controls the width of the ribbon being filled, while `--max-passes` influences the total ribbon width (width = offset × passes).
+
+### Web Interface
+
+The web interface includes crosshatch controls:
+1. **Fill Mode** toggle: Switch between Offset and Crosshatch
+2. **Hatch Preset** dropdown:
+   - Perpendicular (90°)
+   - Cross 45° (±45°) - classic crosshatch
+   - Cross 60° (±60°)
+   - Parallel (0°) - parallel to path
+   - Triple (30°/90°/150°)
+   - Custom (enter your own angles)
+3. **Hatch Spacing** slider (0.1-5mm)
+4. **Live preview** in offset mode
+
+### Use Cases
+
+- **Shading effects** - Variable density hatching based on path length or attractors
+- **Textured fills** - Create pen-and-ink style shading
+- **Technical drawings** - Section marks, material indicators
+- **Artistic effects** - Combine with envelopes for tapered hatches
+- **Dense fills** - Fill wide paths efficiently
+
+### Technical Details
+
+- Hatches are clipped to the ribbon boundary using line-polyline intersection
+- Envelope functions apply to both ribbon width and hatch length
+- Noise affects hatch spacing (creates organic variation in density)
+- Each angle pass generates separate hatch segments
+- Compatible with attractor-based weighting (ribbon width varies by influence)
 
 ---
 
