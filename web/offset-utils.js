@@ -679,3 +679,193 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
     return [];
   }
 }
+
+/**
+ * Generate stippling fill (dots placed along arc normals)
+ * @param {string} pathData - SVG path data
+ * @param {number} baseWidth - Width of the stippling ribbon
+ * @param {number} dotSpacing - Distance between dots in mm
+ * @param {number} dotSize - Radius of each dot in mm
+ * @param {number} seed - Random seed
+ * @param {string} pathId - Path identifier for envelope
+ * @param {Function} offsetEnvelope - Optional envelope function (pathId, t) => multiplier
+ * @param {boolean} extractOutline - Return outline paths separately (default: false)
+ * @returns {Array<Object>|Object} Array of dot objects {x, y, r}, or {fills: Array, outlines: Array} if extractOutline=true
+ */
+function generateStipplingFill(pathData, baseWidth, dotSpacing, dotSize, seed = 0, pathId = '', offsetEnvelope = null, extractOutline = false) {
+  if (!pathData || typeof pathData !== 'string') {
+    return [];
+  }
+
+  try {
+    // Convert to absolute commands
+    const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+    const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return [];
+    }
+
+    // Get sample rate from UI if available, otherwise use 2mm default
+    const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
+    const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
+
+    // Sample centerline and compute offset boundaries
+    const sampleInterval = Math.min(sampleRate, totalLength / 100);
+    const numSamples = Math.max(2, Math.min(200, Math.ceil(totalLength / sampleInterval)));
+
+    // Build centerline with metadata
+    const centerline = [];
+    const leftBoundary = [];
+    const rightBoundary = [];
+
+    for (let i = 0; i <= numSamples; i++) {
+      const arcLength = (i / numSamples) * totalLength;
+      const t = i / numSamples;
+
+      const point = SVGPathCommander.getPointAtLength(absolutePath, arcLength);
+      if (!point || isNaN(point.x) || isNaN(point.y)) continue;
+
+      // Calculate tangent from adjacent samples
+      const delta = Math.min(0.1, totalLength * 0.01);
+      const t1 = Math.max(0, arcLength - delta);
+      const t2 = Math.min(totalLength, arcLength + delta);
+
+      const p1 = SVGPathCommander.getPointAtLength(absolutePath, t1);
+      const p2 = SVGPathCommander.getPointAtLength(absolutePath, t2);
+
+      if (!p1 || !p2) continue;
+
+      // Tangent vector
+      const tx = p2.x - p1.x;
+      const ty = p2.y - p1.y;
+      const tLen = Math.sqrt(tx * tx + ty * ty);
+
+      let nx, ny;
+
+      if (tLen < 0.001) {
+        // Tangent collapsed - use overall path direction as fallback
+        const startPt = SVGPathCommander.getPointAtLength(absolutePath, 0);
+        const endPt = SVGPathCommander.getPointAtLength(absolutePath, totalLength);
+        const dx = endPt.x - startPt.x;
+        const dy = endPt.y - startPt.y;
+        const dLen = Math.sqrt(dx * dx + dy * dy);
+
+        if (dLen < 0.001) {
+          continue;
+        }
+
+        nx = -dy / dLen;
+        ny = dx / dLen;
+      } else {
+        // Unit normal (perpendicular to tangent, pointing "right")
+        nx = -ty / tLen;
+        ny = tx / tLen;
+      }
+
+      // Apply envelope function
+      let envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
+
+      // If path is short and envelope would zero it out, apply floor
+      if (totalLength < sampleRate * 2 && envelopeMultiplier < 0.1) {
+        envelopeMultiplier = 0.1;
+      }
+
+      const halfWidth = baseWidth * envelopeMultiplier;
+
+      // Store centerline with metadata
+      centerline.push({
+        x: point.x,
+        y: point.y,
+        nx, ny,
+        arcLength,
+        t,
+        halfWidth
+      });
+
+      // Build boundaries for outline extraction
+      leftBoundary.push({
+        x: point.x - nx * halfWidth,
+        y: point.y - ny * halfWidth
+      });
+
+      rightBoundary.push({
+        x: point.x + nx * halfWidth,
+        y: point.y + ny * halfWidth
+      });
+    }
+
+    if (centerline.length === 0) return [];
+
+    // Generate dots along the centerline
+    const dots = [];
+    let currentArcLength = 0;
+
+    while (currentArcLength <= totalLength) {
+      // Find closest centerline sample
+      const sample = centerline.reduce((closest, pt) =>
+        Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
+      );
+
+      // Calculate number of dots across the width at this position
+      // Spacing them evenly perpendicular to the path
+      const numDotsAcross = Math.max(1, Math.floor((sample.halfWidth * 2) / dotSpacing));
+
+      // Place dots symmetrically around the centerline
+      for (let i = 0; i < numDotsAcross; i++) {
+        // Map i to offset distance from center
+        // For odd counts: center dot at 0, then symmetrical pairs
+        // For even counts: no center dot, symmetrical pairs
+        let offsetDist;
+        if (numDotsAcross === 1) {
+          offsetDist = 0; // Single dot on centerline
+        } else {
+          // Distribute evenly across the width
+          const step = (sample.halfWidth * 2) / (numDotsAcross - 1);
+          offsetDist = -sample.halfWidth + i * step;
+        }
+
+        const dotX = sample.x + sample.nx * offsetDist;
+        const dotY = sample.y + sample.ny * offsetDist;
+
+        dots.push({
+          x: dotX,
+          y: dotY,
+          r: dotSize
+        });
+      }
+
+      // Advance to next position along arc
+      currentArcLength += dotSpacing;
+    }
+
+    // Extract outline if requested
+    if (extractOutline && leftBoundary.length > 0 && rightBoundary.length > 0) {
+      const outlines = [];
+
+      // Convert left boundary to path string
+      const leftPathParts = leftBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(leftPathParts.join(' '));
+
+      // Convert right boundary to path string
+      const rightPathParts = rightBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(rightPathParts.join(' '));
+
+      return { fills: dots, outlines };
+    }
+
+    return dots;
+  } catch (error) {
+    console.warn('Failed to generate stippling fill:', error.message);
+    if (extractOutline) {
+      return { fills: [], outlines: [] };
+    }
+    return [];
+  }
+}

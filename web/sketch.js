@@ -31,9 +31,13 @@ let useNormalOffset = true; // Use normal-based offset
 let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 
 // Fill mode state
-let fillMode = 'offset'; // 'offset' or 'crosshatch'
+let fillMode = 'offset'; // 'offset', 'crosshatch', or 'stippling'
 let hatchAngles = [45, -45]; // Crosshatch angles in degrees
 let hatchSpacing = 1; // Spacing between hatch lines in mm
+
+// Stippling state
+let dotSpacing = 1.5; // Distance between dots in mm
+let dotSize = 0.3; // Radius of each dot in mm
 
 // Organic crosshatch state
 let organicHatchEnabled = false;
@@ -255,7 +259,7 @@ function renderOffsetPreview() {
     // Get envelope function if using normal mode
     const envelope = useNormalOffset ? getEnvelopePreset(envelopePreset) : null;
 
-    // Route to crosshatch or offset fill
+    // Route to crosshatch, stippling, or offset fill
     if (fillMode === 'crosshatch') {
       // Crosshatch fill
       const baseWidth = baseOffset * Math.max(1, weight);
@@ -289,6 +293,22 @@ function renderOffsetPreview() {
           endShape();
         }
       });
+    } else if (fillMode === 'stippling') {
+      // Stippling fill
+      const baseWidth = baseOffset * Math.max(1, weight);
+      const dots = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope);
+
+      // Draw dots as circles
+      fill(100); // Gray fill for dots
+      noStroke();
+      dots.forEach(dot => {
+        circle(dot.x, dot.y, dot.r * 2); // p5.js circle uses diameter
+      });
+
+      // Reset to no fill for other drawing
+      noFill();
+      stroke(100);
+      strokeWeight(0.5 / zoomScale);
     } else {
       // Offset fill (existing code)
       const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance

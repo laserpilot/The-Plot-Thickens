@@ -87,7 +87,15 @@ function initializeControls() {
         crosshatchControls.style.display = fillMode === 'crosshatch' ? 'block' : 'none';
       }
 
-      updateStatus(fillMode === 'crosshatch' ? 'Crosshatch fill mode' : 'Offset fill mode');
+      // Show/hide stippling controls
+      const stipplingControls = document.getElementById('stippling-controls');
+      if (stipplingControls) {
+        stipplingControls.style.display = fillMode === 'stippling' ? 'block' : 'none';
+      }
+
+      const modeLabel = fillMode === 'crosshatch' ? 'Crosshatch fill mode' :
+                        fillMode === 'stippling' ? 'Stippling fill mode' : 'Offset fill mode';
+      updateStatus(modeLabel);
       needsRedraw = true;
       redraw();
       updateCLICommand();
@@ -213,6 +221,21 @@ function initializeControls() {
     redraw();
     updateCLICommand();
     updateCrosshatchPreview();
+  });
+
+  // Stippling controls
+  setupSlider('dot-spacing', (value) => {
+    dotSpacing = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('dot-size', (value) => {
+    dotSize = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
   });
 
   // Offset mode toggle
@@ -779,7 +802,7 @@ async function prepareExport() {
     // Collect all paths for this source path
     const sourcePaths = [];
 
-    // Route to crosshatch or offset fill
+    // Route to crosshatch, stippling, or offset fill
     if (fillMode === 'crosshatch') {
       // Crosshatch fill
       const baseWidth = baseOffset * Math.max(1, passes);
@@ -814,6 +837,56 @@ async function prepareExport() {
           stroke: path.stroke,
           fill: path.fill,
           strokeWidth: path.strokeWidth,
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          processedPaths.push(pathData);
+        }
+      });
+
+      // Add outline paths
+      outlinePathStrings.forEach(outlinePathD => {
+        const pathData = {
+          d: outlinePathD,
+          stroke: path.stroke,
+          fill: 'none',
+          strokeWidth: path.strokeWidth,
+          class: 'outline'
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          processedPaths.push(pathData);
+        }
+      });
+    } else if (fillMode === 'stippling') {
+      // Stippling fill
+      const baseWidth = baseOffset * Math.max(1, passes);
+      const stipplingResult = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope, addOutlineStroke);
+
+      // Handle result (either array or {fills, outlines} object)
+      let dots, outlinePathStrings;
+      if (addOutlineStroke && stipplingResult.fills) {
+        dots = stipplingResult.fills;
+        outlinePathStrings = stipplingResult.outlines || [];
+      } else {
+        dots = Array.isArray(stipplingResult) ? stipplingResult : [];
+        outlinePathStrings = [];
+      }
+
+      // Convert dots to SVG circles
+      dots.forEach(dot => {
+        // Create circle as SVG path
+        const circlePathD = `M ${(dot.x - dot.r).toFixed(3)},${dot.y.toFixed(3)} a ${dot.r.toFixed(3)},${dot.r.toFixed(3)} 0 1,0 ${(dot.r * 2).toFixed(3)},0 a ${dot.r.toFixed(3)},${dot.r.toFixed(3)} 0 1,0 ${(-dot.r * 2).toFixed(3)},0`;
+
+        const pathData = {
+          d: circlePathD,
+          stroke: path.stroke,
+          fill: path.stroke, // Fill dots with stroke color
+          strokeWidth: 0, // No stroke on dots
         };
 
         sourcePaths.push(pathData);
@@ -1394,7 +1467,7 @@ function generateCLICommand() {
   params.push(`--offset ${offset}`);
   params.push(`--noise ${noise}`);
 
-  // Add fill mode and crosshatch options
+  // Add fill mode and mode-specific options
   if (fillModeValue === 'crosshatch') {
     params.push(`--fill-mode crosshatch`);
     const hatchAnglesStr = hatchAngles.join(',');
@@ -1411,6 +1484,10 @@ function generateCLICommand() {
       if (positionJitter > 0) params.push(`--position-jitter ${positionJitter}`);
       if (spacingJitter > 0) params.push(`--spacing-jitter ${spacingJitter}`);
     }
+  } else if (fillModeValue === 'stippling') {
+    params.push(`--fill-mode stippling`);
+    params.push(`--dot-spacing ${dotSpacing}`);
+    params.push(`--dot-size ${dotSize}`);
   }
 
   // Add outline stroke option
