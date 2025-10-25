@@ -1153,7 +1153,7 @@ function buildSVGContent(paths) {
       });
 
       const fill = path.fill || 'none';
-      const stroke = path.stroke || 'black';
+      const stroke = 'red'; // Use red for outline paths to make them stand out
       const strokeWidth = path.strokeWidth || 0.1;
 
       parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
@@ -1301,7 +1301,7 @@ function buildBinnedSVGContent(pathsWithMetadata, binCount) {
       });
 
       const fill = path.fill || 'none';
-      const stroke = path.stroke || 'black';
+      const stroke = 'red'; // Use red for outline paths to make them stand out
       const strokeWidth = path.strokeWidth || 0.1;
 
       parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
