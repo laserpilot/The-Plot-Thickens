@@ -611,13 +611,244 @@ class CrosshatchPreview {
   }
 }
 
+/**
+ * Light Direction Indicator
+ * Shows an arrow pointing in the light direction
+ */
+class LightDirectionIndicator {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
+
+    this.ctx = this.canvas.getContext('2d');
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
+    this.lightAngle = 45;
+
+    this.draw();
+  }
+
+  update(lightAngle) {
+    this.lightAngle = lightAngle;
+    this.draw();
+  }
+
+  draw() {
+    if (!this.ctx) return;
+
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const centerX = w / 2;
+    const centerY = h / 2;
+
+    // Clear
+    ctx.clearRect(0, 0, w, h);
+
+    // Background
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, w, h);
+
+    // Compass circle
+    ctx.strokeStyle = '#dee2e6';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, w * 0.35, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cardinal direction labels
+    ctx.fillStyle = '#adb5bd';
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('E', w - 6, centerY);
+    ctx.fillText('W', 6, centerY);
+    ctx.fillText('N', centerX, 7);
+    ctx.fillText('S', centerX, h - 7);
+
+    // Light arrow
+    const angleRad = (this.lightAngle * Math.PI) / 180;
+    const arrowLength = w * 0.3;
+    const arrowEndX = centerX + Math.cos(angleRad) * arrowLength;
+    const arrowEndY = centerY + Math.sin(angleRad) * arrowLength;
+
+    // Arrow shaft
+    ctx.strokeStyle = '#ffa500';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(arrowEndX, arrowEndY);
+    ctx.stroke();
+
+    // Arrow head
+    const headSize = 6;
+    const headAngle1 = angleRad + Math.PI * 0.75;
+    const headAngle2 = angleRad - Math.PI * 0.75;
+
+    ctx.fillStyle = '#ffa500';
+    ctx.beginPath();
+    ctx.moveTo(arrowEndX, arrowEndY);
+    ctx.lineTo(arrowEndX + Math.cos(headAngle1) * headSize, arrowEndY + Math.sin(headAngle1) * headSize);
+    ctx.lineTo(arrowEndX + Math.cos(headAngle2) * headSize, arrowEndY + Math.sin(headAngle2) * headSize);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/**
+ * Gradient Hatch Preview
+ * Shows a circle with gradient hatching based on light direction
+ */
+class GradientHatchPreview {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
+
+    this.ctx = this.canvas.getContext('2d');
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
+
+    // Default parameters
+    this.lightAngle = 45;
+    this.lightStrength = 0.8;
+    this.baseWeight = 0.2;
+    this.shadowSoftness = 0.5;
+    this.hatchAngles = [0, 90];
+    this.hatchSpacing = 2; // In pixels for preview
+
+    this.draw();
+  }
+
+  update(lightAngle, lightStrength, baseWeight, shadowSoftness, hatchAngles, hatchSpacing) {
+    this.lightAngle = lightAngle;
+    this.lightStrength = lightStrength;
+    this.baseWeight = baseWeight;
+    this.shadowSoftness = shadowSoftness;
+    this.hatchAngles = hatchAngles;
+    this.hatchSpacing = hatchSpacing * 3; // Scale for visibility
+    this.draw();
+  }
+
+  draw() {
+    if (!this.ctx) return;
+
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+
+    // Clear
+    ctx.clearRect(0, 0, w, h);
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw circle with gradient hatching
+    const centerX = w / 2;
+    const centerY = h / 2;
+    const radius = Math.min(w, h) * 0.35;
+
+    // Convert light angle to direction vector
+    const lightAngleRad = (this.lightAngle * Math.PI) / 180;
+    const lightDirX = Math.cos(lightAngleRad);
+    const lightDirY = Math.sin(lightAngleRad);
+
+    // Draw hatches for each angle
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 0.8;
+
+    this.hatchAngles.forEach(hatchAngle => {
+      const angleRad = (hatchAngle * Math.PI) / 180;
+
+      // Sample points around the circle
+      const numSamples = 64;
+      for (let i = 0; i < numSamples; i++) {
+        const theta = (i / numSamples) * Math.PI * 2;
+        const pointX = centerX + Math.cos(theta) * radius;
+        const pointY = centerY + Math.sin(theta) * radius;
+
+        // Surface normal at this point (points outward from center)
+        const nx = Math.cos(theta);
+        const ny = Math.sin(theta);
+
+        // Calculate lighting weight
+        const dotProduct = nx * lightDirX + ny * lightDirY;
+        let rawWeight = (1 - Math.abs(dotProduct)) * this.lightStrength + this.baseWeight;
+
+        // Apply softness
+        if (this.shadowSoftness > 0) {
+          rawWeight = this.smoothstep(this.baseWeight, 1.0, rawWeight);
+        }
+
+        const weight = Math.max(0, Math.min(1, rawWeight));
+
+        // Determine if we should draw a hatch here
+        // Higher weight = denser hatching = smaller spacing
+        const effectiveSpacing = this.hatchSpacing / Math.max(weight, 0.1);
+
+        // Use deterministic pattern based on position
+        if (i % Math.max(1, Math.round(effectiveSpacing)) === 0) {
+          // Draw hatch line at this point
+          const hatchLength = radius * 0.4;
+          const dx = Math.cos(angleRad) * hatchLength;
+          const dy = Math.sin(angleRad) * hatchLength;
+
+          ctx.beginPath();
+          ctx.moveTo(pointX - dx, pointY - dy);
+          ctx.lineTo(pointX + dx, pointY + dy);
+          ctx.stroke();
+        }
+      }
+    });
+
+    // Draw circle outline for context
+    ctx.strokeStyle = '#dee2e6';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Draw light direction indicator
+    const arrowLength = radius * 1.3;
+    const arrowX = centerX + lightDirX * arrowLength;
+    const arrowY = centerY + lightDirY * arrowLength;
+
+    ctx.strokeStyle = '#ffa500';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(arrowX, arrowY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Light source indicator
+    ctx.fillStyle = '#ffeb3b';
+    ctx.strokeStyle = '#ffa500';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(arrowX, arrowY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  }
+}
+
 // Initialize preview when DOM loads
 let paramPreview = null;
 let crosshatchPreview = null;
+let gradientPreview = null;
+let lightIndicator = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   paramPreview = new ParameterPreview('param-preview-canvas');
   crosshatchPreview = new CrosshatchPreview('crosshatch-preview-canvas');
+  gradientPreview = new GradientHatchPreview('gradient-preview-canvas');
+  lightIndicator = new LightDirectionIndicator('light-direction-indicator');
 
   // Update preview when parameters change
   function updatePreview() {

@@ -93,8 +93,15 @@ function initializeControls() {
         stipplingControls.style.display = fillMode === 'stippling' ? 'block' : 'none';
       }
 
+      // Show/hide hatch-gradient controls
+      const hatchGradientControls = document.getElementById('hatch-gradient-controls');
+      if (hatchGradientControls) {
+        hatchGradientControls.style.display = fillMode === 'hatch-gradient' ? 'block' : 'none';
+      }
+
       const modeLabel = fillMode === 'crosshatch' ? 'Crosshatch fill mode' :
-                        fillMode === 'stippling' ? 'Stippling fill mode' : 'Offset fill mode';
+                        fillMode === 'stippling' ? 'Stippling fill mode' :
+                        fillMode === 'hatch-gradient' ? 'Hatch gradient fill mode' : 'Offset fill mode';
       updateStatus(modeLabel);
       needsRedraw = true;
       redraw();
@@ -236,6 +243,89 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+  });
+
+  // Hatch gradient controls
+  setupSlider('light-angle', (value) => {
+    lightAngle = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('light-strength', (value) => {
+    lightStrength = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('gradient-base-weight', (value) => {
+    gradientBaseWeight = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('shadow-softness', (value) => {
+    shadowSoftness = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  // Gradient preset selector
+  const gradientPresetSelect = document.getElementById('gradient-hatch-preset');
+  if (gradientPresetSelect) {
+    gradientPresetSelect.addEventListener('change', (e) => {
+      const preset = e.target.value;
+      const customControl = document.getElementById('gradient-custom-angles-control');
+
+      if (preset === 'custom') {
+        customControl.style.display = 'block';
+        const customAngles = document.getElementById('gradient-custom-angles').value;
+        gradientHatchAngles = customAngles.split(',').map(a => parseFloat(a.trim()));
+      } else {
+        customControl.style.display = 'none';
+        // Set predefined angles
+        const presets = {
+          'single': [0],
+          'cross': [0, 90],
+          'triple': [0, 45, 90]
+        };
+        gradientHatchAngles = presets[preset] || [0, 45, 90];
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateGradientPreview();
+    });
+  }
+
+  // Custom gradient angles
+  const gradientCustomAnglesInput = document.getElementById('gradient-custom-angles');
+  if (gradientCustomAnglesInput) {
+    gradientCustomAnglesInput.addEventListener('change', (e) => {
+      gradientHatchAngles = e.target.value.split(',').map(a => parseFloat(a.trim())).filter(a => !isNaN(a));
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateGradientPreview();
+    });
+  }
+
+  // Gradient hatch spacing
+  setupSlider('gradient-hatch-spacing', (value) => {
+    gradientHatchSpacing = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
   });
 
   // Offset mode toggle
@@ -682,6 +772,9 @@ function initializeControls() {
 
   // Initialize crosshatch preview
   updateCrosshatchPreview();
+
+  // Initialize gradient preview
+  updateGradientPreview();
 }
 
 /**
@@ -946,6 +1039,63 @@ async function prepareExport() {
           processedPaths.push(pathData);
         }
       });
+    } else if (fillMode === 'hatch-gradient') {
+      // Hatch gradient fill
+      const baseWidth = baseOffset * Math.max(1, passes);
+
+      // Build organic options (currently disabled but ready for future)
+      const organicOptions = {
+        enabled: false
+      };
+
+      const gradientResult = generateHatchGradientFill(
+        path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
+        lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
+        noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke
+      );
+
+      // Handle result (either array or {fills, outlines} object)
+      let gradientPathStrings, outlinePathStrings;
+      if (addOutlineStroke && gradientResult.fills) {
+        gradientPathStrings = gradientResult.fills;
+        outlinePathStrings = gradientResult.outlines || [];
+      } else {
+        gradientPathStrings = Array.isArray(gradientResult) ? gradientResult : [];
+        outlinePathStrings = [];
+      }
+
+      // Add fill paths
+      gradientPathStrings.forEach(gradientPathD => {
+        const pathData = {
+          d: gradientPathD,
+          stroke: path.stroke,
+          fill: path.fill,
+          strokeWidth: path.strokeWidth,
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          processedPaths.push(pathData);
+        }
+      });
+
+      // Add outline paths
+      outlinePathStrings.forEach(outlinePathD => {
+        const pathData = {
+          d: outlinePathD,
+          stroke: path.stroke,
+          fill: 'none',
+          strokeWidth: path.strokeWidth,
+          class: 'outline'
+        };
+
+        sourcePaths.push(pathData);
+
+        if (!enableBinning) {
+          processedPaths.push(pathData);
+        }
+      });
     } else {
       // Offset fill (existing code)
       let leftOutline = null;
@@ -1084,7 +1234,9 @@ async function prepareExport() {
   // Build filename with original name prefix
   const baseFilename = originalFilename || 'processed';
   const mode = useAttractors ? 'attractor' : 'length';
-  const fillSuffix = fillMode === 'crosshatch' ? '-crosshatch' : '';
+  const fillSuffix = fillMode === 'crosshatch' ? '-crosshatch' :
+                     fillMode === 'stippling' ? '-stippling' :
+                     fillMode === 'hatch-gradient' ? '-gradient' : '';
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
   const filename = `${baseFilename}-${mode}${fillSuffix}-${timestamp}.svg`;
 
@@ -1522,6 +1674,15 @@ function generateCLICommand() {
     params.push(`--fill-mode stippling`);
     params.push(`--dot-spacing ${dotSpacing}`);
     params.push(`--dot-size ${dotSize}`);
+  } else if (fillModeValue === 'hatch-gradient') {
+    params.push(`--fill-mode hatch-gradient`);
+    const gradientAnglesStr = gradientHatchAngles.join(',');
+    params.push(`--hatch-angles "${gradientAnglesStr}"`);
+    params.push(`--hatch-spacing ${gradientHatchSpacing}`);
+    params.push(`--light-angle ${lightAngle}`);
+    if (lightStrength !== 0.8) params.push(`--light-strength ${lightStrength}`);
+    if (gradientBaseWeight !== 0.2) params.push(`--gradient-base-weight ${gradientBaseWeight}`);
+    if (shadowSoftness !== 0.5) params.push(`--shadow-softness ${shadowSoftness}`);
   }
 
   // Add outline stroke option
@@ -1643,6 +1804,25 @@ function updateCrosshatchPreview() {
       positionJitter,
       spacingJitter
     );
+  }
+}
+
+/**
+ * Update gradient hatch preview
+ */
+function updateGradientPreview() {
+  if (typeof gradientPreview !== 'undefined' && gradientPreview) {
+    gradientPreview.update(
+      lightAngle,
+      lightStrength,
+      gradientBaseWeight,
+      shadowSoftness,
+      gradientHatchAngles,
+      gradientHatchSpacing
+    );
+  }
+  if (typeof lightIndicator !== 'undefined' && lightIndicator) {
+    lightIndicator.update(lightAngle);
   }
 }
 

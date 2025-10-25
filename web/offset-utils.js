@@ -1069,3 +1069,292 @@ function generateStipplingFill(pathData, baseWidth, dotSpacing, dotSize, seed = 
     return [];
   }
 }
+
+/**
+ * Smoothstep easing function for smooth transitions
+ */
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Generate light-based gradient hatching fill
+ * Creates directional shading by varying hatch density based on light direction
+ */
+function generateHatchGradientFill(
+  pathData,
+  baseWidth,
+  hatchAngles,
+  baseSpacing,
+  lightAngle,
+  lightStrength = 0.8,
+  baseWeight = 0.2,
+  shadowSoftness = 0.5,
+  noise = 0,
+  seed = 0,
+  pathId = '',
+  offsetEnvelope = null,
+  noiseFrequency = 50,
+  organicOptions = {},
+  extractOutline = false
+) {
+  // Extract organic options with defaults
+  const {
+    enabled: organicEnabled = false,
+    wiggle: hatchWiggle = 0,
+    wiggleFreq: wiggleFrequency = 20,
+    angleJitter = 0,
+    lengthJitter = 0,
+    positionJitter = 0,
+    spacingJitter = 0
+  } = organicOptions;
+
+  try {
+    const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+    const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return extractOutline ? { fills: [], outlines: [] } : [];
+    }
+
+    // Sample centerline and compute offset boundaries
+    const sampleInterval = Math.min(2, totalLength / 100);
+    const numSamples = Math.min(200, Math.ceil(totalLength / sampleInterval));
+
+    // Build centerline and offset boundaries
+    const centerline = [];
+    const leftBoundary = [];
+    const rightBoundary = [];
+
+    for (let i = 0; i <= numSamples; i++) {
+      const arcLength = (i / numSamples) * totalLength;
+      const t = i / numSamples;
+
+      const point = SVGPathCommander.getPointAtLength(absolutePath, arcLength);
+      if (!point || isNaN(point.x) || isNaN(point.y)) continue;
+
+      // Calculate tangent
+      const delta = Math.min(0.1, totalLength * 0.01);
+      const t1 = Math.max(0, arcLength - delta);
+      const t2 = Math.min(totalLength, arcLength + delta);
+
+      const p1 = SVGPathCommander.getPointAtLength(absolutePath, t1);
+      const p2 = SVGPathCommander.getPointAtLength(absolutePath, t2);
+
+      if (!p1 || !p2) continue;
+
+      const tx = p2.x - p1.x;
+      const ty = p2.y - p1.y;
+      const tLen = Math.sqrt(tx * tx + ty * ty);
+
+      if (tLen === 0) continue;
+
+      // Unit normal and tangent
+      const nx = -ty / tLen;
+      const ny = tx / tLen;
+      const ux = tx / tLen;
+      const uy = ty / tLen;
+
+      // Apply envelope
+      const envelopeMultiplier = offsetEnvelope ? offsetEnvelope(pathId, t) : 1.0;
+      const halfWidth = baseWidth * envelopeMultiplier;
+
+      // Store centerline with metadata
+      centerline.push({
+        x: point.x,
+        y: point.y,
+        nx, ny,
+        ux, uy,
+        arcLength,
+        t,
+        halfWidth
+      });
+
+      // Build boundaries
+      leftBoundary.push({
+        x: point.x - nx * halfWidth,
+        y: point.y - ny * halfWidth
+      });
+
+      rightBoundary.push({
+        x: point.x + nx * halfWidth,
+        y: point.y + ny * halfWidth
+      });
+    }
+
+    if (centerline.length === 0) {
+      return extractOutline ? { fills: [], outlines: [] } : [];
+    }
+
+    // Convert light angle to direction vector
+    const lightAngleRad = (lightAngle * Math.PI) / 180;
+    const lightDirX = Math.cos(lightAngleRad);
+    const lightDirY = Math.sin(lightAngleRad);
+
+    // Generate hatch lines for each angle with density based on light
+    const hatchPaths = [];
+    let hatchIndex = 0;
+
+    // Sort angles by average weight (lighter hatches first, darker last)
+    const angleWeights = hatchAngles.map(angle => {
+      const angleRad = (angle * Math.PI) / 180;
+      const angleDirX = Math.cos(angleRad);
+      const angleDirY = Math.sin(angleRad);
+      const dotProduct = angleDirX * lightDirX + angleDirY * lightDirY;
+      return { angle, avgWeight: Math.abs(dotProduct) };
+    });
+    angleWeights.sort((a, b) => a.avgWeight - b.avgWeight);
+
+    for (const { angle: angleInDegrees } of angleWeights) {
+      // Apply angle jitter if organic mode enabled
+      const actualAngle = organicEnabled && angleJitter > 0
+        ? angleInDegrees + (simpleNoise(seed * 1000 + hatchIndex * 100, seed) * angleJitter * 2 - angleJitter)
+        : angleInDegrees;
+
+      const angleRad = (actualAngle * Math.PI) / 180;
+
+      // Direction of this hatch angle
+      const hatchDirX = Math.cos(angleRad);
+      const hatchDirY = Math.sin(angleRad);
+
+      // March along centerline with variable spacing based on light
+      let currentArcLength = 0;
+
+      while (currentArcLength <= totalLength) {
+        // Find closest centerline sample
+        const sample = centerline.reduce((closest, pt) =>
+          Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
+        );
+
+        // Calculate weight for this position based on LOCAL SURFACE ORIENTATION
+        // dot(surfaceNormal, lightDir) determines if this point faces toward/away from light
+        const dotProduct = sample.nx * lightDirX + sample.ny * lightDirY;
+
+        // Map dot product to weight
+        // Positive dot (facing light) = low weight = sparse (light area)
+        // Negative dot (facing away) = high weight = dense (shadow area)
+        let rawWeight = (1 - Math.abs(dotProduct)) * lightStrength + baseWeight;
+
+        // Apply shadow softness (easing)
+        if (shadowSoftness > 0) {
+          rawWeight = smoothstep(baseWeight, 1.0, rawWeight);
+        }
+
+        // Clamp weight
+        const weight = Math.max(0, Math.min(1, rawWeight));
+
+        // Skip if weight is too low
+        const epsilon = 0.05;
+        if (weight < epsilon) {
+          currentArcLength += baseSpacing * 2;
+          continue;
+        }
+
+        // Apply position jitter if organic mode enabled
+        let sampleX = sample.x;
+        let sampleY = sample.y;
+        if (organicEnabled && positionJitter > 0) {
+          const jitterAmount = simpleNoise(currentArcLength / 20 + seed * 500, seed + hatchIndex) * positionJitter;
+          sampleX += sample.nx * jitterAmount;
+          sampleY += sample.ny * jitterAmount;
+        }
+
+        // Rotate normal by hatch angle to get hatch direction
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        const hatchDx = sample.nx * cos - sample.ny * sin;
+        const hatchDy = sample.nx * sin + sample.ny * cos;
+
+        // Cast ray in both directions from center
+        const rayLength = sample.halfWidth * 2;
+        const p1 = { x: sampleX - hatchDx * rayLength, y: sampleY - hatchDy * rayLength };
+        const p2 = { x: sampleX + hatchDx * rayLength, y: sampleY + hatchDy * rayLength };
+
+        // Intersect with boundaries
+        let leftHit = linePolylineIntersection(p1, p2, leftBoundary);
+        let rightHit = linePolylineIntersection(p1, p2, rightBoundary);
+
+        if (leftHit && rightHit) {
+          // Apply length randomization if organic mode enabled
+          if (organicEnabled && lengthJitter > 0) {
+            const shrinkFactor = 1 - (Math.abs(simpleNoise(hatchIndex * 50 + seed * 200, seed)) * lengthJitter);
+            const centerX = (leftHit.x + rightHit.x) / 2;
+            const centerY = (leftHit.y + rightHit.y) / 2;
+            leftHit = {
+              x: centerX + (leftHit.x - centerX) * shrinkFactor,
+              y: centerY + (leftHit.y - centerY) * shrinkFactor
+            };
+            rightHit = {
+              x: centerX + (rightHit.x - centerX) * shrinkFactor,
+              y: centerY + (rightHit.y - centerY) * shrinkFactor
+            };
+          }
+
+          // Generate wiggly or straight line
+          if (organicEnabled && hatchWiggle > 0) {
+            const wigglySeed = seed + hatchIndex;
+            const points = generateWigglyLine(leftHit, rightHit, hatchWiggle, wiggleFrequency, wigglySeed);
+
+            if (points.length > 0) {
+              let pathStr = `M ${points[0].x.toFixed(3)} ${points[0].y.toFixed(3)}`;
+              for (let i = 1; i < points.length; i++) {
+                pathStr += ` L ${points[i].x.toFixed(3)} ${points[i].y.toFixed(3)}`;
+              }
+              hatchPaths.push(pathStr);
+            }
+          } else {
+            // Straight line (fast path)
+            hatchPaths.push(`M ${leftHit.x.toFixed(3)} ${leftHit.y.toFixed(3)} L ${rightHit.x.toFixed(3)} ${rightHit.y.toFixed(3)}`);
+          }
+        }
+
+        hatchIndex++;
+
+        // Calculate spacing based on weight: higher weight = denser = smaller spacing
+        const densityFactor = 1.0 / Math.max(weight, epsilon);
+        let spacing = baseSpacing * densityFactor;
+
+        // Add noise variation
+        if (noise > 0) {
+          const noiseValue = simpleNoise(currentArcLength / noiseFrequency, seed + angleInDegrees) * noise;
+          spacing += noiseValue;
+        }
+
+        // Add random spacing jitter if organic mode enabled
+        if (organicEnabled && spacingJitter > 0) {
+          const randomJitter = (simpleNoise(hatchIndex * 30 + seed * 300, seed) - 0.5) * 2;
+          spacing += randomJitter * spacingJitter * baseSpacing;
+        }
+
+        // Ensure minimum spacing
+        spacing = Math.max(0.1, spacing);
+        currentArcLength += spacing;
+      }
+    }
+
+    // Extract outline if requested
+    if (extractOutline && leftBoundary.length > 0 && rightBoundary.length > 0) {
+      const outlines = [];
+
+      const leftPathParts = leftBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(leftPathParts.join(' '));
+
+      const rightPathParts = rightBoundary.map((pt, i) => {
+        const cmd = i === 0 ? 'M' : 'L';
+        return `${cmd}${pt.x},${pt.y}`;
+      });
+      outlines.push(rightPathParts.join(' '));
+
+      return { fills: hatchPaths, outlines };
+    }
+
+    return hatchPaths;
+  } catch (error) {
+    console.warn('Failed to generate hatch gradient fill:', error.message);
+    return extractOutline ? { fills: [], outlines: [] } : [];
+  }
+}

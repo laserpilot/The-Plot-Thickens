@@ -214,6 +214,11 @@
             Stippling (dots)
           </label>
 
+          <label>
+            <input type="radio" name="fill-mode" value="hatch-gradient">
+            Hatch Gradient (light-based)
+          </label>
+
           <div id="crosshatch-controls"
             style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
@@ -326,6 +331,69 @@
               <span id="dot-size-value">0.3</span>
               <span class="hint-icon" title="Radius of each stippled dot/circle.">?</span>
             </label>
+          </div>
+
+          <div id="hatch-gradient-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fff8f0; border-radius: 4px;">
+            <label>
+              Light Direction (degrees):
+              <input type="range" id="light-angle" min="0" max="360" step="5" value="45">
+              <span id="light-angle-value">45</span>
+              <canvas id="light-direction-indicator" width="50" height="50" style="display: inline-block; margin-left: 8px; vertical-align: middle; border: 1px solid #ddd; border-radius: 4px;"></canvas>
+              <span class="hint-icon" title="Direction of light source. 0° = right, 90° = down, 180° = left, 270° = up. Affects hatch density to create shading.">?</span>
+            </label>
+
+            <label>
+              Light Strength:
+              <input type="range" id="light-strength" min="0" max="1" step="0.05" value="0.8">
+              <span id="light-strength-value">0.80</span>
+              <span class="hint-icon" title="How much the light direction affects density. 0 = uniform, 1 = maximum contrast.">?</span>
+            </label>
+
+            <label>
+              Base Density:
+              <input type="range" id="gradient-base-weight" min="0" max="0.5" step="0.05" value="0.2">
+              <span id="gradient-base-weight-value">0.20</span>
+              <span class="hint-icon" title="Minimum hatch density in lightest areas. Higher = more visible in light areas.">?</span>
+            </label>
+
+            <label>
+              Shadow Softness:
+              <input type="range" id="shadow-softness" min="0" max="1" step="0.05" value="0.5">
+              <span id="shadow-softness-value">0.50</span>
+              <span class="hint-icon" title="Smoothness of transitions between light and shadow. 0 = sharp, 1 = very soft gradient.">?</span>
+            </label>
+
+            <label>
+              Gradient Preset:
+              <select id="gradient-hatch-preset">
+                <option value="single">Single Angle</option>
+                <option value="cross" selected>Cross (2 angles)</option>
+                <option value="triple">Triple (3 angles)</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+
+            <div id="gradient-custom-angles-control" style="display: none; margin-top: 0.5rem;">
+              <label>
+                Custom Angles (comma-separated degrees):
+                <input type="text" id="gradient-custom-angles" placeholder="0,45,90" value="0,45,90">
+              </label>
+            </div>
+
+            <label>
+              Hatch Spacing (mm):
+              <input type="range" id="gradient-hatch-spacing" min="0.1" max="5" step="0.1" value="1">
+              <span id="gradient-hatch-spacing-value">1.0</span>
+              <span class="hint-icon" title="Base spacing between hatch lines. Will vary based on light direction.">?</span>
+            </label>
+
+            <div
+              style="margin-top: 1rem; padding: 0.5rem; background: white; border-radius: 4px; border: 1px solid #ddd;">
+              <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9em;">Gradient Preview</div>
+              <canvas id="gradient-preview-canvas" width="400" height="80"
+                style="width: 100%; height: auto; border: 1px solid #ccc; border-radius: 2px;"></canvas>
+            </div>
           </div>
         </section>
 

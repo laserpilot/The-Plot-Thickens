@@ -31,13 +31,21 @@ let useNormalOffset = true; // Use normal-based offset
 let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 
 // Fill mode state
-let fillMode = 'offset'; // 'offset', 'crosshatch', or 'stippling'
+let fillMode = 'offset'; // 'offset', 'crosshatch', 'stippling', or 'hatch-gradient'
 let hatchAngles = [45, -45]; // Crosshatch angles in degrees
 let hatchSpacing = 1; // Spacing between hatch lines in mm
 
 // Stippling state
 let dotSpacing = 1.5; // Distance between dots in mm
 let dotSize = 0.3; // Radius of each dot in mm
+
+// Hatch gradient state
+let lightAngle = 45; // Light direction in degrees
+let lightStrength = 0.8; // Light influence strength
+let gradientBaseWeight = 0.2; // Minimum density weight
+let shadowSoftness = 0.5; // Easing factor for smooth transitions
+let gradientHatchAngles = [0, 45, 90]; // Gradient hatch angles
+let gradientHatchSpacing = 1; // Base spacing for gradient hatches
 
 // Organic crosshatch state
 let organicHatchEnabled = false;
@@ -390,6 +398,37 @@ function renderOffsetPreview() {
       noFill();
       stroke(100);
       strokeWeight(0.5 / zoomScale);
+    } else if (fillMode === 'hatch-gradient') {
+      // Hatch gradient fill
+      const baseWidth = baseOffset * Math.max(1, weight);
+
+      // Build organic options (can be extended later if needed)
+      const organicOptions = {
+        enabled: false // Not implemented for gradient yet, but ready for future
+      };
+
+      const hatchPaths = generateHatchGradientFill(
+        path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
+        lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
+        noise, seed, path.id, envelope, noiseFrequency, organicOptions, false
+      );
+
+      hatchPaths.forEach(hatchPath => {
+        // Parse and render hatch line
+        const pathParts = hatchPath.split(/\s+/);
+        if (pathParts.length >= 4 && pathParts[0] === 'M') {
+          // Draw polyline
+          beginShape();
+          for (let i = 1; i < pathParts.length; i += 3) {
+            if (pathParts[i - 1] === 'M' || pathParts[i - 1] === 'L') {
+              const x = parseFloat(pathParts[i]);
+              const y = parseFloat(pathParts[i + 1]);
+              vertex(x, y);
+            }
+          }
+          endShape();
+        }
+      });
     } else {
       // Offset fill (existing code)
       const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance

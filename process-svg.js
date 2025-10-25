@@ -25,7 +25,7 @@ const DEFAULT_CONFIG = {
   envelope: 'sinTaperBoth', // envelope preset name
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
-  fillMode: 'offset', // 'offset' or 'crosshatch'
+  fillMode: 'offset', // 'offset', 'crosshatch', 'stippling', or 'hatch-gradient'
   addOutline: false, // Add outline strokes (furthermost boundaries)
   crosshatch: {
     angles: [90], // hatch angles in degrees
@@ -39,6 +39,14 @@ const DEFAULT_CONFIG = {
       positionJitter: 0,
       spacingJitter: 0
     }
+  },
+  hatchGradient: {
+    angles: [0, 45, 90], // gradient hatch angles
+    spacing: 1, // base spacing between hatch lines
+    lightAngle: 45, // light direction in degrees
+    lightStrength: 0.8, // light influence strength
+    baseWeight: 0.2, // minimum density weight
+    shadowSoftness: 0.5 // transition smoothness
   },
 };
 
@@ -66,9 +74,9 @@ program
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
-  .option('--fill-mode <mode>', 'Fill mode: offset or crosshatch (default: offset)')
+  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, or hatch-gradient (default: offset)')
   .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
-  .option('--hatch-angles <angles>', 'Crosshatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
+  .option('--hatch-angles <angles>', 'Hatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
   .option('--organic-hatch', 'Enable organic/hand-drawn crosshatch mode')
   .option('--hatch-wiggle <number>', 'Line wiggle amplitude in mm (default: 0)', parseFloat)
@@ -77,6 +85,10 @@ program
   .option('--length-jitter <number>', 'Random length variation 0-1 (default: 0)', parseFloat)
   .option('--position-jitter <number>', 'Position offset jitter in mm (default: 0)', parseFloat)
   .option('--spacing-jitter <number>', 'Spacing randomization 0-1 (default: 0)', parseFloat)
+  .option('--light-angle <degrees>', 'Light direction for hatch-gradient mode (0=right, 90=down, default: 45)', parseFloat)
+  .option('--light-strength <number>', 'Light influence strength for hatch-gradient (0-1, default: 0.8)', parseFloat)
+  .option('--gradient-base-weight <number>', 'Minimum density for hatch-gradient (0-1, default: 0.2)', parseFloat)
+  .option('--shadow-softness <number>', 'Shadow transition smoothness for hatch-gradient (0-1, default: 0.5)', parseFloat)
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -157,6 +169,33 @@ program
       config.crosshatch = config.crosshatch || {};
       config.crosshatch.organic = config.crosshatch.organic || {};
       config.crosshatch.organic.spacingJitter = options.spacingJitter;
+    }
+
+    // Handle hatch-gradient options
+    if (options.hatchAngles !== undefined && config.fillMode === 'hatch-gradient') {
+      const angles = options.hatchAngles.split(',').map(a => parseFloat(a.trim()));
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.angles = angles;
+    }
+    if (options.hatchSpacing !== undefined && config.fillMode === 'hatch-gradient') {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.spacing = options.hatchSpacing;
+    }
+    if (options.lightAngle !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.lightAngle = options.lightAngle;
+    }
+    if (options.lightStrength !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.lightStrength = options.lightStrength;
+    }
+    if (options.gradientBaseWeight !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.baseWeight = options.gradientBaseWeight;
+    }
+    if (options.shadowSoftness !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.shadowSoftness = options.shadowSoftness;
     }
 
     // Load attractors preset if provided
