@@ -689,10 +689,11 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
  * @param {number} seed - Random seed
  * @param {string} pathId - Path identifier for envelope
  * @param {Function} offsetEnvelope - Optional envelope function (pathId, t) => multiplier
+ * @param {number} sampleRate - Sample interval in mm (default: 2)
  * @param {boolean} extractOutline - Return outline paths separately (default: false)
  * @returns {Array<Object>|Object} Array of dot objects {x, y, r}, or {fills: Array, outlines: Array} if extractOutline=true
  */
-function generateStipplingFill(pathData, baseWidth, dotSpacing, dotSize, seed = 0, pathId = '', offsetEnvelope = null, extractOutline = false) {
+function generateStipplingFill(pathData, baseWidth, dotSpacing, dotSize, seed = 0, pathId = '', offsetEnvelope = null, sampleRate = 2, extractOutline = false) {
   if (!pathData || typeof pathData !== 'string') {
     return [];
   }
@@ -705,10 +706,6 @@ function generateStipplingFill(pathData, baseWidth, dotSpacing, dotSize, seed = 
     if (totalLength === 0) {
       return [];
     }
-
-    // Get sample rate from UI if available, otherwise use 2mm default
-    const sampleRateInput = typeof document !== 'undefined' ? document.getElementById('sample-rate') : null;
-    const sampleRate = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
 
     // Sample centerline and compute offset boundaries
     const sampleInterval = Math.min(sampleRate, totalLength / 100);

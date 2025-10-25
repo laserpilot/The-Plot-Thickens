@@ -865,7 +865,10 @@ async function prepareExport() {
     } else if (fillMode === 'stippling') {
       // Stippling fill
       const baseWidth = baseOffset * Math.max(1, passes);
-      const stipplingResult = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope, addOutlineStroke);
+      // Get sample rate from UI
+      const sampleRateInput = document.getElementById('sample-rate');
+      const sampleRateValue = sampleRateInput ? parseFloat(sampleRateInput.value) : 2;
+      const stipplingResult = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope, sampleRateValue, addOutlineStroke);
 
       // Handle result (either array or {fills, outlines} object)
       let dots, outlinePathStrings;

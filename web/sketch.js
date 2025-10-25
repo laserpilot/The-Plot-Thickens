@@ -296,7 +296,8 @@ function renderOffsetPreview() {
     } else if (fillMode === 'stippling') {
       // Stippling fill
       const baseWidth = baseOffset * Math.max(1, weight);
-      const dots = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope);
+      // For preview, use default sampleRate of 2mm (parameter default)
+      const dots = generateStipplingFill(path.d, baseWidth, dotSpacing, dotSize, seed, path.id, envelope, 2, false);
 
       // Draw dots as circles
       fill(100); // Gray fill for dots
