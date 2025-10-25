@@ -53,10 +53,12 @@
           <label>
             <input type="checkbox" id="live-preview" checked>
             Live Preview (auto-reprocess on changes)
-            <span class="hint-icon" title="Disable to improve performance when placing attractors. Original paths will show until you manually trigger preview.">?</span>
+            <span class="hint-icon"
+              title="Disable to improve performance when placing attractors. Original paths will show until you manually trigger preview.">?</span>
           </label>
 
-          <button id="update-preview" style="display: none; margin-bottom: 0.5rem; width: 100%; padding: 0.5rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+          <button id="update-preview"
+            style="display: none; margin-bottom: 0.5rem; width: 100%; padding: 0.5rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
             🔄 Update Preview
           </button>
 
@@ -262,7 +264,7 @@
 
               <label>
                 Wiggle Frequency (mm):
-                <input type="range" id="wiggle-frequency" min="5" max="50" step="5" value="20">
+                <input type="range" id="wiggle-frequency" min="1" max="20" step="1" value="1">
                 <span id="wiggle-frequency-value">20</span>
                 <span class="hint-icon"
                   title="Wavelength of wiggle. Lower = tighter curves, higher = gentle waves.">?</span>
@@ -270,7 +272,7 @@
 
               <label>
                 Angle Variation (degrees):
-                <input type="range" id="angle-jitter" min="0" max="15" step="1" value="5">
+                <input type="range" id="angle-jitter" min="0" max="20" step="1" value="5">
                 <span id="angle-jitter-value">5</span>
                 <span class="hint-icon"
                   title="Random variation in hatch angle per line. 0 = uniform, 15 = very chaotic.">?</span>
@@ -355,6 +357,16 @@
               </select>
             </label>
           </div>
+
+          <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+          <label>
+            Curvature Influence:
+            <input type="range" id="curvature-influence" min="0" max="1" step="0.05" value="0">
+            <span id="curvature-influence-value">0.00</span>
+            <span class="hint-icon"
+              title="Reduce passes in high-curvature areas. 0 = disabled (length-only), 1 = maximum effect (thinner lines in tight curves).">?</span>
+          </label>
         </section>
 
         <section class="control-group">
@@ -368,7 +380,7 @@
 
           <label>
             Base Offset (mm):
-            <input type="range" id="base-offset" min="0.01" max="3" step="0.05" value="0.25">
+            <input type="range" id="base-offset" min="0.01" max="2" step="0.05" value="0.25">
             <span id="base-offset-value">0.25</span>
             <span class="hint-icon"
               title="Spacing between duplicate lines. Larger = thicker appearance. Each pass is offset by this distance.">?</span>
@@ -485,6 +497,7 @@
             <select id="preview-display-mode">
               <option value="weight">Weight Only (fast)</option>
               <option value="offset">Offset Rendering (accurate)</option>
+              <option value="curvature">Curvature Preview (diagnostic)</option>
             </select>
           </label>
 
@@ -581,7 +594,8 @@
           <label>
             <input type="checkbox" id="add-outline-stroke">
             Add Outline Stroke
-            <span class="hint-icon" title="Extract and add the furthermost boundary paths as separate outlines. Useful for outlining crosshatches or adding borders to fills.">?</span>
+            <span class="hint-icon"
+              title="Extract and add the furthermost boundary paths as separate outlines. Useful for outlining crosshatches or adding borders to fills.">?</span>
           </label>
 
           <button id="export-svg" class="primary-button">Export SVG</button>

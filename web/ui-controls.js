@@ -268,6 +268,24 @@ function initializeControls() {
     });
   }
 
+  // Curvature influence slider
+  setupSlider('curvature-influence', async (value) => {
+    attractorSystem.updateConfig({ curvatureInfluence: value });
+
+    // Trigger curvature calculation if user enables it for the first time
+    if (value > 0 && typeof ensureCurvatureCalculated === 'function') {
+      await ensureCurvatureCalculated();
+    }
+
+    // Invalidate weight cache since curvature changes affect weights
+    if (typeof invalidateWeightCache === 'function') {
+      invalidateWeightCache();
+    }
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
   // Attractor controls
   document.getElementById('clear-attractors').addEventListener('click', () => {
     attractorSystem.clearAll();
@@ -571,8 +589,14 @@ function initializeControls() {
   // Preview display mode toggle
   const previewDisplayModeSelect = document.getElementById('preview-display-mode');
   if (previewDisplayModeSelect) {
-    previewDisplayModeSelect.addEventListener('change', (e) => {
+    previewDisplayModeSelect.addEventListener('change', async (e) => {
       previewDisplayMode = e.target.value;
+
+      // Trigger curvature calculation if user switches to curvature preview
+      if (previewDisplayMode === 'curvature' && typeof ensureCurvatureCalculated === 'function') {
+        await ensureCurvatureCalculated();
+      }
+
       needsRedraw = true;
       redraw();
     });
@@ -742,6 +766,12 @@ async function prepareExport() {
   console.log('Generating processed SVG...');
   updateStatus('Exporting SVG...');
 
+  // Calculate curvature if needed and influence > 0
+  const curvatureInfluence = attractorSystem.config.curvatureInfluence || 0;
+  if (curvatureInfluence > 0 && typeof ensureCurvatureCalculated === 'function') {
+    await ensureCurvatureCalculated();
+  }
+
   // Show export progress UI
   showExportProgress(true);
 
@@ -782,7 +812,8 @@ async function prepareExport() {
       passes = attractorSystem.calculatePathWeight(highQualityPoints);
     } else {
       // Use the shared calculateLengthBasedWeight function from sketch.js
-      passes = calculateLengthBasedWeight(path.length || 0);
+      // Pass path object for curvature support
+      passes = calculateLengthBasedWeight(path.length || 0, path);
     }
 
     // Only log first 5 and last 5 paths to avoid console spam
@@ -1620,7 +1651,7 @@ function updateCrosshatchPreview() {
  */
 function triggerDownload(content, filename) {
   console.log(`🔵 TRIGGER DOWNLOAD CALLED: ${filename} (${content.length} bytes)`);
-  alert(`DEBUG: triggerDownload() called for ${filename}`);
+  //alert(`DEBUG: triggerDownload() called for ${filename}`);
 
   // Validate content
   if (!content || content.length === 0) {

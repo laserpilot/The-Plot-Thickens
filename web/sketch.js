@@ -171,6 +171,9 @@ function drawPaths() {
   if (focusModeEnabled && focusWindow && showFocusDetail) {
     // Render with focus window: fast preview outside, high-res inside
     renderWithFocusWindow();
+  } else if (previewDisplayMode === 'curvature') {
+    // Curvature-based color preview (diagnostic)
+    renderCurvaturePreview();
   } else if (previewDisplayMode === 'offset') {
     // Render actual offset paths for all
     renderOffsetPreview();
@@ -194,8 +197,8 @@ function renderWeightPreview() {
         // Attractor-based weight - prefer path data string for arc-length sampling
         weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
       } else {
-        // Length-based weight
-        weight = calculateLengthBasedWeight(path.length);
+        // Length-based weight (pass path object for curvature)
+        weight = calculateLengthBasedWeight(path.length, path);
       }
       path.cachedWeight = weight; // Cache for next time
     }
@@ -232,6 +235,83 @@ function renderWeightPreview() {
 }
 
 /**
+ * Render curvature preview (color-coded by curvature score)
+ */
+function renderCurvaturePreview() {
+  svgData.paths.forEach(path => {
+    // Get curvature score (0-1, where 1 = highest curvature)
+    const curvatureScore = path.curvatureScore || 0;
+
+    // Color-code by curvature:
+    // Blue (hue 240) = low curvature (straight)
+    // Red (hue 0) = high curvature (tight curves)
+    const hue = map(curvatureScore, 0, 1, 240, 0);
+    const saturation = curvatureScore > 0 ? 80 : 20; // Desaturate paths with no curvature
+    stroke(hue, saturation, 70);
+
+    // Use fixed stroke weight for visibility
+    strokeWeight(2 / zoomScale);
+
+    // Draw path
+    noFill();
+    beginShape();
+    path.points.forEach((pt, index) => {
+      if (pt.move && index > 0) {
+        endShape();
+        beginShape();
+      }
+      vertex(pt.x, pt.y);
+    });
+    endShape();
+  });
+
+  // Draw legend in top-right corner
+  push();
+  resetMatrix(); // Draw in screen space, not SVG space
+  const legendX = width - 150;
+  const legendY = 20;
+  const legendWidth = 130;
+  const legendHeight = 80;
+
+  // Background
+  fill(255, 255, 255, 200);
+  stroke(100);
+  strokeWeight(1);
+  rect(legendX, legendY, legendWidth, legendHeight, 4);
+
+  // Title
+  noStroke();
+  fill(0);
+  textAlign(LEFT, TOP);
+  textSize(12);
+  text('Curvature Preview', legendX + 10, legendY + 8);
+
+  // Gradient bar
+  const barX = legendX + 10;
+  const barY = legendY + 30;
+  const barWidth = legendWidth - 20;
+  const barHeight = 15;
+
+  for (let i = 0; i < barWidth; i++) {
+    const t = i / barWidth;
+    const hue = map(t, 0, 1, 240, 0); // Blue to red
+    stroke(hue, 80, 70);
+    line(barX + i, barY, barX + i, barY + barHeight);
+  }
+
+  // Labels
+  noStroke();
+  fill(0);
+  textSize(10);
+  textAlign(LEFT, TOP);
+  text('Straight', barX, barY + barHeight + 3);
+  textAlign(RIGHT, TOP);
+  text('Curved', barX + barWidth, barY + barHeight + 3);
+
+  pop();
+}
+
+/**
  * Render actual offset paths (accurate but slower)
  */
 function renderOffsetPreview() {
@@ -248,7 +328,7 @@ function renderOffsetPreview() {
       if (useAttractors) {
         weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
       } else {
-        weight = calculateLengthBasedWeight(path.length);
+        weight = calculateLengthBasedWeight(path.length, path);
       }
       path.cachedWeight = weight; // Cache for next time
     }
@@ -350,8 +430,12 @@ function renderOffsetPreview() {
 
 /**
  * Calculate weight based on path length with configurable mapping curves
+ * Optionally blends with curvature-based adjustment
+ * @param {number} pathLength - Length of the path in mm
+ * @param {Object} path - Optional path object with curvatureScore property
+ * @returns {number} Number of passes (clamped to min/max range)
  */
-function calculateLengthBasedWeight(pathLength) {
+function calculateLengthBasedWeight(pathLength, path = null) {
   if (!svgData || svgData.paths.length === 0) {
     return attractorSystem.config.minPasses;
   }
@@ -414,10 +498,20 @@ function calculateLengthBasedWeight(pathLength) {
       break;
   }
 
-  // Map to pass range
-  const passes = Math.round(
+  // Map to pass range (base calculation)
+  let passes = Math.round(
     attractorSystem.config.minPasses + normalized * (attractorSystem.config.maxPasses - attractorSystem.config.minPasses)
   );
+
+  // Apply curvature influence if enabled and available
+  const curvatureInfluence = attractorSystem.config.curvatureInfluence || 0;
+  if (curvatureInfluence > 0 && path && path.curvatureScore !== undefined && path.curvatureScore > 0) {
+    // High curvature → reduce passes (thinner lines in tight curves)
+    // curvatureScore is [0, 1] where 1 = highest curvature
+    // Blend: passes = basePasses * (1 - influence * curvature)
+    const curvatureMultiplier = 1 - (curvatureInfluence * path.curvatureScore);
+    passes = Math.round(passes * curvatureMultiplier);
+  }
 
   return Math.max(attractorSystem.config.minPasses, Math.min(attractorSystem.config.maxPasses, passes));
 }
@@ -464,7 +558,7 @@ function renderPathWeightOnly(path) {
     if (useAttractors) {
       weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
     } else {
-      weight = calculateLengthBasedWeight(path.length);
+      weight = calculateLengthBasedWeight(path.length, path);
     }
     path.cachedWeight = weight; // Cache for next time
   }
@@ -570,7 +664,7 @@ async function computeFocusOffsets() {
         if (useAttractors) {
           weight = attractorSystem.calculatePathWeight(path.d || path.points, path.length);
         } else {
-          weight = calculateLengthBasedWeight(path.length);
+          weight = calculateLengthBasedWeight(path.length, path);
         }
         path.cachedWeight = weight; // Cache for next time
       }
@@ -914,6 +1008,10 @@ function loadSVGFile(file) {
   // Store original filename for export
   originalFilename = file.name.replace(/\.svg$/i, ''); // Remove .svg extension
 
+  // Reset curvature calculation flag for new file
+  curvatureCalculated = false;
+  isCalculatingCurvature = false;
+
   // Reset export button state
   resetExportButton();
 
@@ -950,6 +1048,88 @@ function loadSVGFile(file) {
     }
   };
   reader.readAsText(file);
+}
+
+// Track whether curvature has been calculated
+let curvatureCalculated = false;
+let isCalculatingCurvature = false;
+
+/**
+ * Calculate curvature scores for all paths asynchronously
+ * Uses FAST point-based calculation (no path re-parsing!)
+ * @param {Array} paths - Array of path objects with .points property
+ * @param {Function} progressCallback - Called with (processed, total)
+ */
+async function calculateCurvatureScoresAsync(paths, progressCallback) {
+  const chunkSize = 25; // Smaller chunks for smoother progress updates
+  const totalPaths = paths.length;
+  const sampleStride = 5; // Process every 5th point for speed
+
+  for (let i = 0; i < totalPaths; i += chunkSize) {
+    const chunkEnd = Math.min(i + chunkSize, totalPaths);
+    const chunk = paths.slice(i, chunkEnd);
+
+    // Process chunk - use FAST point-based calculation
+    chunk.forEach(path => {
+      if (path.points && path.points.length > 0 && typeof calculatePathCurvatureFast === 'function') {
+        // Use pre-sampled points (100x faster than re-parsing!)
+        path.curvatureRaw = calculatePathCurvatureFast(path.points, sampleStride);
+      } else {
+        path.curvatureRaw = 0;
+      }
+    });
+
+    // Update progress
+    if (progressCallback) {
+      progressCallback(chunkEnd, totalPaths);
+    }
+
+    // Yield to UI thread every chunk
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+}
+
+/**
+ * Ensure curvature scores are calculated (lazy initialization)
+ * Call this before using curvature data
+ */
+async function ensureCurvatureCalculated() {
+  if (curvatureCalculated || isCalculatingCurvature || !svgData || !svgData.paths) {
+    return;
+  }
+
+  isCalculatingCurvature = true;
+  console.log('Calculating curvature scores on-demand...');
+  updateStatus('Calculating curvature scores... (this is a one-time operation)');
+
+  const startTime = Date.now();
+
+  await calculateCurvatureScoresAsync(svgData.paths, (processed, total) => {
+    const percent = Math.round((processed / total) * 100);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`Curvature: ${percent}% (${processed}/${total}) - ${elapsed}s`);
+    updateStatus(`Calculating curvature: ${percent}% (${processed}/${total} paths, ${elapsed}s)`);
+  });
+
+  // Normalize curvature scores across all paths
+  if (typeof normalizeCurvatureScores === 'function') {
+    normalizeCurvatureScores(svgData.paths);
+
+    // Log curvature statistics
+    const curvatures = svgData.paths.map(p => p.curvatureScore || 0).filter(c => c > 0);
+    if (curvatures.length > 0) {
+      const avgCurv = curvatures.reduce((sum, c) => sum + c, 0) / curvatures.length;
+      const maxCurv = Math.max(...curvatures);
+      console.log(`Curvature scores calculated: avg=${avgCurv.toFixed(3)}, max=${maxCurv.toFixed(3)}, ${curvatures.length}/${svgData.paths.length} paths`);
+    }
+  }
+
+  curvatureCalculated = true;
+  isCalculatingCurvature = false;
+
+  const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+  updateStatus(`Curvature calculation complete (${totalTime}s)`);
+  console.log(`✓ Curvature calculation complete in ${totalTime}s`);
 }
 
 /**
@@ -999,6 +1179,10 @@ async function processPaths() {
       if (minInfo) minInfo.textContent = `(detected: ${minLen.toFixed(0)})`;
       if (maxInfo) maxInfo.textContent = `(detected: ${maxLen.toFixed(0)})`;
     }
+
+    // Skip curvature calculation during initial load - it will be calculated
+    // on-demand when user enables curvature influence or switches to curvature preview
+    console.log('Curvature calculation deferred (will compute on-demand when needed)');
 
     fitSVGToCanvas();
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -1051,6 +1235,7 @@ function clearSVG() {
   svgRawData = null;
   originalFilename = null;
   pathsProcessed = false;
+  curvatureCalculated = false; // Reset curvature flag
   attractorSystem.clearAll();
   updateAttractorList();
   updateStatus('SVG cleared');

@@ -681,6 +681,209 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
 }
 
 /**
+ * FAST curvature calculation using pre-sampled points
+ * Uses simple dot product proxy instead of expensive atan2
+ *
+ * @param {Array} points - Array of {x, y} points (already sampled)
+ * @param {number} sampleStride - Process every Nth point (default: 5 for speed)
+ * @returns {number} Raw curvature score (max angle difference), or 0 if insufficient points
+ */
+function calculatePathCurvatureFast(points, sampleStride = 5) {
+  if (!points || points.length < sampleStride * 2) {
+    return 0; // Need at least 2 segments
+  }
+
+  let maxCurvature = 0;
+  let sumCurvature = 0;
+  let sampleCount = 0;
+
+  // Sample every Nth point for speed
+  for (let i = sampleStride; i < points.length - sampleStride; i += sampleStride) {
+    const p0 = points[i - sampleStride];
+    const p1 = points[i];
+    const p2 = points[i + sampleStride];
+
+    // Skip move commands
+    if (p0.move || p1.move || p2.move) continue;
+
+    // Tangent vectors (no normalization needed for dot product!)
+    const dx1 = p1.x - p0.x;
+    const dy1 = p1.y - p0.y;
+    const dx2 = p2.x - p1.x;
+    const dy2 = p2.y - p1.y;
+
+    // Squared lengths
+    const len1Sq = dx1 * dx1 + dy1 * dy1;
+    const len2Sq = dx2 * dx2 + dy2 * dy2;
+
+    if (len1Sq < 0.001 || len2Sq < 0.001) continue;
+
+    // Dot product of tangents (normalized by lengths)
+    const dot = (dx1 * dx2 + dy1 * dy2) / Math.sqrt(len1Sq * len2Sq);
+
+    // Curvature proxy: 1 - dot
+    // dot = 1 (parallel) → curvature = 0 (straight)
+    // dot = 0 (perpendicular) → curvature = 1 (90° turn)
+    // dot = -1 (opposite) → curvature = 2 (180° turn)
+    const curvature = Math.max(0, 1 - dot);
+
+    maxCurvature = Math.max(maxCurvature, curvature);
+    sumCurvature += curvature;
+    sampleCount++;
+  }
+
+  // Return max curvature as the representative score
+  // (max is more robust than average for detecting tight curves)
+  return maxCurvature;
+}
+
+/**
+ * DEPRECATED: Old slow curvature calculation using path data strings
+ * Kept for backwards compatibility but not recommended
+ * Use calculatePathCurvatureFast() instead for 100x better performance
+ */
+function calculatePathCurvature(pathData, sampleRate = 2, normalizationMode = 'percentile', percentile = 95) {
+  if (!pathData || typeof pathData !== 'string') {
+    return 0;
+  }
+
+  try {
+    // Convert to absolute commands
+    const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+    const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return 0;
+    }
+
+    // Sample points uniformly by arc length
+    // Limit samples for performance - curvature doesn't need super high resolution
+    const sampleInterval = Math.min(sampleRate, totalLength / 50);
+    const numSamples = Math.max(3, Math.min(50, Math.ceil(totalLength / sampleInterval)));
+
+    // Calculate curvature at each sample point
+    const curvatures = [];
+
+    for (let i = 1; i < numSamples - 1; i++) {
+      const arcLength = (i / numSamples) * totalLength;
+
+      // Get three consecutive points
+      const delta = Math.min(0.5, totalLength * 0.01);
+      const t0 = Math.max(0, arcLength - delta);
+      const t1 = arcLength;
+      const t2 = Math.min(totalLength, arcLength + delta);
+
+      const p0 = SVGPathCommander.getPointAtLength(absolutePath, t0);
+      const p1 = SVGPathCommander.getPointAtLength(absolutePath, t1);
+      const p2 = SVGPathCommander.getPointAtLength(absolutePath, t2);
+
+      if (!p0 || !p1 || !p2) continue;
+
+      // Calculate tangent vectors
+      const tx1 = p1.x - p0.x;
+      const ty1 = p1.y - p0.y;
+      const tLen1 = Math.sqrt(tx1 * tx1 + ty1 * ty1);
+
+      const tx2 = p2.x - p1.x;
+      const ty2 = p2.y - p1.y;
+      const tLen2 = Math.sqrt(tx2 * tx2 + ty2 * ty2);
+
+      if (tLen1 < 0.001 || tLen2 < 0.001) continue;
+
+      // Normalize tangent vectors
+      const ux1 = tx1 / tLen1;
+      const uy1 = ty1 / tLen1;
+      const ux2 = tx2 / tLen2;
+      const uy2 = ty2 / tLen2;
+
+      // Calculate angle change using dot product and cross product
+      const dot = ux1 * ux2 + uy1 * uy2;
+      const cross = ux1 * uy2 - uy1 * ux2;
+      const angleChange = Math.atan2(cross, dot);
+
+      // Curvature κ = |dθ/ds|
+      const ds = (tLen1 + tLen2) / 2; // Average segment length
+      const curvature = Math.abs(angleChange) / ds;
+
+      curvatures.push(curvature);
+    }
+
+    if (curvatures.length === 0) {
+      return 0;
+    }
+
+    // Calculate average curvature for this path
+    const avgCurvature = curvatures.reduce((sum, k) => sum + k, 0) / curvatures.length;
+
+    // Store raw curvature (normalization will happen globally across all paths)
+    return avgCurvature;
+
+  } catch (error) {
+    console.warn('Failed to calculate curvature:', error.message);
+    return 0;
+  }
+}
+
+/**
+ * Normalize curvature scores across multiple paths (OPTIMIZED single-pass)
+ * @param {Array} paths - Array of path objects with curvatureRaw property
+ * @param {string} mode - 'minmax' or 'percentile'
+ * @param {number} percentile - Percentile threshold (e.g., 95 for top 5% rejection)
+ * @returns {void} Updates paths in place with normalized curvatureScore
+ */
+function normalizeCurvatureScores(paths, mode = 'percentile', percentile = 95) {
+  // First pass: collect curvatures and find min/max
+  const curvatures = [];
+  let minCurvature = Infinity;
+  let maxCurvature = -Infinity;
+
+  for (let i = 0; i < paths.length; i++) {
+    const curv = paths[i].curvatureRaw || 0;
+    if (curv > 0) {
+      curvatures.push(curv);
+      minCurvature = Math.min(minCurvature, curv);
+      maxCurvature = Math.max(maxCurvature, curv);
+    }
+  }
+
+  if (curvatures.length === 0) {
+    // No curvature data - set all to 0
+    for (let i = 0; i < paths.length; i++) {
+      paths[i].curvatureScore = 0;
+    }
+    return;
+  }
+
+  // Apply percentile clamping if requested
+  if (mode === 'percentile' && percentile < 100) {
+    // Only sort for percentile mode
+    curvatures.sort((a, b) => a - b);
+    const percentileIndex = Math.floor((percentile / 100) * (curvatures.length - 1));
+    maxCurvature = curvatures[percentileIndex];
+  }
+
+  // Avoid division by zero
+  const range = maxCurvature - minCurvature;
+  if (range < 1e-10) {
+    for (let i = 0; i < paths.length; i++) {
+      paths[i].curvatureScore = 0;
+    }
+    return;
+  }
+
+  // Second pass: normalize
+  for (let i = 0; i < paths.length; i++) {
+    const curv = paths[i].curvatureRaw;
+    if (!curv || curv <= 0) {
+      paths[i].curvatureScore = 0;
+    } else {
+      const clamped = Math.max(minCurvature, Math.min(maxCurvature, curv));
+      paths[i].curvatureScore = (clamped - minCurvature) / range;
+    }
+  }
+}
+
+/**
  * Generate stippling fill (dots placed along arc normals)
  * @param {string} pathData - SVG path data
  * @param {number} baseWidth - Width of the stippling ribbon

@@ -106,6 +106,8 @@ class AttractorSystem {
       lengthPercentileClamp: 100, // Percentile to use as max (50-100)
       minLengthOverride: null, // Manual min length (null = auto)
       maxLengthOverride: null, // Manual max length (null = auto)
+      // Curvature-based weight modification
+      curvatureInfluence: 0, // 0-1: blend between length-only (0) and curvature-adjusted (1)
     };
   }
 
