@@ -43,7 +43,11 @@ const DEFAULT_CONFIG = {
   hatchGradient: {
     angles: [0, 45, 90], // gradient hatch angles
     spacing: 1, // base spacing between hatch lines
-    lightAngle: 45, // light direction in degrees
+    lightMode: 'directional', // 'directional' or 'point'
+    lightAngle: 45, // light direction in degrees (directional)
+    lightPosX: 25, // light X position in % (point)
+    lightPosY: 25, // light Y position in % (point)
+    falloffRadius: 100, // light falloff radius in mm (point)
     lightStrength: 0.8, // light influence strength
     baseWeight: 0.2, // minimum density weight
     shadowSoftness: 0.5 // transition smoothness
@@ -85,7 +89,11 @@ program
   .option('--length-jitter <number>', 'Random length variation 0-1 (default: 0)', parseFloat)
   .option('--position-jitter <number>', 'Position offset jitter in mm (default: 0)', parseFloat)
   .option('--spacing-jitter <number>', 'Spacing randomization 0-1 (default: 0)', parseFloat)
-  .option('--light-angle <degrees>', 'Light direction for hatch-gradient mode (0=right, 90=down, default: 45)', parseFloat)
+  .option('--light-mode <mode>', 'Light mode for hatch-gradient: directional or point (default: directional)')
+  .option('--light-angle <degrees>', 'Light direction for hatch-gradient directional mode (0=right, 90=down, default: 45)', parseFloat)
+  .option('--light-pos-x <percent>', 'Light X position for hatch-gradient point mode (0-100%, default: 25)', parseFloat)
+  .option('--light-pos-y <percent>', 'Light Y position for hatch-gradient point mode (0-100%, default: 25)', parseFloat)
+  .option('--falloff-radius <number>', 'Light falloff radius for hatch-gradient point mode (mm, default: 100)', parseFloat)
   .option('--light-strength <number>', 'Light influence strength for hatch-gradient (0-1, default: 0.8)', parseFloat)
   .option('--gradient-base-weight <number>', 'Minimum density for hatch-gradient (0-1, default: 0.2)', parseFloat)
   .option('--shadow-softness <number>', 'Shadow transition smoothness for hatch-gradient (0-1, default: 0.5)', parseFloat)
@@ -181,9 +189,25 @@ program
       config.hatchGradient = config.hatchGradient || {};
       config.hatchGradient.spacing = options.hatchSpacing;
     }
+    if (options.lightMode !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.lightMode = options.lightMode;
+    }
     if (options.lightAngle !== undefined) {
       config.hatchGradient = config.hatchGradient || {};
       config.hatchGradient.lightAngle = options.lightAngle;
+    }
+    if (options.lightPosX !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.lightPosX = options.lightPosX;
+    }
+    if (options.lightPosY !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.lightPosY = options.lightPosY;
+    }
+    if (options.falloffRadius !== undefined) {
+      config.hatchGradient = config.hatchGradient || {};
+      config.hatchGradient.falloffRadius = options.falloffRadius;
     }
     if (options.lightStrength !== undefined) {
       config.hatchGradient = config.hatchGradient || {};

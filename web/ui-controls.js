@@ -245,9 +245,56 @@ function initializeControls() {
     updateCLICommand();
   });
 
+  // Light mode toggle (directional vs point)
+  document.querySelectorAll('input[name="light-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      lightMode = e.target.value;
+
+      // Show/hide appropriate controls
+      const directionalControls = document.getElementById('directional-light-controls');
+      const pointControls = document.getElementById('point-light-controls');
+      if (directionalControls) {
+        directionalControls.style.display = lightMode === 'directional' ? 'block' : 'none';
+      }
+      if (pointControls) {
+        pointControls.style.display = lightMode === 'point' ? 'block' : 'none';
+      }
+
+      updateStatus(lightMode === 'point' ? 'Point light mode' : 'Directional light mode');
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateGradientPreview();
+    });
+  });
+
   // Hatch gradient controls
   setupSlider('light-angle', (value) => {
     lightAngle = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('light-pos-x', (value) => {
+    lightPosX = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('light-pos-y', (value) => {
+    lightPosY = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('falloff-radius', (value) => {
+    falloffRadius = value;
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -1048,10 +1095,15 @@ async function prepareExport() {
         enabled: false
       };
 
+      // Convert light position from % to user units for point mode
+      const lightX = svgData ? (lightPosX / 100) * svgData.viewBox.width : 0;
+      const lightY = svgData ? (lightPosY / 100) * svgData.viewBox.height : 0;
+
       const gradientResult = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
-        noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke
+        noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke,
+        lightMode, lightX, lightY, falloffRadius
       );
 
       // Handle result (either array or {fills, outlines} object)
@@ -1679,7 +1731,18 @@ function generateCLICommand() {
     const gradientAnglesStr = gradientHatchAngles.join(',');
     params.push(`--hatch-angles "${gradientAnglesStr}"`);
     params.push(`--hatch-spacing ${gradientHatchSpacing}`);
-    params.push(`--light-angle ${lightAngle}`);
+
+    // Add light mode
+    params.push(`--light-mode ${lightMode}`);
+
+    if (lightMode === 'directional') {
+      params.push(`--light-angle ${lightAngle}`);
+    } else {
+      params.push(`--light-pos-x ${lightPosX}`);
+      params.push(`--light-pos-y ${lightPosY}`);
+      params.push(`--falloff-radius ${falloffRadius}`);
+    }
+
     if (lightStrength !== 0.8) params.push(`--light-strength ${lightStrength}`);
     if (gradientBaseWeight !== 0.2) params.push(`--gradient-base-weight ${gradientBaseWeight}`);
     if (shadowSoftness !== 0.5) params.push(`--shadow-softness ${shadowSoftness}`);
@@ -1813,7 +1876,11 @@ function updateCrosshatchPreview() {
 function updateGradientPreview() {
   if (typeof gradientPreview !== 'undefined' && gradientPreview) {
     gradientPreview.update(
+      lightMode,
       lightAngle,
+      lightPosX,
+      lightPosY,
+      falloffRadius,
       lightStrength,
       gradientBaseWeight,
       shadowSoftness,
@@ -1822,7 +1889,7 @@ function updateGradientPreview() {
     );
   }
   if (typeof lightIndicator !== 'undefined' && lightIndicator) {
-    lightIndicator.update(lightAngle);
+    lightIndicator.update(lightAngle, lightMode);
   }
 }
 

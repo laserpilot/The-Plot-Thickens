@@ -1080,7 +1080,7 @@ function smoothstep(edge0, edge1, x) {
 
 /**
  * Generate light-based gradient hatching fill
- * Creates directional shading by varying hatch density based on light direction
+ * Creates directional shading by varying hatch density based on light direction or position
  */
 function generateHatchGradientFill(
   pathData,
@@ -1097,7 +1097,11 @@ function generateHatchGradientFill(
   offsetEnvelope = null,
   noiseFrequency = 50,
   organicOptions = {},
-  extractOutline = false
+  extractOutline = false,
+  lightMode = 'directional',
+  lightPosX = 0,
+  lightPosY = 0,
+  falloffRadius = 100
 ) {
   // Extract organic options with defaults
   const {
@@ -1187,24 +1191,28 @@ function generateHatchGradientFill(
       return extractOutline ? { fills: [], outlines: [] } : [];
     }
 
-    // Convert light angle to direction vector
-    const lightAngleRad = (lightAngle * Math.PI) / 180;
-    const lightDirX = Math.cos(lightAngleRad);
-    const lightDirY = Math.sin(lightAngleRad);
+    // Prepare light parameters based on mode
+    let globalLightDirX, globalLightDirY;
+    if (lightMode === 'directional') {
+      const lightAngleRad = (lightAngle * Math.PI) / 180;
+      globalLightDirX = Math.cos(lightAngleRad);
+      globalLightDirY = Math.sin(lightAngleRad);
+    }
 
     // Generate hatch lines for each angle with density based on light
     const hatchPaths = [];
     let hatchIndex = 0;
 
     // Sort angles by average weight (lighter hatches first, darker last)
-    const angleWeights = hatchAngles.map(angle => {
-      const angleRad = (angle * Math.PI) / 180;
-      const angleDirX = Math.cos(angleRad);
-      const angleDirY = Math.sin(angleRad);
-      const dotProduct = angleDirX * lightDirX + angleDirY * lightDirY;
-      return { angle, avgWeight: Math.abs(dotProduct) };
-    });
-    angleWeights.sort((a, b) => a.avgWeight - b.avgWeight);
+    const angleWeights = lightMode === 'directional'
+      ? hatchAngles.map(angle => {
+          const angleRad = (angle * Math.PI) / 180;
+          const angleDirX = Math.cos(angleRad);
+          const angleDirY = Math.sin(angleRad);
+          const dotProduct = angleDirX * globalLightDirX + angleDirY * globalLightDirY;
+          return { angle, avgWeight: Math.abs(dotProduct) };
+        }).sort((a, b) => a.avgWeight - b.avgWeight)
+      : hatchAngles.map(angle => ({ angle, avgWeight: 0 }));
 
     for (const { angle: angleInDegrees } of angleWeights) {
       // Apply angle jitter if organic mode enabled
@@ -1227,14 +1235,34 @@ function generateHatchGradientFill(
           Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
         );
 
-        // Calculate weight for this position based on LOCAL SURFACE ORIENTATION
-        // dot(surfaceNormal, lightDir) determines if this point faces toward/away from light
-        const dotProduct = sample.nx * lightDirX + sample.ny * lightDirY;
+        // Calculate weight based on lighting mode
+        let rawWeight;
 
-        // Map dot product to weight
-        // Positive dot (facing light) = low weight = sparse (light area)
-        // Negative dot (facing away) = high weight = dense (shadow area)
-        let rawWeight = (1 - Math.abs(dotProduct)) * lightStrength + baseWeight;
+        if (lightMode === 'point') {
+          // POINT LIGHT MODE: Calculate direction and distance from sample to light
+          const toLightX = lightPosX - sample.x;
+          const toLightY = lightPosY - sample.y;
+          const dist = Math.sqrt(toLightX * toLightX + toLightY * toLightY);
+
+          if (dist < 0.001) {
+            rawWeight = baseWeight;
+          } else {
+            const lightDirX = toLightX / dist;
+            const lightDirY = toLightY / dist;
+
+            const orientDot = sample.nx * lightDirX + sample.ny * lightDirY;
+            const orientWeight = (1 - Math.abs(orientDot)) * 0.5;
+
+            const distanceFalloff = 1 / (1 + dist / falloffRadius);
+            const distWeight = (1 - distanceFalloff) * 0.5;
+
+            rawWeight = (orientWeight + distWeight) * lightStrength + baseWeight;
+          }
+        } else {
+          // DIRECTIONAL MODE: Global light direction
+          const dotProduct = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
+          rawWeight = (1 - Math.abs(dotProduct)) * lightStrength + baseWeight;
+        }
 
         // Apply shadow softness (easing)
         if (shadowSoftness > 0) {

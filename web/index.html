@@ -336,12 +336,50 @@
           <div id="hatch-gradient-controls"
             style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fff8f0; border-radius: 4px;">
             <label>
-              Light Direction (degrees):
-              <input type="range" id="light-angle" min="0" max="360" step="5" value="45">
-              <span id="light-angle-value">45</span>
-              <canvas id="light-direction-indicator" width="50" height="50" style="display: inline-block; margin-left: 8px; vertical-align: middle; border: 1px solid #ddd; border-radius: 4px;"></canvas>
-              <span class="hint-icon" title="Direction of light source. 0° = right, 90° = down, 180° = left, 270° = up. Affects hatch density to create shading.">?</span>
+              Light Mode:
+              <label style="margin-left: 10px;">
+                <input type="radio" name="light-mode" value="directional" checked>
+                Directional
+              </label>
+              <label style="margin-left: 10px;">
+                <input type="radio" name="light-mode" value="point">
+                Point Source
+              </label>
+              <span class="hint-icon" title="Directional: Light from infinite distance at angle. Point: Light at specific canvas position.">?</span>
             </label>
+
+            <div id="directional-light-controls">
+              <label>
+                Light Direction (degrees):
+                <input type="range" id="light-angle" min="0" max="360" step="5" value="45">
+                <span id="light-angle-value">45</span>
+                <canvas id="light-direction-indicator" width="50" height="50" style="display: inline-block; margin-left: 8px; vertical-align: middle; border: 1px solid #ddd; border-radius: 4px;"></canvas>
+                <span class="hint-icon" title="Direction of light source. 0° = right, 90° = down, 180° = left, 270° = up.">?</span>
+              </label>
+            </div>
+
+            <div id="point-light-controls" style="display: none;">
+              <label>
+                Light Position X (%):
+                <input type="range" id="light-pos-x" min="0" max="100" step="1" value="25">
+                <span id="light-pos-x-value">25</span>
+                <span class="hint-icon" title="Horizontal position of point light source (0% = left edge, 100% = right edge).">?</span>
+              </label>
+
+              <label>
+                Light Position Y (%):
+                <input type="range" id="light-pos-y" min="0" max="100" step="1" value="25">
+                <span id="light-pos-y-value">25</span>
+                <span class="hint-icon" title="Vertical position of point light source (0% = top edge, 100% = bottom edge).">?</span>
+              </label>
+
+              <label>
+                Falloff Radius (mm):
+                <input type="range" id="falloff-radius" min="10" max="500" step="10" value="100">
+                <span id="falloff-radius-value">100</span>
+                <span class="hint-icon" title="Distance where light intensity drops to 50%. Larger = softer falloff, smaller = harsher shadows.">?</span>
+              </label>
+            </div>
 
             <label>
               Light Strength:

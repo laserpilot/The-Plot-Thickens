@@ -40,7 +40,11 @@ let dotSpacing = 1.5; // Distance between dots in mm
 let dotSize = 0.3; // Radius of each dot in mm
 
 // Hatch gradient state
-let lightAngle = 45; // Light direction in degrees
+let lightMode = 'directional'; // 'directional' or 'point'
+let lightAngle = 45; // Light direction in degrees (directional mode)
+let lightPosX = 25; // Light X position in % (point mode)
+let lightPosY = 25; // Light Y position in % (point mode)
+let falloffRadius = 100; // Light falloff radius in mm (point mode)
 let lightStrength = 0.8; // Light influence strength
 let gradientBaseWeight = 0.2; // Minimum density weight
 let shadowSoftness = 0.5; // Easing factor for smooth transitions
@@ -407,10 +411,15 @@ function renderOffsetPreview() {
         enabled: false // Not implemented for gradient yet, but ready for future
       };
 
+      // Convert light position from % to user units for point mode
+      const lightX = svgData ? (lightPosX / 100) * svgData.viewBox.width : 0;
+      const lightY = svgData ? (lightPosY / 100) * svgData.viewBox.height : 0;
+
       const hatchPaths = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
-        noise, seed, path.id, envelope, noiseFrequency, organicOptions, false
+        noise, seed, path.id, envelope, noiseFrequency, organicOptions, false,
+        lightMode, lightX, lightY, falloffRadius
       );
 
       hatchPaths.forEach(hatchPath => {

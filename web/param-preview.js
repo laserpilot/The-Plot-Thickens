@@ -628,8 +628,9 @@ class LightDirectionIndicator {
     this.draw();
   }
 
-  update(lightAngle) {
+  update(lightAngle, lightMode) {
     this.lightAngle = lightAngle;
+    this.lightMode = lightMode || 'directional';
     this.draw();
   }
 
@@ -649,6 +650,17 @@ class LightDirectionIndicator {
     ctx.fillStyle = '#f8f9fa';
     ctx.fillRect(0, 0, w, h);
 
+    if (this.lightMode === 'point') {
+      // Point mode: show "POINT" text instead
+      ctx.fillStyle = '#ffa500';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('POINT', centerX, centerY);
+      return;
+    }
+
+    // Directional mode: show compass and arrow
     // Compass circle
     ctx.strokeStyle = '#dee2e6';
     ctx.lineWidth = 1;
@@ -709,7 +721,11 @@ class GradientHatchPreview {
     this.height = this.canvas.height;
 
     // Default parameters
+    this.lightMode = 'directional';
     this.lightAngle = 45;
+    this.lightPosX = 25; // %
+    this.lightPosY = 25; // %
+    this.falloffRadius = 100;
     this.lightStrength = 0.8;
     this.baseWeight = 0.2;
     this.shadowSoftness = 0.5;
@@ -719,8 +735,12 @@ class GradientHatchPreview {
     this.draw();
   }
 
-  update(lightAngle, lightStrength, baseWeight, shadowSoftness, hatchAngles, hatchSpacing) {
+  update(lightMode, lightAngle, lightPosX, lightPosY, falloffRadius, lightStrength, baseWeight, shadowSoftness, hatchAngles, hatchSpacing) {
+    this.lightMode = lightMode;
     this.lightAngle = lightAngle;
+    this.lightPosX = lightPosX;
+    this.lightPosY = lightPosY;
+    this.falloffRadius = falloffRadius;
     this.lightStrength = lightStrength;
     this.baseWeight = baseWeight;
     this.shadowSoftness = shadowSoftness;
@@ -748,10 +768,17 @@ class GradientHatchPreview {
     const centerY = h / 2;
     const radius = Math.min(w, h) * 0.35;
 
-    // Convert light angle to direction vector
-    const lightAngleRad = (this.lightAngle * Math.PI) / 180;
-    const lightDirX = Math.cos(lightAngleRad);
-    const lightDirY = Math.sin(lightAngleRad);
+    // Prepare light parameters based on mode
+    let globalLightDirX, globalLightDirY, lightX, lightY;
+    if (this.lightMode === 'directional') {
+      const lightAngleRad = (this.lightAngle * Math.PI) / 180;
+      globalLightDirX = Math.cos(lightAngleRad);
+      globalLightDirY = Math.sin(lightAngleRad);
+    } else {
+      // Point mode: convert % to canvas coordinates
+      lightX = (this.lightPosX / 100) * w;
+      lightY = (this.lightPosY / 100) * h;
+    }
 
     // Draw hatches for each angle
     ctx.strokeStyle = '#2c3e50';
@@ -771,9 +798,34 @@ class GradientHatchPreview {
         const nx = Math.cos(theta);
         const ny = Math.sin(theta);
 
-        // Calculate lighting weight
-        const dotProduct = nx * lightDirX + ny * lightDirY;
-        let rawWeight = (1 - Math.abs(dotProduct)) * this.lightStrength + this.baseWeight;
+        // Calculate lighting weight based on mode
+        let rawWeight;
+        if (this.lightMode === 'point') {
+          const toLightX = lightX - pointX;
+          const toLightY = lightY - pointY;
+          const dist = Math.sqrt(toLightX * toLightX + toLightY * toLightY);
+
+          if (dist < 0.001) {
+            rawWeight = this.baseWeight;
+          } else {
+            const lightDirX = toLightX / dist;
+            const lightDirY = toLightY / dist;
+
+            const orientDot = nx * lightDirX + ny * lightDirY;
+            const orientWeight = (1 - Math.abs(orientDot)) * 0.5;
+
+            // Scale falloff radius to canvas
+            const scaledFalloff = this.falloffRadius * (w / 100); // Rough scale
+            const distanceFalloff = 1 / (1 + dist / scaledFalloff);
+            const distWeight = (1 - distanceFalloff) * 0.5;
+
+            rawWeight = (orientWeight + distWeight) * this.lightStrength + this.baseWeight;
+          }
+        } else {
+          // Directional mode
+          const dotProduct = nx * globalLightDirX + ny * globalLightDirY;
+          rawWeight = (1 - Math.abs(dotProduct)) * this.lightStrength + this.baseWeight;
+        }
 
         // Apply softness
         if (this.shadowSoftness > 0) {
@@ -808,28 +860,52 @@ class GradientHatchPreview {
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Draw light direction indicator
-    const arrowLength = radius * 1.3;
-    const arrowX = centerX + lightDirX * arrowLength;
-    const arrowY = centerY + lightDirY * arrowLength;
+    // Draw light indicator based on mode
+    if (this.lightMode === 'point') {
+      // Point light: show actual position and falloff
+      const scaledFalloff = this.falloffRadius * (w / 100);
 
-    ctx.strokeStyle = '#ffa500';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(arrowX, arrowY);
-    ctx.stroke();
-    ctx.setLineDash([]);
+      // Draw falloff radius
+      ctx.strokeStyle = '#ffa500';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.arc(lightX, lightY, scaledFalloff, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-    // Light source indicator
-    ctx.fillStyle = '#ffeb3b';
-    ctx.strokeStyle = '#ffa500';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(arrowX, arrowY, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      // Draw light source
+      ctx.fillStyle = '#ffeb3b';
+      ctx.strokeStyle = '#ffa500';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(lightX, lightY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // Directional light: show arrow from center
+      const arrowLength = radius * 1.3;
+      const arrowX = centerX + globalLightDirX * arrowLength;
+      const arrowY = centerY + globalLightDirY * arrowLength;
+
+      ctx.strokeStyle = '#ffa500';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(arrowX, arrowY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Light source indicator
+      ctx.fillStyle = '#ffeb3b';
+      ctx.strokeStyle = '#ffa500';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(arrowX, arrowY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   smoothstep(edge0, edge1, x) {
