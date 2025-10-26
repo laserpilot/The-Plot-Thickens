@@ -19,6 +19,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@xmldom/xmldom": "^0.8.11",
     "commander": "^14.0.1",
     "svg-path-commander": "^2.1.11",
     "svgson": "^5.3.1"
