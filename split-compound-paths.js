@@ -10,46 +10,124 @@ const fs = require('fs');
 const { DOMParser, XMLSerializer } = require('@xmldom/xmldom');
 
 /**
- * Split a compound path into individual subpaths
+ * Split a compound path into individual subpaths with absolute coordinates
  * @param {string} pathData - The d attribute value
  * @returns {Array<string>} Array of individual path data strings
  */
 function splitCompoundPath(pathData) {
-  // Split on 'm' or 'M' commands, keeping the delimiter
-  // We use a regex that captures the move command with its coordinates
   const segments = [];
+  let currentX = 0;
+  let currentY = 0;
+
+  // Parse path commands
+  const commandRegex = /([mMlLhHvVcCsSqQtTaAzZ])\s*([^mMlLhHvVcCsSqQtTaAzZ]*)/g;
   let currentSegment = '';
+  let isFirstMove = true;
 
-  // Match 'm' or 'M' followed by optional whitespace and coordinates
-  const moveCommandRegex = /\s*([mM])\s*/g;
-  let lastIndex = 0;
   let match;
-  let firstCommand = true;
+  while ((match = commandRegex.exec(pathData)) !== null) {
+    const command = match[1];
+    const params = match[2].trim();
 
-  while ((match = moveCommandRegex.exec(pathData)) !== null) {
-    if (!firstCommand) {
-      // Save the previous segment (everything before this move command)
-      const segmentData = pathData.substring(lastIndex, match.index).trim();
-      if (segmentData) {
-        currentSegment += ' ' + segmentData;
-      }
-      if (currentSegment.trim()) {
+    if (command === 'm' || command === 'M') {
+      // Move command - start new subpath if not the first
+      if (!isFirstMove && currentSegment.trim()) {
         segments.push(currentSegment.trim());
+        currentSegment = '';
       }
-      currentSegment = '';
-    }
 
-    // Start new segment with the move command
-    currentSegment = match[1]; // 'm' or 'M'
-    lastIndex = match.index + match[0].length;
-    firstCommand = false;
+      // Parse coordinates
+      const coords = params.split(/[\s,]+/).map(parseFloat);
+      if (coords.length >= 2) {
+        if (command === 'M') {
+          // Absolute move
+          currentX = coords[0];
+          currentY = coords[1];
+          currentSegment = `M ${currentX},${currentY}`;
+        } else {
+          // Relative move - convert to absolute
+          currentX += coords[0];
+          currentY += coords[1];
+          currentSegment = `M ${currentX},${currentY}`;
+        }
+
+        // Handle additional coordinate pairs (implicit lineto)
+        for (let i = 2; i < coords.length; i += 2) {
+          if (command === 'M') {
+            currentX = coords[i];
+            currentY = coords[i + 1];
+          } else {
+            currentX += coords[i];
+            currentY += coords[i + 1];
+          }
+          currentSegment += ` L ${currentX},${currentY}`;
+        }
+      }
+
+      isFirstMove = false;
+    } else {
+      // Other commands - append to current segment
+      currentSegment += ` ${command} ${params}`;
+
+      // Update current position for commands that move the cursor
+      const coords = params.split(/[\s,]+/).filter(c => c).map(parseFloat);
+
+      if (command === 'L' || command === 'T') {
+        // Line to - last 2 params are endpoint
+        if (coords.length >= 2) {
+          currentX = coords[coords.length - 2];
+          currentY = coords[coords.length - 1];
+        }
+      } else if (command === 'l' || command === 't') {
+        if (coords.length >= 2) {
+          currentX += coords[coords.length - 2];
+          currentY += coords[coords.length - 1];
+        }
+      } else if (command === 'H') {
+        // Horizontal line - updates only X
+        if (coords.length >= 1) {
+          currentX = coords[coords.length - 1];
+        }
+      } else if (command === 'h') {
+        if (coords.length >= 1) {
+          currentX += coords[coords.length - 1];
+        }
+      } else if (command === 'V') {
+        // Vertical line - updates only Y
+        if (coords.length >= 1) {
+          currentY = coords[coords.length - 1];
+        }
+      } else if (command === 'v') {
+        if (coords.length >= 1) {
+          currentY += coords[coords.length - 1];
+        }
+      } else if (command === 'C' || command === 'S' || command === 'Q') {
+        // Cubic/Smooth/Quadratic bezier - last 2 params are endpoint
+        if (coords.length >= 2) {
+          currentX = coords[coords.length - 2];
+          currentY = coords[coords.length - 1];
+        }
+      } else if (command === 'c' || command === 's' || command === 'q') {
+        if (coords.length >= 2) {
+          currentX += coords[coords.length - 2];
+          currentY += coords[coords.length - 1];
+        }
+      } else if (command === 'A') {
+        // Arc - last 2 params are endpoint
+        if (coords.length >= 7) {
+          currentX = coords[5];
+          currentY = coords[6];
+        }
+      } else if (command === 'a') {
+        if (coords.length >= 7) {
+          currentX += coords[5];
+          currentY += coords[6];
+        }
+      }
+    }
   }
 
   // Add the final segment
-  const finalData = pathData.substring(lastIndex).trim();
-  if (finalData) {
-    currentSegment += ' ' + finalData;
-  }
   if (currentSegment.trim()) {
     segments.push(currentSegment.trim());
   }
