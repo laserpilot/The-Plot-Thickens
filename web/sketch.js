@@ -31,13 +31,17 @@ let useNormalOffset = true; // Use normal-based offset
 let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 
 // Fill mode state
-let fillMode = 'offset'; // 'offset', 'crosshatch', 'stippling', or 'hatch-gradient'
+let fillMode = 'offset'; // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', or 'striped'
 let hatchAngles = [45, -45]; // Crosshatch angles in degrees
 let hatchSpacing = 1; // Spacing between hatch lines in mm
 
 // Stippling state
 let dotSpacing = 1.5; // Distance between dots in mm
 let dotSize = 0.3; // Radius of each dot in mm
+
+// Striped fill state
+let stripeFilled = 1; // Number of consecutive paths to draw
+let stripeEmpty = 1; // Number of consecutive paths to skip
 
 // Hatch gradient state
 let lightMode = 'directional'; // 'directional' or 'point'

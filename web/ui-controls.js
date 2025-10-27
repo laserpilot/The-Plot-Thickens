@@ -99,9 +99,16 @@ function initializeControls() {
         hatchGradientControls.style.display = fillMode === 'hatch-gradient' ? 'block' : 'none';
       }
 
+      // Show/hide striped controls
+      const stripedControls = document.getElementById('striped-controls');
+      if (stripedControls) {
+        stripedControls.style.display = fillMode === 'striped' ? 'block' : 'none';
+      }
+
       const modeLabel = fillMode === 'crosshatch' ? 'Crosshatch fill mode' :
                         fillMode === 'stippling' ? 'Stippling fill mode' :
-                        fillMode === 'hatch-gradient' ? 'Hatch gradient fill mode' : 'Offset fill mode';
+                        fillMode === 'hatch-gradient' ? 'Hatch gradient fill mode' :
+                        fillMode === 'striped' ? 'Striped fill mode' : 'Offset fill mode';
       updateStatus(modeLabel);
       needsRedraw = true;
       redraw();
@@ -244,6 +251,30 @@ function initializeControls() {
     redraw();
     updateCLICommand();
   });
+
+  // Striped fill controls
+  setupSlider('stripe-filled', (value) => {
+    stripeFilled = value;
+    updateStripePatternPreview();
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('stripe-empty', (value) => {
+    stripeEmpty = value;
+    updateStripePatternPreview();
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  function updateStripePatternPreview() {
+    const preview = document.getElementById('stripe-pattern-preview');
+    if (preview) {
+      preview.textContent = `${stripeFilled} filled, ${stripeEmpty} empty (repeating pattern)`;
+    }
+  }
 
   // Light mode toggle (directional vs point)
   document.querySelectorAll('input[name="light-mode"]').forEach(radio => {
@@ -394,6 +425,15 @@ function initializeControls() {
     });
   });
 
+  // Initialize envelope controls visibility based on checked radio
+  const checkedOffsetMode = document.querySelector('input[name="offset-mode"]:checked');
+  if (checkedOffsetMode && checkedOffsetMode.value === 'normal') {
+    const envelopeControls = document.getElementById('envelope-controls');
+    if (envelopeControls) {
+      envelopeControls.style.display = 'block';
+    }
+  }
+
   // Envelope preset selector
   const envelopeSelect = document.getElementById('envelope-preset');
   if (envelopeSelect) {
@@ -402,6 +442,18 @@ function initializeControls() {
       needsRedraw = true;
       redraw();
       updateCLICommand();
+    });
+  }
+
+  // Display section collapsible toggle
+  const displayToggle = document.getElementById('display-section-toggle');
+  const displayContent = document.getElementById('display-section-content');
+  const displayIcon = document.getElementById('display-toggle-icon');
+  if (displayToggle && displayContent && displayIcon) {
+    displayToggle.addEventListener('click', () => {
+      const isHidden = displayContent.style.display === 'none';
+      displayContent.style.display = isHidden ? 'block' : 'none';
+      displayIcon.textContent = isHidden ? '▼' : '▶';
     });
   }
 
@@ -1149,11 +1201,53 @@ async function prepareExport() {
         }
       });
     } else {
-      // Offset fill (existing code)
+      // Offset fill or Striped fill (both use offset logic)
       let leftOutline = null;
       let rightOutline = null;
 
+      // For striped mode with outlines, generate outline paths separately
+      // so they're always present regardless of stripe pattern
+      if (fillMode === 'striped' && addOutlineStroke && passes > 0) {
+        // Generate right outline (furthest right)
+        const rightPassIndex = Math.floor((passes - 1) / 2) + 1;
+        const rightDistance = rightPassIndex * baseOffset;
+        let rightPoints;
+        if (useNormalOffset) {
+          rightPoints = generateOffsetPath(path.d, rightDistance, noise, seed + passes, path.id, envelope, true, noiseFrequency);
+        } else {
+          rightPoints = generateOffsetPath(highQualityPoints, rightDistance, noise, seed + passes, path.id, null, false);
+        }
+        if (rightPoints) {
+          rightOutline = pointsToPathString(rightPoints);
+        }
+
+        // Generate left outline (furthest left) if we have multiple passes
+        if (passes > 1) {
+          const leftPassIndex = Math.floor((passes - 2) / 2) + 1 + 1;
+          const leftDistance = -leftPassIndex * baseOffset;
+          let leftPoints;
+          if (useNormalOffset) {
+            leftPoints = generateOffsetPath(path.d, leftDistance, noise, seed + passes + 1, path.id, envelope, true, noiseFrequency);
+          } else {
+            leftPoints = generateOffsetPath(highQualityPoints, leftDistance, noise, seed + passes + 1, path.id, null, false);
+          }
+          if (leftPoints) {
+            leftOutline = pointsToPathString(leftPoints);
+          }
+        }
+      }
+
       for (let i = 0; i < passes; i++) {
+        // Skip paths for striped mode using fill/empty pattern
+        if (fillMode === 'striped') {
+          const patternLength = stripeFilled + stripeEmpty;
+          const positionInPattern = i % patternLength;
+          // Skip if we're in the "empty" portion of the pattern
+          if (positionInPattern >= stripeFilled) {
+            continue;
+          }
+        }
+
         const passIndex = Math.floor(i / 2) + 1; // Distance from center (start at 1, not 0)
         const isRight = i % 2 === 0; // Alternate sides
         const direction = isRight ? 1 : -1;
@@ -1187,8 +1281,8 @@ async function prepareExport() {
             processedPaths.push(pathData);
           }
 
-          // Track outermost offsets for outline extraction
-          if (addOutlineStroke && passes > 0) {
+          // Track outermost offsets for outline extraction (non-striped modes only)
+          if (fillMode !== 'striped' && addOutlineStroke && passes > 0) {
             const isLastRight = isRight && passIndex === Math.floor((passes - 1) / 2) + 1;
             const isLastLeft = !isRight && passIndex === Math.floor((passes - 2) / 2) + 1 + 1;
 
@@ -1288,7 +1382,8 @@ async function prepareExport() {
   const mode = useAttractors ? 'attractor' : 'length';
   const fillSuffix = fillMode === 'crosshatch' ? '-crosshatch' :
                      fillMode === 'stippling' ? '-stippling' :
-                     fillMode === 'hatch-gradient' ? '-gradient' : '';
+                     fillMode === 'hatch-gradient' ? '-gradient' :
+                     fillMode === 'striped' ? '-striped' : '';
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
   const filename = `${baseFilename}-${mode}${fillSuffix}-${timestamp}.svg`;
 
@@ -1746,6 +1841,10 @@ function generateCLICommand() {
     if (lightStrength !== 0.8) params.push(`--light-strength ${lightStrength}`);
     if (gradientBaseWeight !== 0.2) params.push(`--gradient-base-weight ${gradientBaseWeight}`);
     if (shadowSoftness !== 0.5) params.push(`--shadow-softness ${shadowSoftness}`);
+  } else if (fillModeValue === 'striped') {
+    params.push(`--fill-mode striped`);
+    params.push(`--stripe-filled ${stripeFilled}`);
+    params.push(`--stripe-empty ${stripeEmpty}`);
   }
 
   // Add outline stroke option

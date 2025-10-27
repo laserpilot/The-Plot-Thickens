@@ -1251,17 +1251,24 @@ function generateHatchGradientFill(
             const lightDirY = toLightY / dist;
 
             const orientDot = sample.nx * lightDirX + sample.ny * lightDirY;
-            const orientWeight = (1 - Math.abs(orientDot)) * 0.5;
+            // Remap signed dot to [0,1]: +1 (facing) → 0 (sparse), -1 (away) → 1 (dense)
+            const orientWeight = (1 - orientDot) / 2;
 
             const distanceFalloff = 1 / (1 + dist / falloffRadius);
-            const distWeight = (1 - distanceFalloff) * 0.5;
+            const distWeight = 1 - distanceFalloff; // 0 at light, 1 at infinity
 
-            rawWeight = (orientWeight + distWeight) * lightStrength + baseWeight;
+            // Combine with separate strengths
+            const orientStrength = 0.7; // How much surface orientation matters
+            const distStrength = 0.3;   // How much distance matters
+            rawWeight = (orientWeight * orientStrength + distWeight * distStrength) * lightStrength + baseWeight;
           }
         } else {
           // DIRECTIONAL MODE: Global light direction
           const dotProduct = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
-          rawWeight = (1 - Math.abs(dotProduct)) * lightStrength + baseWeight;
+          // Map dot product [-1, 1] to weight [0, 1]
+          // +1 (facing light) → 0 (low weight = sparse = bright)
+          // -1 (facing away) → 1 (high weight = dense = shadow)
+          rawWeight = ((1 - dotProduct) / 2) * lightStrength + baseWeight;
         }
 
         // Apply shadow softness (easing)

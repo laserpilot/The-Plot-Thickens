@@ -219,6 +219,11 @@
             Hatch Gradient (light-based)
           </label>
 
+          <label>
+            <input type="radio" name="fill-mode" value="striped">
+            Striped (skip paths)
+          </label>
+
           <div id="crosshatch-controls"
             style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
@@ -433,6 +438,27 @@
                 style="width: 100%; height: auto; border: 1px solid #ccc; border-radius: 2px;"></canvas>
             </div>
           </div>
+
+          <div id="striped-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fff0f8; border-radius: 4px;">
+            <label>
+              Filled Stripes:
+              <input type="range" id="stripe-filled" min="1" max="10" step="1" value="1">
+              <span id="stripe-filled-value">1</span>
+              <span class="hint-icon" title="Number of consecutive paths to draw in the pattern.">?</span>
+            </label>
+
+            <label>
+              Empty Stripes:
+              <input type="range" id="stripe-empty" min="1" max="10" step="1" value="1">
+              <span id="stripe-empty-value">1</span>
+              <span class="hint-icon" title="Number of consecutive paths to skip in the pattern.">?</span>
+            </label>
+
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; font-size: 0.85em; color: #666;">
+              Pattern: <span id="stripe-pattern-preview">1 filled, 1 empty (alternating)</span>
+            </div>
+          </div>
         </section>
 
         <section class="control-group">
@@ -596,8 +622,11 @@
         </section>
 
         <section class="control-group">
-          <h3>Display</h3>
+          <h3 style="cursor: pointer; user-select: none;" id="display-section-toggle">
+            <span id="display-toggle-icon">▼</span> Display
+          </h3>
 
+          <div id="display-section-content">
           <label>
             Preview Mode:
             <select id="preview-display-mode">
@@ -629,8 +658,8 @@
 
           <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
 
-          <div style="padding: 0.75rem; background: #f0f8ff; border-radius: 4px; border: 1px solid #b3d9ff;">
-            <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #0066cc;">🔍 Focus Window (large SVGs)</h4>
+          <div style="padding: 0.75rem; background: #fff8dc; border-radius: 4px; border: 1px solid #ffcc66;">
+            <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #cc6600;">🔍 Focus Window (large SVGs) <span style="background: #ff9933; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.7em;">NOT WORKING</span></h4>
             <p style="font-size: 0.8em; color: #666; margin: 0 0 0.5rem 0;">
               Select a region for high-res preview while keeping rest in fast mode
             </p>
@@ -669,6 +698,7 @@
               <button id="clear-focus" style="width: 100%; padding: 4px; font-size: 0.85em; margin-top: 0.5rem;">Clear
                 Focus Rectangle</button>
             </div>
+          </div>
           </div>
         </section>
 

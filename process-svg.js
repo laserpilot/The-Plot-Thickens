@@ -25,7 +25,9 @@ const DEFAULT_CONFIG = {
   envelope: 'sinTaperBoth', // envelope preset name
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
-  fillMode: 'offset', // 'offset', 'crosshatch', 'stippling', or 'hatch-gradient'
+  fillMode: 'offset', // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', or 'striped'
+  stripeFilled: 1, // Number of consecutive filled paths in striped mode
+  stripeEmpty: 1, // Number of consecutive empty paths in striped mode
   addOutline: false, // Add outline strokes (furthermost boundaries)
   crosshatch: {
     angles: [90], // hatch angles in degrees
@@ -78,7 +80,9 @@ program
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
-  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, or hatch-gradient (default: offset)')
+  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, hatch-gradient, or striped (default: offset)')
+  .option('--stripe-filled <number>', 'Number of consecutive filled paths in striped pattern (default: 1)', parseInt)
+  .option('--stripe-empty <number>', 'Number of consecutive empty paths in striped pattern (default: 1)', parseInt)
   .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
   .option('--hatch-angles <angles>', 'Hatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
@@ -129,6 +133,8 @@ program
     if (options.bins !== undefined) config.bins = options.bins;
     if (options.sampleRate !== undefined) config.sampleRate = options.sampleRate;
     if (options.fillMode !== undefined) config.fillMode = options.fillMode;
+    if (options.stripeFilled !== undefined) config.stripeFilled = options.stripeFilled;
+    if (options.stripeEmpty !== undefined) config.stripeEmpty = options.stripeEmpty;
     if (options.addOutline) config.addOutline = true;
 
     // Handle crosshatch options
