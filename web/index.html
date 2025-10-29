@@ -224,6 +224,11 @@
             Striped (skip paths)
           </label>
 
+          <label>
+            <input type="radio" name="fill-mode" value="focus-blur">
+            Focus Blur (noise modulation)
+          </label>
+
           <div id="crosshatch-controls"
             style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f0f8ff; border-radius: 4px;">
             <label>
@@ -600,6 +605,108 @@
 
             <div style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; font-size: 0.85em; color: #666;">
               Pattern: <span id="stripe-pattern-preview">1 filled, 1 empty (alternating)</span>
+            </div>
+          </div>
+
+          <div id="focus-blur-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #f8f0ff; border-radius: 4px;">
+            <label>
+              Light Mode:
+              <label style="margin-left: 10px;">
+                <input type="radio" name="focus-blur-light-mode" value="directional" checked>
+                Directional
+              </label>
+              <label style="margin-left: 10px;">
+                <input type="radio" name="focus-blur-light-mode" value="point">
+                Point Source
+              </label>
+              <span class="hint-icon" title="Directional: Light from infinite distance at angle. Point: Light at specific canvas position.">?</span>
+            </label>
+
+            <div id="focus-blur-directional-light-controls">
+              <label>
+                Light Direction (degrees):
+                <input type="range" id="focus-blur-light-angle" min="0" max="360" step="5" value="45">
+                <span id="focus-blur-light-angle-value">45</span>
+                <span class="hint-icon" title="Direction of light source. 0° = right, 90° = down, 180° = left, 270° = up.">?</span>
+              </label>
+            </div>
+
+            <div id="focus-blur-point-light-controls" style="display: none;">
+              <label>
+                Light Position X (%):
+                <input type="range" id="focus-blur-light-pos-x" min="0" max="100" step="1" value="50">
+                <span id="focus-blur-light-pos-x-value">50</span>
+                <span class="hint-icon" title="Horizontal position of point light source (0% = left edge, 100% = right edge).">?</span>
+              </label>
+
+              <label>
+                Light Position Y (%):
+                <input type="range" id="focus-blur-light-pos-y" min="0" max="100" step="1" value="50">
+                <span id="focus-blur-light-pos-y-value">50</span>
+                <span class="hint-icon" title="Vertical position of point light source (0% = top edge, 100% = bottom edge).">?</span>
+              </label>
+
+              <label>
+                Falloff Radius (mm):
+                <input type="range" id="focus-blur-falloff-radius" min="10" max="500" step="10" value="150">
+                <span id="focus-blur-falloff-radius-value">150</span>
+                <span class="hint-icon" title="Distance where light intensity drops to 50%. Larger = softer falloff, smaller = harsher shadows.">?</span>
+              </label>
+            </div>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
+              Noise Amplitude Min (focus):
+              <input type="range" id="focus-noise-min" min="0" max="2" step="0.01" value="0.05">
+              <span id="focus-noise-min-value">0.05</span>
+              <span class="hint-icon" title="Noise amplitude in lit/focused areas. Low value = calm, sharp.">?</span>
+            </label>
+
+            <label>
+              Noise Amplitude Max (blur):
+              <input type="range" id="focus-noise-max" min="0" max="2" step="0.01" value="0.6">
+              <span id="focus-noise-max-value">0.60</span>
+              <span class="hint-icon" title="Noise amplitude in shadowed/blurred areas. High value = chaotic, loose.">?</span>
+            </label>
+
+            <label>
+              Noise Frequency Min (focus):
+              <input type="range" id="focus-freq-min" min="1" max="200" step="1" value="100">
+              <span id="focus-freq-min-value">100</span>
+              <span class="hint-icon" title="Noise frequency in lit/focused areas. Higher = tighter detail.">?</span>
+            </label>
+
+            <label>
+              Noise Frequency Max (blur):
+              <input type="range" id="focus-freq-max" min="1" max="200" step="1" value="10">
+              <span id="focus-freq-max-value">10</span>
+              <span class="hint-icon" title="Noise frequency in shadowed/blurred areas. Lower = looser, broader noise.">?</span>
+            </label>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
+              <input type="checkbox" id="focus-blur-modulate-passes">
+              Modulate Pass Count (thicker strokes in shadow)
+              <span class="hint-icon" title="Make strokes thicker in shadowed areas by increasing pass count.">?</span>
+            </label>
+
+            <div id="focus-blur-passes-controls" style="display: none; margin-top: 0.5rem;">
+              <label>
+                Pass Multiplier Min (focus):
+                <input type="range" id="focus-passes-min" min="0.5" max="2" step="0.1" value="1.0">
+                <span id="focus-passes-min-value">1.0</span>
+                <span class="hint-icon" title="Pass count multiplier in lit areas. 1.0 = normal weight.">?</span>
+              </label>
+
+              <label>
+                Pass Multiplier Max (blur):
+                <input type="range" id="focus-passes-max" min="0.5" max="2" step="0.1" value="1.5">
+                <span id="focus-passes-max-value">1.5</span>
+                <span class="hint-icon" title="Pass count multiplier in shadows. Higher = thicker/darker in shadow.">?</span>
+              </label>
             </div>
           </div>
         </section>

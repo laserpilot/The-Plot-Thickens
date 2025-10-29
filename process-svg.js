@@ -54,6 +54,20 @@ const DEFAULT_CONFIG = {
     baseWeight: 0.2, // minimum density weight
     shadowSoftness: 0.5 // transition smoothness
   },
+  focusBlur: {
+    lightMode: 'directional', // 'directional' or 'point'
+    lightAngle: 45, // light direction in degrees (directional)
+    lightPosX: 50, // light X position in % (point)
+    lightPosY: 50, // light Y position in % (point)
+    falloffRadius: 150, // light falloff radius in mm (point)
+    noiseMin: 0.05, // noise amplitude in lit/focused areas
+    noiseMax: 0.6, // noise amplitude in shadowed/blurred areas
+    freqMin: 100, // noise frequency in lit areas (calm)
+    freqMax: 10, // noise frequency in shadows (chaotic)
+    modulatePasses: false, // enable pass count modulation
+    passesMin: 1.0, // pass multiplier in lit areas
+    passesMax: 1.5 // pass multiplier in shadows
+  },
 };
 
 // CLI setup
@@ -101,6 +115,18 @@ program
   .option('--light-strength <number>', 'Light influence strength for hatch-gradient (0-1, default: 0.8)', parseFloat)
   .option('--gradient-base-weight <number>', 'Minimum density for hatch-gradient (0-1, default: 0.2)', parseFloat)
   .option('--shadow-softness <number>', 'Shadow transition smoothness for hatch-gradient (0-1, default: 0.5)', parseFloat)
+  .option('--focus-blur-light-mode <mode>', 'Light mode for focus-blur: directional or point (default: directional)')
+  .option('--focus-blur-light-angle <degrees>', 'Light direction for focus-blur directional mode (0=right, 90=down, default: 45)', parseFloat)
+  .option('--focus-blur-light-pos-x <percent>', 'Light X position for focus-blur point mode (0-100%, default: 50)', parseFloat)
+  .option('--focus-blur-light-pos-y <percent>', 'Light Y position for focus-blur point mode (0-100%, default: 50)', parseFloat)
+  .option('--focus-blur-falloff-radius <number>', 'Light falloff radius for focus-blur point mode (mm, default: 150)', parseFloat)
+  .option('--focus-blur-noise-min <number>', 'Noise amplitude in focused/lit areas (mm, default: 0.05)', parseFloat)
+  .option('--focus-blur-noise-max <number>', 'Noise amplitude in blurred/shadowed areas (mm, default: 0.6)', parseFloat)
+  .option('--focus-blur-freq-min <number>', 'Noise frequency in focused areas (default: 100)', parseFloat)
+  .option('--focus-blur-freq-max <number>', 'Noise frequency in blurred areas (default: 10)', parseFloat)
+  .option('--focus-blur-modulate-passes', 'Enable pass count modulation (thicker in shadow)')
+  .option('--focus-blur-passes-min <number>', 'Pass multiplier in focused areas (default: 1.0)', parseFloat)
+  .option('--focus-blur-passes-max <number>', 'Pass multiplier in blurred areas (default: 1.5)', parseFloat)
   .action((input, output, options) => {
     // Load configuration
     let config = { ...DEFAULT_CONFIG };
@@ -226,6 +252,56 @@ program
     if (options.shadowSoftness !== undefined) {
       config.hatchGradient = config.hatchGradient || {};
       config.hatchGradient.shadowSoftness = options.shadowSoftness;
+    }
+
+    // Handle focus-blur options
+    if (options.focusBlurLightMode !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.lightMode = options.focusBlurLightMode;
+    }
+    if (options.focusBlurLightAngle !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.lightAngle = options.focusBlurLightAngle;
+    }
+    if (options.focusBlurLightPosX !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.lightPosX = options.focusBlurLightPosX;
+    }
+    if (options.focusBlurLightPosY !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.lightPosY = options.focusBlurLightPosY;
+    }
+    if (options.focusBlurFalloffRadius !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.falloffRadius = options.focusBlurFalloffRadius;
+    }
+    if (options.focusBlurNoiseMin !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.noiseMin = options.focusBlurNoiseMin;
+    }
+    if (options.focusBlurNoiseMax !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.noiseMax = options.focusBlurNoiseMax;
+    }
+    if (options.focusBlurFreqMin !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.freqMin = options.focusBlurFreqMin;
+    }
+    if (options.focusBlurFreqMax !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.freqMax = options.focusBlurFreqMax;
+    }
+    if (options.focusBlurModulatePasses) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.modulatePasses = true;
+    }
+    if (options.focusBlurPassesMin !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.passesMin = options.focusBlurPassesMin;
+    }
+    if (options.focusBlurPassesMax !== undefined) {
+      config.focusBlur = config.focusBlur || {};
+      config.focusBlur.passesMax = options.focusBlurPassesMax;
     }
 
     // Load attractors preset if provided

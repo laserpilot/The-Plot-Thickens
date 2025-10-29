@@ -31,7 +31,7 @@ let useNormalOffset = true; // Use normal-based offset
 let envelopePreset = 'sinTaperBoth'; // Envelope preset name
 
 // Fill mode state
-let fillMode = 'offset'; // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', or 'striped'
+let fillMode = 'offset'; // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', 'striped', or 'focus-blur'
 let hatchAngles = [45, -45]; // Crosshatch angles in degrees
 let hatchSpacing = 1; // Spacing between hatch lines in mm
 
@@ -42,6 +42,19 @@ let dotSize = 0.3; // Radius of each dot in mm
 // Striped fill state
 let stripeFilled = 1; // Number of consecutive paths to draw
 let stripeEmpty = 1; // Number of consecutive paths to skip
+
+// Focus blur fill state
+let focusBlurLightMode = 'directional'; // 'directional' or 'point'
+let focusBlurLightAngle = 45;          // Light direction in degrees (directional mode)
+let focusBlurLightPosX = 50;           // Light X position in % (point mode)
+let focusBlurLightPosY = 50;           // Light Y position in % (point mode)
+let focusBlurFalloffRadius = 150;      // Light falloff radius in mm (point mode)
+let focusNoiseMin = 0.05;              // Noise amplitude in lit areas
+let focusNoiseMax = 0.6;               // Noise amplitude in shadows
+let focusFreqMin = 100;                // Noise frequency in lit areas (calm)
+let focusFreqMax = 10;                 // Noise frequency in shadows (chaotic)
+let focusPassesMin = 1.0;              // Pass multiplier in lit areas
+let focusPassesMax = 1.5;              // Pass multiplier in shadows
 
 // Hatch gradient state
 let lightMode = 'directional'; // 'directional' or 'point'
@@ -59,15 +72,6 @@ let shadowDebugMode = false; // Visualize shadow/highlight edges for debugging
 let shadingMode = 'per-surface'; // 'per-surface' or 'global-field'
 let densityField = null; // Global density field instance
 let densityFieldNeedsUpdate = true; // Dirty flag for density field
-
-// Focus/blur effect (light-based noise modulation)
-let focusBlurEnabled = false;
-let focusNoiseMin = 0.05;       // Noise amplitude in lit areas
-let focusNoiseMax = 0.5;        // Noise amplitude in shadows
-let focusFreqMin = 80;          // Noise frequency in lit areas (calm)
-let focusFreqMax = 10;          // Noise frequency in shadows (chaotic)
-let focusSpacingMin = 1.0;      // Spacing multiplier in lit areas
-let focusSpacingMax = 2.0;      // Spacing multiplier in shadows
 
 // Organic crosshatch state
 let organicHatchEnabled = false;
@@ -183,6 +187,11 @@ function draw() {
     // Draw point light if in point mode and hatch gradient fill
     if (fillMode === 'hatch-gradient' && lightMode === 'point') {
       drawPointLight();
+    }
+
+    // Draw focus blur light if in point mode and focus blur fill
+    if (fillMode === 'focus-blur' && focusBlurLightMode === 'point') {
+      drawFocusBlurLight();
     }
 
     // Draw density field debug overlay if enabled
@@ -509,54 +518,89 @@ function renderOffsetPreview() {
           endShape();
         }
       });
-    } else {
-      // Offset fill (existing code)
-      const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
+    } else if (fillMode === 'focus-blur') {
+      // Focus blur fill - light-driven noise modulation
 
-      // Calculate effective base offset (modulated by focus/blur if enabled)
-      let effectiveBaseOffset = baseOffset;
-
-      if (focusBlurEnabled && shadingMode === 'global-field' && densityField) {
-        // Update density field if needed
-        if (densityFieldNeedsUpdate) {
-          updateDensityField();
-        }
-
-        // Sample field along centerline
-        const samplePoints = path.points.slice(0, Math.min(20, path.points.length));
-        let fieldSum = 0;
-        for (let pt of samplePoints) {
-          fieldSum += densityField.sample(pt.x, pt.y);
-        }
-        const avgFieldValue = fieldSum / samplePoints.length; // 0-1
-
-        // Modulate spacing based on field value
-        const spacingMult = focusSpacingMin + avgFieldValue * (focusSpacingMax - focusSpacingMin);
-        effectiveBaseOffset = baseOffset * spacingMult;
+      // Initialize or update density field
+      if (!densityField) {
+        initializeDensityField();
       }
+      if (densityFieldNeedsUpdate) {
+        updateFocusBlurDensityField();
+      }
+
+      // Sample field along centerline for this path
+      const samplePoints = path.points.slice(0, Math.min(20, path.points.length));
+      let fieldSum = 0;
+      for (let pt of samplePoints) {
+        fieldSum += densityField.sample(pt.x, pt.y);
+      }
+      const avgBlurFactor = fieldSum / samplePoints.length; // 0 = highlight, 1 = shadow
+
+      // Optional: Modulate pass count based on blur factor
+      const passModulateCheckbox = typeof document !== 'undefined' ? document.getElementById('focus-blur-modulate-passes') : null;
+      const shouldModulatePasses = passModulateCheckbox && passModulateCheckbox.checked;
+      const effectiveWeight = shouldModulatePasses ?
+        weight * (focusPassesMin + avgBlurFactor * (focusPassesMax - focusPassesMin)) :
+        weight;
+      const maxPreviewPasses = Math.min(effectiveWeight, 10); // Cap at 10 for performance
+
+      // Build noise field params
+      const noiseFieldParams = {
+        minAmp: focusNoiseMin,
+        maxAmp: focusNoiseMax,
+        minFreq: focusFreqMin,
+        maxFreq: focusFreqMax
+      };
 
       for (let i = 0; i < maxPreviewPasses; i++) {
         const passIndex = Math.floor(i / 2) + 1;
         const isRight = i % 2 === 0;
         const direction = isRight ? 1 : -1;
-        const offsetDistance = direction * passIndex * effectiveBaseOffset; // Use effective offset
+        const offsetDistance = direction * passIndex * baseOffset;
+        const passSeed = seed + i;
+
+        let offsetPoints;
+        if (useNormalOffset) {
+          offsetPoints = generateOffsetPath(
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
+            densityField,  // Pass the field
+            noiseFieldParams
+          );
+        } else {
+          // Legacy mode: regular offset without field
+          const sampledPoints = path.points.filter((_, idx) => idx % 3 === 0);
+          offsetPoints = generateOffsetPath(sampledPoints, offsetDistance, noise, passSeed, path.id, null, false);
+        }
+
+        if (offsetPoints && offsetPoints.length > 0) {
+          beginShape();
+          offsetPoints.forEach((pt, idx) => {
+            if (pt.move && idx > 0) {
+              endShape();
+              beginShape();
+            }
+            vertex(pt.x, pt.y);
+          });
+          endShape();
+        }
+      }
+    } else {
+      // Offset fill (existing code)
+      const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
+
+      for (let i = 0; i < maxPreviewPasses; i++) {
+        const passIndex = Math.floor(i / 2) + 1;
+        const isRight = i % 2 === 0;
+        const direction = isRight ? 1 : -1;
+        const offsetDistance = direction * passIndex * baseOffset;
         const passSeed = seed + i;
 
         let offsetPoints;
 
         if (useNormalOffset) {
-          // Build noise field params if enabled
-          const noiseFieldParams = (focusBlurEnabled && shadingMode === 'global-field' && densityField) ? {
-            minAmp: focusNoiseMin,
-            maxAmp: focusNoiseMax,
-            minFreq: focusFreqMin,
-            maxFreq: focusFreqMax
-          } : null;
-
           offsetPoints = generateOffsetPath(
-            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
-            densityField && focusBlurEnabled ? densityField : null,
-            noiseFieldParams
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency
           );
         } else {
           // Legacy mode: use points (low quality for speed)
@@ -988,6 +1032,73 @@ function updateDensityField() {
   }
 
   densityFieldNeedsUpdate = false;
+}
+
+/**
+ * Update density field for focus blur mode (uses its own light params)
+ */
+function updateFocusBlurDensityField() {
+  if (!densityField || !svgData) return;
+
+  // Focus blur uses 0-1 range (0 = focus/lit, 1 = blur/shadow)
+  const minDensity = 0;
+  const maxDensity = 1;
+
+  if (focusBlurLightMode === 'point') {
+    // Convert light position from % to user units
+    const lightX = (focusBlurLightPosX / 100) * svgData.viewBox.width;
+    const lightY = (focusBlurLightPosY / 100) * svgData.viewBox.height;
+
+    densityField.computeFromPointLight(lightX, lightY, focusBlurFalloffRadius, minDensity, maxDensity);
+  } else {
+    // Directional light
+    densityField.computeFromDirectionalLight(focusBlurLightAngle, minDensity, maxDensity);
+  }
+
+  densityFieldNeedsUpdate = false;
+}
+
+/**
+ * Draw focus blur point light visualization overlay (pink/magenta to distinguish from hatch-gradient)
+ */
+function drawFocusBlurLight() {
+  if (!svgData || focusBlurLightMode !== 'point') return;
+
+  // Convert light position from % to user units
+  const lightX = (focusBlurLightPosX / 100) * svgData.viewBox.width;
+  const lightY = (focusBlurLightPosY / 100) * svgData.viewBox.height;
+
+  // Draw falloff radius circle
+  noFill();
+  stroke(255, 100, 200, 80); // Pink/magenta for focus blur light
+  strokeWeight(2);
+  circle(lightX, lightY, focusBlurFalloffRadius * 2);
+
+  // Draw inner bright circle (50% falloff radius)
+  stroke(255, 100, 200, 120);
+  strokeWeight(1);
+  circle(lightX, lightY, focusBlurFalloffRadius);
+
+  // Draw light source point
+  fill(255, 150, 220);
+  noStroke();
+  circle(lightX, lightY, 8);
+
+  // Draw center dot
+  fill(255, 100, 200);
+  circle(lightX, lightY, 3);
+
+  // Label
+  fill(255, 100, 200);
+  textAlign(CENTER, CENTER);
+  textSize(11);
+  textStyle(BOLD);
+  text('FOCUS', lightX, lightY - focusBlurFalloffRadius - 15);
+
+  // Show position info
+  textSize(9);
+  textStyle(NORMAL);
+  text(`${focusBlurLightPosX.toFixed(0)}%, ${focusBlurLightPosY.toFixed(0)}%`, lightX, lightY - focusBlurFalloffRadius - 5);
 }
 
 /**

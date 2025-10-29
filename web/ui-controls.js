@@ -105,10 +105,17 @@ function initializeControls() {
         stripedControls.style.display = fillMode === 'striped' ? 'block' : 'none';
       }
 
+      // Show/hide focus blur controls
+      const focusBlurControls = document.getElementById('focus-blur-controls');
+      if (focusBlurControls) {
+        focusBlurControls.style.display = fillMode === 'focus-blur' ? 'block' : 'none';
+      }
+
       const modeLabel = fillMode === 'crosshatch' ? 'Crosshatch fill mode' :
                         fillMode === 'stippling' ? 'Stippling fill mode' :
                         fillMode === 'hatch-gradient' ? 'Hatch gradient fill mode' :
-                        fillMode === 'striped' ? 'Striped fill mode' : 'Offset fill mode';
+                        fillMode === 'striped' ? 'Striped fill mode' :
+                        fillMode === 'focus-blur' ? 'Focus blur fill mode' : 'Offset fill mode';
       updateStatus(modeLabel);
       needsRedraw = true;
       redraw();
@@ -344,6 +351,119 @@ function initializeControls() {
       preview.textContent = `${stripeFilled} filled, ${stripeEmpty} empty (repeating pattern)`;
     }
   }
+
+  // Focus blur fill controls
+
+  // Focus blur light mode toggle (directional vs point)
+  document.querySelectorAll('input[name="focus-blur-light-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      focusBlurLightMode = e.target.value;
+
+      // Show/hide appropriate controls
+      const directionalControls = document.getElementById('focus-blur-directional-light-controls');
+      const pointControls = document.getElementById('focus-blur-point-light-controls');
+      if (directionalControls) {
+        directionalControls.style.display = focusBlurLightMode === 'directional' ? 'block' : 'none';
+      }
+      if (pointControls) {
+        pointControls.style.display = focusBlurLightMode === 'point' ? 'block' : 'none';
+      }
+
+      densityFieldNeedsUpdate = true; // Mark density field for update
+      updateStatus(focusBlurLightMode === 'point' ? 'Focus blur: Point light mode' : 'Focus blur: Directional light mode');
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  });
+
+  setupSlider('focus-blur-light-angle', (value) => {
+    focusBlurLightAngle = value;
+    densityFieldNeedsUpdate = true;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-blur-light-pos-x', (value) => {
+    focusBlurLightPosX = value;
+    densityFieldNeedsUpdate = true;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-blur-light-pos-y', (value) => {
+    focusBlurLightPosY = value;
+    densityFieldNeedsUpdate = true;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-blur-falloff-radius', (value) => {
+    focusBlurFalloffRadius = value;
+    densityFieldNeedsUpdate = true;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-noise-min', (value) => {
+    focusNoiseMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-noise-max', (value) => {
+    focusNoiseMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-freq-min', (value) => {
+    focusFreqMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-freq-max', (value) => {
+    focusFreqMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  // Focus blur pass modulation checkbox
+  const focusBlurModulateCheckbox = document.getElementById('focus-blur-modulate-passes');
+  if (focusBlurModulateCheckbox) {
+    focusBlurModulateCheckbox.addEventListener('change', (e) => {
+      const passesControls = document.getElementById('focus-blur-passes-controls');
+      if (passesControls) {
+        passesControls.style.display = e.target.checked ? 'block' : 'none';
+      }
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  }
+
+  setupSlider('focus-passes-min', (value) => {
+    focusPassesMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-passes-max', (value) => {
+    focusPassesMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
 
   // Light mode toggle (directional vs point)
   document.querySelectorAll('input[name="light-mode"]').forEach(radio => {
@@ -1480,36 +1600,86 @@ async function prepareExport() {
           processedPaths.push(pathData);
         }
       });
+    } else if (fillMode === 'focus-blur') {
+      // Focus blur fill - noise modulation based on light
+
+      // Initialize or update density field
+      if (!densityField) {
+        initializeDensityField();
+      }
+      if (densityFieldNeedsUpdate) {
+        updateFocusBlurDensityField();
+      }
+
+      // Sample field along centerline for this path
+      const samplePoints = highQualityPoints.slice(0, Math.min(20, highQualityPoints.length));
+      let fieldSum = 0;
+      for (let pt of samplePoints) {
+        fieldSum += densityField.sample(pt.x, pt.y);
+      }
+      const avgBlurFactor = fieldSum / samplePoints.length; // 0 = highlight, 1 = shadow
+
+      // Optional: Modulate pass count based on blur factor
+      const passModulateCheckbox = document.getElementById('focus-blur-modulate-passes');
+      const shouldModulatePasses = passModulateCheckbox && passModulateCheckbox.checked;
+      const effectiveWeight = shouldModulatePasses ?
+        passes * (focusPassesMin + avgBlurFactor * (focusPassesMax - focusPassesMin)) :
+        passes;
+
+      // Build noise field params
+      const noiseFieldParams = {
+        minAmp: focusNoiseMin,
+        maxAmp: focusNoiseMax,
+        minFreq: focusFreqMin,
+        maxFreq: focusFreqMax
+      };
+
+      for (let i = 0; i < effectiveWeight; i++) {
+        const passIndex = Math.floor(i / 2) + 1;
+        const isRight = i % 2 === 0;
+        const direction = isRight ? 1 : -1;
+        const offsetDistance = direction * passIndex * baseOffset;
+        const passSeed = seed + i;
+
+        let offsetPoints;
+        if (useNormalOffset) {
+          offsetPoints = generateOffsetPath(
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
+            densityField,  // Pass the field
+            noiseFieldParams
+          );
+        } else {
+          // Legacy mode: regular offset without field
+          offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);
+        }
+
+        if (offsetPoints && offsetPoints.length > 0) {
+          const offsetPathD = pointsToPathString(offsetPoints);
+          const pathData = {
+            d: offsetPathD,
+            stroke: path.stroke,
+            fill: path.fill,
+            strokeWidth: path.strokeWidth,
+          };
+
+          sourcePaths.push(pathData);
+
+          if (!enableBinning) {
+            processedPaths.push(pathData);
+          }
+        }
+      }
     } else {
       // Offset fill or Striped fill (both use offset logic)
       let leftOutline = null;
       let rightOutline = null;
-
-      // Calculate effective base offset (modulated by focus/blur if enabled)
-      let effectiveBaseOffset = baseOffset;
-
-      if (focusBlurEnabled && shadingMode === 'global-field' && densityField) {
-        if (densityFieldNeedsUpdate) {
-          updateDensityField();
-        }
-
-        const samplePoints = highQualityPoints.slice(0, Math.min(20, highQualityPoints.length));
-        let fieldSum = 0;
-        for (let pt of samplePoints) {
-          fieldSum += densityField.sample(pt.x, pt.y);
-        }
-        const avgFieldValue = fieldSum / samplePoints.length;
-
-        const spacingMult = focusSpacingMin + avgFieldValue * (focusSpacingMax - focusSpacingMin);
-        effectiveBaseOffset = baseOffset * spacingMult;
-      }
 
       // If outlines requested, generate outermost offset paths separately
       // This ensures they're always present regardless of stripe pattern
       if (addOutlineStroke && passes > 0) {
         // Generate right outline (furthest right)
         const rightPassIndex = Math.floor((passes - 1) / 2) + 1;
-        const rightDistance = rightPassIndex * effectiveBaseOffset; // Use effective offset
+        const rightDistance = rightPassIndex * baseOffset;
         let rightPoints;
         if (useNormalOffset) {
           rightPoints = generateOffsetPath(path.d, rightDistance, noise, seed + passes, path.id, envelope, true, noiseFrequency);
@@ -1523,7 +1693,7 @@ async function prepareExport() {
         // Generate left outline (furthest left) if we have multiple passes
         if (passes > 1) {
           const leftPassIndex = Math.floor((passes - 2) / 2) + 1 + 1;
-          const leftDistance = -leftPassIndex * effectiveBaseOffset; // Use effective offset
+          const leftDistance = -leftPassIndex * baseOffset;
           let leftPoints;
           if (useNormalOffset) {
             leftPoints = generateOffsetPath(path.d, leftDistance, noise, seed + passes + 1, path.id, envelope, true, noiseFrequency);
@@ -1551,24 +1721,14 @@ async function prepareExport() {
         const isRight = i % 2 === 0; // Alternate sides
         const direction = isRight ? 1 : -1;
 
-        const offsetDistance = direction * passIndex * effectiveBaseOffset; // Use effective offset
+        const offsetDistance = direction * passIndex * baseOffset;
         const passSeed = seed + i;
 
         // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
         let offsetPoints;
         if (useNormalOffset) {
-          // Build noise field params if enabled
-          const noiseFieldParams = (focusBlurEnabled && shadingMode === 'global-field' && densityField) ? {
-            minAmp: focusNoiseMin,
-            maxAmp: focusNoiseMax,
-            minFreq: focusFreqMin,
-            maxFreq: focusFreqMax
-          } : null;
-
           offsetPoints = generateOffsetPath(
-            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
-            densityField && focusBlurEnabled ? densityField : null,
-            noiseFieldParams
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency
           );
         } else {
           // Legacy mode: use high-quality points
@@ -1680,7 +1840,8 @@ async function prepareExport() {
   const fillSuffix = fillMode === 'crosshatch' ? '-crosshatch' :
                      fillMode === 'stippling' ? '-stippling' :
                      fillMode === 'hatch-gradient' ? '-gradient' :
-                     fillMode === 'striped' ? '-striped' : '';
+                     fillMode === 'striped' ? '-striped' :
+                     fillMode === 'focus-blur' ? '-focus' : '';
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: 2025-10-20T14-30-45
   const filename = `${baseFilename}-${mode}${fillSuffix}-${timestamp}.svg`;
 
