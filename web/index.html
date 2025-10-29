@@ -633,6 +633,52 @@
             </label>
           </div>
 
+          <!-- Focus/Blur Effect Controls -->
+          <label>
+            <input type="checkbox" id="focus-blur-enabled">
+            Enable Light-Based Focus/Blur
+            <span class="hint-icon"
+              title="Modulate stroke spacing, noise amplitude, and noise frequency based on global lighting. Creates sharp focus in lit areas, blur in shadows. Requires Global Field shading mode.">?</span>
+          </label>
+
+          <div id="focus-blur-controls" style="display: none; margin-left: 1rem; margin-top: 0.5rem;">
+            <label style="font-weight: bold; font-size: 0.9rem; color: #666;">Noise Amplitude:</label>
+            <label>
+              Min (lit areas):
+              <input type="range" id="focus-noise-min" min="0" max="1" step="0.05" value="0.05">
+              <span id="focus-noise-min-value">0.05</span>
+            </label>
+            <label>
+              Max (shadows):
+              <input type="range" id="focus-noise-max" min="0" max="2" step="0.05" value="0.5">
+              <span id="focus-noise-max-value">0.50</span>
+            </label>
+
+            <label style="font-weight: bold; font-size: 0.9rem; color: #666; margin-top: 0.5rem;">Noise Frequency:</label>
+            <label>
+              Min (lit areas - calm):
+              <input type="range" id="focus-freq-min" min="5" max="200" step="5" value="80">
+              <span id="focus-freq-min-value">80</span>
+            </label>
+            <label>
+              Max (shadows - chaotic):
+              <input type="range" id="focus-freq-max" min="5" max="200" step="5" value="10">
+              <span id="focus-freq-max-value">10</span>
+            </label>
+
+            <label style="font-weight: bold; font-size: 0.9rem; color: #666; margin-top: 0.5rem;">Stroke Spacing:</label>
+            <label>
+              Min (lit areas - tight):
+              <input type="range" id="focus-spacing-min" min="0.5" max="2" step="0.1" value="1.0">
+              <span id="focus-spacing-min-value">1.0x</span>
+            </label>
+            <label>
+              Max (shadows - wide):
+              <input type="range" id="focus-spacing-max" min="0.5" max="3" step="0.1" value="2.0">
+              <span id="focus-spacing-max-value">2.0x</span>
+            </label>
+          </div>
+
           <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
 
           <label>

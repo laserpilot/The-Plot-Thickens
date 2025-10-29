@@ -622,6 +622,71 @@ function initializeControls() {
     }
   }
 
+  // Focus/blur effect controls
+  const focusBlurCheckbox = document.getElementById('focus-blur-enabled');
+  if (focusBlurCheckbox) {
+    focusBlurCheckbox.addEventListener('change', (e) => {
+      focusBlurEnabled = e.target.checked;
+
+      // Show/hide controls
+      const controlsPanel = document.getElementById('focus-blur-controls');
+      if (controlsPanel) {
+        controlsPanel.style.display = focusBlurEnabled ? 'block' : 'none';
+      }
+
+      // Warn if not in global field mode
+      if (focusBlurEnabled && shadingMode !== 'global-field') {
+        alert('Focus/Blur effect requires Global Field shading mode. Please enable it in the Hatch Gradient controls.');
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+    });
+  }
+
+  setupSlider('focus-noise-min', (value) => {
+    focusNoiseMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-noise-max', (value) => {
+    focusNoiseMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-freq-min', (value) => {
+    focusFreqMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-freq-max', (value) => {
+    focusFreqMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-spacing-min', (value) => {
+    focusSpacingMin = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('focus-spacing-max', (value) => {
+    focusSpacingMax = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
   // Envelope preset selector
   const envelopeSelect = document.getElementById('envelope-preset');
   if (envelopeSelect) {
@@ -1420,12 +1485,31 @@ async function prepareExport() {
       let leftOutline = null;
       let rightOutline = null;
 
+      // Calculate effective base offset (modulated by focus/blur if enabled)
+      let effectiveBaseOffset = baseOffset;
+
+      if (focusBlurEnabled && shadingMode === 'global-field' && densityField) {
+        if (densityFieldNeedsUpdate) {
+          updateDensityField();
+        }
+
+        const samplePoints = highQualityPoints.slice(0, Math.min(20, highQualityPoints.length));
+        let fieldSum = 0;
+        for (let pt of samplePoints) {
+          fieldSum += densityField.sample(pt.x, pt.y);
+        }
+        const avgFieldValue = fieldSum / samplePoints.length;
+
+        const spacingMult = focusSpacingMin + avgFieldValue * (focusSpacingMax - focusSpacingMin);
+        effectiveBaseOffset = baseOffset * spacingMult;
+      }
+
       // If outlines requested, generate outermost offset paths separately
       // This ensures they're always present regardless of stripe pattern
       if (addOutlineStroke && passes > 0) {
         // Generate right outline (furthest right)
         const rightPassIndex = Math.floor((passes - 1) / 2) + 1;
-        const rightDistance = rightPassIndex * baseOffset;
+        const rightDistance = rightPassIndex * effectiveBaseOffset; // Use effective offset
         let rightPoints;
         if (useNormalOffset) {
           rightPoints = generateOffsetPath(path.d, rightDistance, noise, seed + passes, path.id, envelope, true, noiseFrequency);
@@ -1439,7 +1523,7 @@ async function prepareExport() {
         // Generate left outline (furthest left) if we have multiple passes
         if (passes > 1) {
           const leftPassIndex = Math.floor((passes - 2) / 2) + 1 + 1;
-          const leftDistance = -leftPassIndex * baseOffset;
+          const leftDistance = -leftPassIndex * effectiveBaseOffset; // Use effective offset
           let leftPoints;
           if (useNormalOffset) {
             leftPoints = generateOffsetPath(path.d, leftDistance, noise, seed + passes + 1, path.id, envelope, true, noiseFrequency);
@@ -1467,14 +1551,25 @@ async function prepareExport() {
         const isRight = i % 2 === 0; // Alternate sides
         const direction = isRight ? 1 : -1;
 
-        const offsetDistance = direction * passIndex * baseOffset;
+        const offsetDistance = direction * passIndex * effectiveBaseOffset; // Use effective offset
         const passSeed = seed + i;
 
         // Generate offset - use normal mode if enabled, otherwise legacy (points-based)
         let offsetPoints;
         if (useNormalOffset) {
-          // Normal mode: pass path data string directly with noise frequency
-          offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+          // Build noise field params if enabled
+          const noiseFieldParams = (focusBlurEnabled && shadingMode === 'global-field' && densityField) ? {
+            minAmp: focusNoiseMin,
+            maxAmp: focusNoiseMax,
+            minFreq: focusFreqMin,
+            maxFreq: focusFreqMax
+          } : null;
+
+          offsetPoints = generateOffsetPath(
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
+            densityField && focusBlurEnabled ? densityField : null,
+            noiseFieldParams
+          );
         } else {
           // Legacy mode: use high-quality points
           offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed, path.id, null, false);

@@ -60,6 +60,15 @@ let shadingMode = 'per-surface'; // 'per-surface' or 'global-field'
 let densityField = null; // Global density field instance
 let densityFieldNeedsUpdate = true; // Dirty flag for density field
 
+// Focus/blur effect (light-based noise modulation)
+let focusBlurEnabled = false;
+let focusNoiseMin = 0.05;       // Noise amplitude in lit areas
+let focusNoiseMax = 0.5;        // Noise amplitude in shadows
+let focusFreqMin = 80;          // Noise frequency in lit areas (calm)
+let focusFreqMax = 10;          // Noise frequency in shadows (chaotic)
+let focusSpacingMin = 1.0;      // Spacing multiplier in lit areas
+let focusSpacingMax = 2.0;      // Spacing multiplier in shadows
+
 // Organic crosshatch state
 let organicHatchEnabled = false;
 let hatchWiggle = 0.5;
@@ -504,18 +513,51 @@ function renderOffsetPreview() {
       // Offset fill (existing code)
       const maxPreviewPasses = Math.min(weight, 10); // Cap at 10 for performance
 
+      // Calculate effective base offset (modulated by focus/blur if enabled)
+      let effectiveBaseOffset = baseOffset;
+
+      if (focusBlurEnabled && shadingMode === 'global-field' && densityField) {
+        // Update density field if needed
+        if (densityFieldNeedsUpdate) {
+          updateDensityField();
+        }
+
+        // Sample field along centerline
+        const samplePoints = path.points.slice(0, Math.min(20, path.points.length));
+        let fieldSum = 0;
+        for (let pt of samplePoints) {
+          fieldSum += densityField.sample(pt.x, pt.y);
+        }
+        const avgFieldValue = fieldSum / samplePoints.length; // 0-1
+
+        // Modulate spacing based on field value
+        const spacingMult = focusSpacingMin + avgFieldValue * (focusSpacingMax - focusSpacingMin);
+        effectiveBaseOffset = baseOffset * spacingMult;
+      }
+
       for (let i = 0; i < maxPreviewPasses; i++) {
         const passIndex = Math.floor(i / 2) + 1;
         const isRight = i % 2 === 0;
         const direction = isRight ? 1 : -1;
-        const offsetDistance = direction * passIndex * baseOffset;
+        const offsetDistance = direction * passIndex * effectiveBaseOffset; // Use effective offset
         const passSeed = seed + i;
 
         let offsetPoints;
 
         if (useNormalOffset) {
-          // Normal mode: use path data string
-          offsetPoints = generateOffsetPath(path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency);
+          // Build noise field params if enabled
+          const noiseFieldParams = (focusBlurEnabled && shadingMode === 'global-field' && densityField) ? {
+            minAmp: focusNoiseMin,
+            maxAmp: focusNoiseMax,
+            minFreq: focusFreqMin,
+            maxFreq: focusFreqMax
+          } : null;
+
+          offsetPoints = generateOffsetPath(
+            path.d, offsetDistance, noise, passSeed, path.id, envelope, true, noiseFrequency,
+            densityField && focusBlurEnabled ? densityField : null,
+            noiseFieldParams
+          );
         } else {
           // Legacy mode: use points (low quality for speed)
           const sampledPoints = path.points.filter((_, idx) => idx % 3 === 0); // Subsample for speed

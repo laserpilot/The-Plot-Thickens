@@ -97,9 +97,11 @@ function generateOffsetPathLegacy(pathPoints, offset, noise, seed) {
  * @param {string} pathId - Path identifier for envelope calculation
  * @param {Function} offsetEnvelope - Optional envelope function (pathId, t) => multiplier (default: 1.0)
  * @param {number} noiseFrequency - Noise wavelength in mm (default: 50 for smooth variation)
+ * @param {Object} noiseField - Optional density field for position-dependent noise
+ * @param {Object} noiseFieldParams - Optional params {minAmp, maxAmp, minFreq, maxFreq}
  * @returns {Array} Array of offset points
  */
-function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', offsetEnvelope = null, noiseFrequency = 50) {
+function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', offsetEnvelope = null, noiseFrequency = 50, noiseField = null, noiseFieldParams = null) {
   if (!pathData || typeof pathData !== 'string') {
     return null;
   }
@@ -185,7 +187,17 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
 
       // Apply noise modulated along the normal
       // Lower frequency = smoother (50mm+), higher = more texture (5-10mm)
-      const noiseValue = noise > 0 ? simpleNoise(arcLength / noiseFrequency, seed) * noise : 0;
+      let effectiveNoise = noise;
+      let effectiveFrequency = noiseFrequency;
+
+      // If noise field is provided, modulate based on position
+      if (noiseField && noiseFieldParams) {
+        const fieldValue = noiseField.sample(point.x, point.y); // 0-1
+        effectiveNoise = noiseFieldParams.minAmp + fieldValue * (noiseFieldParams.maxAmp - noiseFieldParams.minAmp);
+        effectiveFrequency = noiseFieldParams.minFreq + fieldValue * (noiseFieldParams.maxFreq - noiseFieldParams.minFreq);
+      }
+
+      const noiseValue = effectiveNoise > 0 ? simpleNoise(arcLength / effectiveFrequency, seed) * effectiveNoise : 0;
       const totalOffset = (offset + noiseValue) * envelopeMultiplier;
 
       // Offset point along normal
@@ -214,12 +226,15 @@ function generateOffsetPathNormal(pathData, offset, noise, seed, pathId = '', of
  * @param {Function} offsetEnvelope - Envelope function (normal mode only)
  * @param {boolean} useNormalMode - Whether to use normal-based offset (default: false for backward compat)
  * @param {number} noiseFrequency - Noise wavelength in mm (normal mode only, default: 50)
+ * @param {Object} noiseField - Optional density field for position-dependent noise (normal mode only)
+ * @param {Object} noiseFieldParams - Optional params {minAmp, maxAmp, minFreq, maxFreq} (normal mode only)
  * @returns {Array} Offset points
  */
-function generateOffsetPath(pathPointsOrData, offset, noise, seed, pathId = '', offsetEnvelope = null, useNormalMode = false, noiseFrequency = 50) {
+function generateOffsetPath(pathPointsOrData, offset, noise, seed, pathId = '', offsetEnvelope = null, useNormalMode = false, noiseFrequency = 50, noiseField = null, noiseFieldParams = null) {
   if (useNormalMode && typeof pathPointsOrData === 'string') {
-    return generateOffsetPathNormal(pathPointsOrData, offset, noise, seed, pathId, offsetEnvelope, noiseFrequency);
+    return generateOffsetPathNormal(pathPointsOrData, offset, noise, seed, pathId, offsetEnvelope, noiseFrequency, noiseField, noiseFieldParams);
   } else {
+    // Legacy mode ignores noise field (not supported)
     return generateOffsetPathLegacy(pathPointsOrData, offset, noise, seed);
   }
 }

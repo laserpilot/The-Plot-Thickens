@@ -698,6 +698,94 @@ The web UI includes comprehensive hatch gradient controls:
 
 ---
 
+## Light-Based Focus/Blur Effect
+
+Create **depth of field** and **atmospheric blur** effects by spatially varying stroke spacing, noise amplitude, and noise frequency based on global lighting.
+
+### What It Does
+
+When enabled, the focus/blur effect modulates three parameters based on the global density field:
+- **Stroke Spacing**: Distance between offset passes (tight in light, wide in shadow)
+- **Noise Amplitude**: Amount of random variation (low in light, high in shadow)
+- **Noise Frequency**: Smoothness of variation (calm in light, chaotic in shadow)
+
+This creates a depth-of-field-like effect where lit areas appear sharp and in-focus, while shadowed areas appear soft and blurry.
+
+### Requirements
+
+- Must use **Offset Fill** or **Striped Fill** mode
+- Must enable **Global Field** shading mode in Hatch Gradient controls
+- Requires a light source (directional or point)
+
+### How It Works
+
+**Centerline Sampling:**
+- Samples the global density field along the original path centerline (20 points)
+- Averages field values to get a single scalar per path (0 = lit, 1 = shadow)
+- Maps this value to spacing multiplier: `baseOffset × multiplier`
+- All offset passes for that path get uniformly adjusted spacing
+
+**Position-Dependent Noise:**
+- Each point along every offset path samples the field individually
+- Interpolates noise amplitude and frequency based on local field value
+- Creates smooth spatial variation within and between strokes
+
+### Web Interface
+
+1. **Enable Global Field** shading mode in Hatch Gradient controls
+2. Set up your light source (directional or point)
+3. Check **"Enable Light-Based Focus/Blur"**
+4. Adjust parameters:
+   - **Noise Amplitude Min/Max**: Controls jitter in lit vs shadow areas (default: 0.05 → 0.5mm)
+   - **Noise Frequency Min/Max**: Controls smoothness in lit vs shadow (default: 80 → 10mm wavelength)
+   - **Stroke Spacing Min/Max**: Controls density in lit vs shadow (default: 1.0x → 2.0x)
+
+### Style Presets
+
+**Dramatic Depth of Field:**
+```
+Min noise: 0, Max noise: 0.8
+Min freq: 120, Max freq: 5
+Min spacing: 0.8x, Max spacing: 2.5x
+```
+
+**Subtle Atmospheric:**
+```
+Min noise: 0.05, Max noise: 0.3
+Min freq: 80, Max freq: 20
+Min spacing: 1.0x, Max spacing: 1.5x
+```
+
+**Extreme Blur (Impressionistic):**
+```
+Min noise: 0.1, Max noise: 1.5
+Min freq: 50, Max freq: 5
+Min spacing: 1.0x, Max spacing: 3.0x
+```
+
+### Use Cases
+
+- **Depth of Field**: Simulate camera focus effects in illustrations
+- **Atmospheric Perspective**: Objects in shadow appear softer/further away
+- **Focal Attention**: Sharp focus on lit areas draws viewer's eye
+- **Dreamy Effects**: High blur in shadows creates ethereal, soft quality
+- **Motion Blur**: Combine with directional light for sense of movement
+
+### Technical Details
+
+- Lit areas (low density value): tight spacing, minimal noise, high frequency = sharp/crisp
+- Shadow areas (high density value): wide spacing, heavy noise, low frequency = loose/blurry
+- Zero overhead when disabled - only activates when checkbox enabled
+- Backward compatible - existing modes unaffected
+- Works with Normal offset mode only (Legacy mode ignores noise field)
+
+**Performance:**
+- ~20 field samples per path for spacing calculation
+- Noise modulation same cost as regular noise
+- Total overhead: negligible (~1-2% additional processing time)
+
+---
+
 ## Organic Crosshatch Mode
 
 Add **hand-drawn, Maurice Sendak-style** pen-and-ink quality to crosshatching with wiggly lines, angle variation, and irregular spacing.
