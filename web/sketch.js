@@ -56,6 +56,9 @@ let gradientHatchAngles = [0, 45, 90]; // Gradient hatch angles
 let gradientHatchSpacing = 1; // Base spacing for gradient hatches
 let shadowBias = 0.5; // Bias hatch origin toward shadow edge (0 = centered, 1 = fully shifted)
 let shadowDebugMode = false; // Visualize shadow/highlight edges for debugging
+let shadingMode = 'per-surface'; // 'per-surface' or 'global-field'
+let densityField = null; // Global density field instance
+let densityFieldNeedsUpdate = true; // Dirty flag for density field
 
 // Organic crosshatch state
 let organicHatchEnabled = false;
@@ -171,6 +174,11 @@ function draw() {
     // Draw point light if in point mode and hatch gradient fill
     if (fillMode === 'hatch-gradient' && lightMode === 'point') {
       drawPointLight();
+    }
+
+    // Draw density field debug overlay if enabled
+    if (fillMode === 'hatch-gradient' && shadingMode === 'global-field' && shadowDebugMode && densityField) {
+      drawDensityFieldDebug();
     }
 
     // Draw focus window if enabled
@@ -460,12 +468,20 @@ function renderOffsetPreview() {
         curvatureStrength: gradientDensityCurvatureStrength
       };
 
+      // Update density field if needed
+      if (shadingMode === 'global-field' && densityFieldNeedsUpdate) {
+        updateDensityField();
+      }
+
+      // Pass density field if in global field mode
+      const fieldToUse = shadingMode === 'global-field' ? densityField : null;
+
       const hatchPaths = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
         noise, seed, path.id, envelope, noiseFrequency, organicOptions, false,
         lightMode, lightX, lightY, falloffRadius, gradientDensityOptions,
-        path.curvatureScore || 0, shadowBias
+        path.curvatureScore || 0, shadowBias, fieldToUse
       );
 
       hatchPaths.forEach(hatchPath => {
@@ -893,6 +909,69 @@ function drawPointLight() {
   textStyle(NORMAL);
   fill(200, 150, 0);
   text(`${lightPosX.toFixed(0)}%, ${lightPosY.toFixed(0)}%`, lightX, lightY + falloffRadius + 15);
+}
+
+/**
+ * Initialize density field for global shading mode
+ */
+function initializeDensityField() {
+  if (!svgData) return;
+
+  const width = svgData.viewBox.width;
+  const height = svgData.viewBox.height;
+  const resolution = 128; // 128x128 grid
+
+  densityField = new DensityField(width, height, resolution);
+  densityFieldNeedsUpdate = true;
+}
+
+/**
+ * Update density field based on current lighting settings
+ */
+function updateDensityField() {
+  if (!densityField || !svgData) return;
+
+  const minDensity = gradientBaseWeight;
+  const maxDensity = Math.min(1.0, gradientBaseWeight + lightStrength);
+
+  if (lightMode === 'point') {
+    // Convert light position from % to user units
+    const lightX = (lightPosX / 100) * svgData.viewBox.width;
+    const lightY = (lightPosY / 100) * svgData.viewBox.height;
+
+    densityField.computeFromPointLight(lightX, lightY, falloffRadius, minDensity, maxDensity);
+  } else {
+    // Directional light
+    densityField.computeFromDirectionalLight(lightAngle, minDensity, maxDensity);
+  }
+
+  densityFieldNeedsUpdate = false;
+}
+
+/**
+ * Draw density field debug visualization
+ */
+function drawDensityFieldDebug() {
+  if (!densityField) return;
+
+  // Update field if needed
+  if (densityFieldNeedsUpdate) {
+    updateDensityField();
+  }
+
+  // Draw field with semi-transparent overlay
+  // In p5 global mode, pass an object with the p5 drawing functions
+  const p5Context = {
+    push: push.bind(this),
+    pop: pop.bind(this),
+    noStroke: noStroke.bind(this),
+    fill: fill.bind(this),
+    rect: rect.bind(this),
+    stroke: stroke.bind(this),
+    strokeWeight: strokeWeight.bind(this),
+    line: line.bind(this)
+  };
+  densityField.drawDebug(p5Context, 100);
 }
 
 /**
@@ -1327,6 +1406,9 @@ async function processPaths() {
     updateStatus(`Processed ${svgData.paths.length} paths in ${totalTime}s`);
     showProcessingProgress(false);
     pathsProcessed = true;
+
+    // Initialize density field for global shading mode
+    initializeDensityField();
 
     // Invalidate weight cache for new SVG data
     invalidateWeightCache();

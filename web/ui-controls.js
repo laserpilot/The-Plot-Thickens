@@ -360,6 +360,7 @@ function initializeControls() {
         pointControls.style.display = lightMode === 'point' ? 'block' : 'none';
       }
 
+      densityFieldNeedsUpdate = true; // Mark density field for update
       updateStatus(lightMode === 'point' ? 'Point light mode' : 'Directional light mode');
       needsRedraw = true;
       redraw();
@@ -371,6 +372,7 @@ function initializeControls() {
   // Hatch gradient controls
   setupSlider('light-angle', (value) => {
     lightAngle = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -379,6 +381,7 @@ function initializeControls() {
 
   setupSlider('light-pos-x', (value) => {
     lightPosX = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -387,6 +390,7 @@ function initializeControls() {
 
   setupSlider('light-pos-y', (value) => {
     lightPosY = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -395,6 +399,7 @@ function initializeControls() {
 
   setupSlider('light-falloff-radius', (value) => {
     falloffRadius = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -403,6 +408,7 @@ function initializeControls() {
 
   setupSlider('light-strength', (value) => {
     lightStrength = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -411,6 +417,7 @@ function initializeControls() {
 
   setupSlider('gradient-base-weight', (value) => {
     gradientBaseWeight = value;
+    densityFieldNeedsUpdate = true; // Mark density field for update
     needsRedraw = true;
     redraw();
     updateCLICommand();
@@ -560,6 +567,30 @@ function initializeControls() {
       shadowDebugMode = e.target.checked;
       needsRedraw = true;
       redraw();
+    });
+  }
+
+  // Shading mode selector
+  const shadingModeSelect = document.getElementById('shading-mode');
+  if (shadingModeSelect) {
+    shadingModeSelect.addEventListener('change', (e) => {
+      shadingMode = e.target.value;
+
+      // Show/hide shadow bias control based on mode
+      const shadowBiasControl = document.getElementById('shadow-bias-control');
+      if (shadowBiasControl) {
+        shadowBiasControl.style.display = shadingMode === 'per-surface' ? 'block' : 'none';
+      }
+
+      // Mark density field as needing update
+      if (shadingMode === 'global-field') {
+        densityFieldNeedsUpdate = true;
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateGradientPreview();
     });
   }
 
@@ -1326,12 +1357,20 @@ async function prepareExport() {
         curvatureStrength: gradientDensityCurvatureStrength
       };
 
+      // Update density field if needed before export
+      if (shadingMode === 'global-field' && densityFieldNeedsUpdate) {
+        updateDensityField();
+      }
+
+      // Pass density field if in global field mode
+      const fieldToUse = shadingMode === 'global-field' ? densityField : null;
+
       const gradientResult = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
         noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke,
         lightMode, lightX, lightY, falloffRadius, gradientDensityOptions,
-        path.curvatureScore || 0, shadowBias
+        path.curvatureScore || 0, shadowBias, fieldToUse
       );
 
       // Handle result (either array or {fills, outlines} object)

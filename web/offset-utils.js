@@ -1199,7 +1199,8 @@ function generateHatchGradientFill(
   falloffRadius = 100,
   densityOptions = {},
   curvatureScore = 0,
-  shadowBias = 0.5
+  shadowBias = 0.5,
+  densityField = null
 ) {
   // Extract organic options with defaults
   const {
@@ -1343,51 +1344,63 @@ function generateHatchGradientFill(
           Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
         );
 
-        // NEW: Calculate highlight factor (which side faces the light)
-        let highlightFactor; // 0 = shadow side, 1 = highlight side
+        // Calculate density/weight based on mode
+        let weight;
+        let shadowFactor; // Used for shadow bias calculation
 
-        if (lightMode === 'point') {
-          const toLightX = lightPosX - sample.x;
-          const toLightY = lightPosY - sample.y;
-          const dist = Math.hypot(toLightX, toLightY);
+        if (densityField) {
+          // GLOBAL FIELD MODE: Sample density from global field
+          const densityValue = densityField.sample(sample.x, sample.y);
+          weight = Math.max(0.05, Math.min(1.0, densityValue));
+          shadowFactor = densityValue - baseWeight; // Approximate shadow factor for bias
+          shadowFactor = Math.max(0, Math.min(1, shadowFactor / lightStrength));
+        } else {
+          // PER-SURFACE MODE: Calculate highlight factor (which side faces the light)
+          let highlightFactor; // 0 = shadow side, 1 = highlight side
 
-          if (dist < 0.001) {
-            highlightFactor = 1.0; // At light position, fully lit
+          if (lightMode === 'point') {
+            const toLightX = lightPosX - sample.x;
+            const toLightY = lightPosY - sample.y;
+            const dist = Math.hypot(toLightX, toLightY);
+
+            if (dist < 0.001) {
+              highlightFactor = 1.0; // At light position, fully lit
+            } else {
+              const lightDirX = toLightX / dist;
+              const lightDirY = toLightY / dist;
+
+              // Dot product: +1 = facing light (highlight), -1 = facing away (shadow)
+              const dot = sample.nx * lightDirX + sample.ny * lightDirY;
+
+              // Map to [0,1]: 1 = highlight, 0 = shadow
+              highlightFactor = (dot + 1) * 0.5;
+
+              // Optional: Apply softness for smoother transitions
+              if (shadowSoftness > 0) {
+                highlightFactor = Math.pow(highlightFactor, 1 + shadowSoftness);
+              }
+
+              // Optional: Apply distance falloff
+              const distanceFalloff = 1 / (1 + dist / falloffRadius);
+              highlightFactor *= distanceFalloff;
+            }
           } else {
-            const lightDirX = toLightX / dist;
-            const lightDirY = toLightY / dist;
-
-            // Dot product: +1 = facing light (highlight), -1 = facing away (shadow)
-            const dot = sample.nx * lightDirX + sample.ny * lightDirY;
-
-            // Map to [0,1]: 1 = highlight, 0 = shadow
+            // Directional mode
+            const dot = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
             highlightFactor = (dot + 1) * 0.5;
 
-            // Optional: Apply softness for smoother transitions
             if (shadowSoftness > 0) {
               highlightFactor = Math.pow(highlightFactor, 1 + shadowSoftness);
             }
-
-            // Optional: Apply distance falloff
-            const distanceFalloff = 1 / (1 + dist / falloffRadius);
-            highlightFactor *= distanceFalloff;
           }
-        } else {
-          // Directional mode
-          const dot = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
-          highlightFactor = (dot + 1) * 0.5;
 
-          if (shadowSoftness > 0) {
-            highlightFactor = Math.pow(highlightFactor, 1 + shadowSoftness);
-          }
+          // Shadow factor: inverse of highlight
+          shadowFactor = 1 - highlightFactor;
+
+          // Density: sparse on highlight, dense on shadow
+          const density = baseWeight + shadowFactor * lightStrength;
+          weight = Math.max(0.05, Math.min(1.0, density));
         }
-
-        // Shadow factor: inverse of highlight
-        const shadowFactor = 1 - highlightFactor;
-
-        // Density: sparse on highlight, dense on shadow
-        const density = baseWeight + shadowFactor * lightStrength;
-        const weight = Math.max(0.05, Math.min(1.0, density));
 
         // Skip if weight is too low
         const epsilon = 0.05;
@@ -1396,9 +1409,10 @@ function generateHatchGradientFill(
           continue;
         }
 
-        // NEW: Bias hatch origin toward shadow edge
-        // This shifts more hatch lines to the shadow side
-        const shadowOffset = sample.halfWidth * shadowFactor * shadowBias;
+        // Bias hatch origin toward shadow edge (only in per-surface mode)
+        // In global field mode, shadow bias doesn't make sense
+        const effectiveShadowBias = densityField ? 0 : shadowBias;
+        const shadowOffset = sample.halfWidth * shadowFactor * effectiveShadowBias;
         let sampleX = sample.x - sample.nx * shadowOffset;
         let sampleY = sample.y - sample.ny * shadowOffset;
 

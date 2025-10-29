@@ -466,18 +466,28 @@
             </label>
 
             <label>
+              Shading Mode:
+              <select id="shading-mode">
+                <option value="per-surface" selected>Per-Surface (independent)</option>
+                <option value="global-field">Global Field (spatial coherence)</option>
+              </select>
+              <span class="hint-icon"
+                title="Per-Surface: each path calculates lighting independently. Global Field: all paths sample from a shared density field for consistent light-to-shadow across the scene.">?</span>
+            </label>
+
+            <label id="shadow-bias-control">
               Shadow Bias (edge shift):
               <input type="range" id="shadow-bias" min="0" max="1" step="0.05" value="0.5">
               <span id="shadow-bias-value">0.50</span>
               <span class="hint-icon"
-                title="How far to shift hatch lines toward shadow edge. 0 = centered (uniform), 1 = fully shifted to shadow side.">?</span>
+                title="How far to shift hatch lines toward shadow edge. 0 = centered (uniform), 1 = fully shifted to shadow side. Only applies in Per-Surface mode.">?</span>
             </label>
 
             <label>
               <input type="checkbox" id="shadow-debug-mode">
               Debug: Show Shadow/Highlight Edges
               <span class="hint-icon"
-                title="Visualize which edges face the light (blue = highlight, red = shadow). Helps verify gradient orientation.">?</span>
+                title="Per-Surface: visualize which edges face the light (blue = highlight, red = shadow). Global Field: overlay the density field with color ramp.">?</span>
             </label>
 
             <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
@@ -934,6 +944,7 @@
   <!-- Scripts -->
   <script src="offset-utils.js"></script>
   <script src="attractor.js"></script>
+  <script src="density-field.js"></script>
   <script src="svg-parser.js"></script>
   <script src="param-preview.js"></script>
   <script src="sketch.js"></script>

@@ -12,7 +12,16 @@ This tool manipulates SVG line weights by duplicating and offsetting paths with 
 - ✅ **Phase 2**: Path Length-Based Weight (complete)
 - ✅ **Phase 3**: Attractor-Based Weight System (complete)
 - ✅ **Phase 4**: Normal-Based Offsets with Taper (complete)
-- ✅ **Crosshatch Fill**: Alternative fill mode with angled hatches (complete)
+- ✅ **Fill Modes**: Multiple fill strategies (complete)
+  - **Offset Fill**: Traditional parallel offset passes
+  - **Striped Fill**: Alternating filled/empty pattern
+  - **Crosshatch Fill**: Angled hatch fills with envelope support
+  - **Hatch Gradient Fill**: Light-responsive directional shading
+- ✅ **Hatch Gradient Features**: (complete)
+  - Point & Directional lighting modes
+  - Global field shading for spatial coherence
+  - Per-surface shading for individual control
+- ✅ **Organic Crosshatch**: Hand-drawn pen-and-ink style effects (complete)
 - ✅ **Performance**: Optimized for large SVG files (200+ paths)
 - ⏳ **Phase 5**: Combined System (pending)
 
@@ -444,6 +453,248 @@ The web interface includes crosshatch controls:
 - Noise affects hatch spacing (creates organic variation in density)
 - Each angle pass generates separate hatch segments
 - Compatible with attractor-based weighting (ribbon width varies by influence)
+
+---
+
+## Striped Fill Mode
+
+A simple fill mode that creates alternating patterns of filled and empty passes, perfect for creating striped textures or reducing ink usage while maintaining visual weight.
+
+### What It Does
+
+Instead of drawing all offset passes, striped mode draws N consecutive passes, then skips M passes, repeating this pattern. This creates a striped appearance while using less ink than full offset fills.
+
+### CLI Usage
+
+```bash
+# Basic striped pattern (1 filled, 1 empty)
+node process-svg.js input.svg output.svg \
+  --fill-mode striped \
+  --stripe-filled 1 \
+  --stripe-empty 1
+
+# Heavy stripes (2 filled, 1 empty)
+node process-svg.js input.svg output.svg \
+  --fill-mode striped \
+  --stripe-filled 2 \
+  --stripe-empty 1
+
+# Sparse stripes (1 filled, 3 empty)
+node process-svg.js input.svg output.svg \
+  --fill-mode striped \
+  --stripe-filled 1 \
+  --stripe-empty 3
+```
+
+### Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--fill-mode striped` | Enable striped fill | - |
+| `--stripe-filled` | Number of consecutive passes to draw | `1` |
+| `--stripe-empty` | Number of consecutive passes to skip | `1` |
+| `--add-outline` | Add outline strokes (works with striped mode) | `false` |
+
+### Web Interface
+
+The web UI includes striped fill controls:
+1. **Fill Mode**: Select "Striped" from dropdown
+2. **Filled Passes** slider (1-5)
+3. **Empty Passes** slider (1-5)
+4. **Pattern Preview**: Shows pattern description (e.g., "2 filled, 1 empty (repeating pattern)")
+5. **Add Outline Stroke**: Works with striped mode to add boundary paths
+
+### Use Cases
+
+- **Textured fills** - Create striped patterns instead of solid fills
+- **Ink saving** - Reduce plotting time and ink usage
+- **Visual weight** - Maintain visual presence with less actual ink
+- **Striped effects** - Intentional stripe patterns for artistic effect
+
+---
+
+## Hatch Gradient Fill Mode
+
+Create **directional shading** effects with light-responsive hatch density. Perfect for creating the illusion of depth, volume, and lighting in pen plotter artwork.
+
+### What It Does
+
+Hatch gradient mode fills paths with angled hatches where the density (spacing between lines) varies based on simulated lighting. This creates shading effects similar to traditional pen-and-ink techniques.
+
+**Key Features:**
+- **Directional & Point Lighting** - Choose between directional light (like sunlight) or point light (like a lamp)
+- **Shadow-Side Density** - Hatches become denser on surfaces facing away from light (shadows), sparse on lit surfaces (highlights)
+- **Spatial Coherence** - Global field mode ensures consistent light-to-shadow transitions across all paths
+- **Per-Surface Mode** - Each path calculates lighting independently for precise surface-level control
+- **Multiple Hatch Angles** - Combine multiple angles (single, cross, triple) for rich crosshatching
+
+### Lighting Modes
+
+**Directional Light** (default)
+- Simulates parallel light rays (like sunlight)
+- Set light angle in degrees (0° = from right, 90° = from bottom, etc.)
+- Consistent direction across entire image
+- Great for: outdoor scenes, general shading, architectural drawings
+
+**Point Light**
+- Simulates radial light from a specific position
+- Set light position as X/Y percentage of canvas
+- Adjustable falloff radius controls how far light spreads
+- Great for: focal effects, dramatic lighting, simulating a lamp or spotlight
+
+### Shading Modes
+
+**Per-Surface Shading**
+- Each path calculates lighting based on its own surface normal
+- Surface normals face perpendicular to path direction
+- Surfaces facing light = sparse hatches (highlight)
+- Surfaces facing away = dense hatches (shadow)
+- Shadow bias shifts hatch lines toward shadow edge for enhanced gradient
+- Best for: individual objects with clear surface orientation
+
+**Global Field Shading** ⭐ (Recommended for scenes)
+- Precomputes a global density field across entire viewport
+- All paths sample from same underlying gradient
+- Creates spatially coherent light-to-shadow transitions
+- Paths act as "transparent windows" revealing the same lighting
+- Shadow bias disabled (not needed with global coherence)
+- Best for: complex scenes, multiple objects, consistent atmospheric lighting
+
+### CLI Usage
+
+```bash
+# Basic directional light gradient (45° angle)
+node process-svg.js input.svg output.svg \
+  --fill-mode hatch-gradient \
+  --light-angle 45 \
+  --hatch-spacing 1.5
+
+# Point light from top-left corner
+node process-svg.js input.svg output.svg \
+  --fill-mode hatch-gradient \
+  --light-mode point \
+  --light-pos-x 25 \
+  --light-pos-y 25 \
+  --falloff-radius 100 \
+  --hatch-spacing 1
+
+# Triple-angle crosshatch with strong light contrast
+node process-svg.js input.svg output.svg \
+  --fill-mode hatch-gradient \
+  --hatch-angles "0,45,90" \
+  --light-angle 135 \
+  --light-strength 0.9 \
+  --base-weight 0.1 \
+  --hatch-spacing 1.2
+
+# Soft, subtle shading
+node process-svg.js input.svg output.svg \
+  --fill-mode hatch-gradient \
+  --light-angle 90 \
+  --light-strength 0.5 \
+  --base-weight 0.4 \
+  --shadow-softness 0.8 \
+  --hatch-spacing 2
+```
+
+### Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--fill-mode hatch-gradient` | Enable hatch gradient fill | - |
+| `--light-mode` | `directional` or `point` | `directional` |
+| `--light-angle` | Light direction in degrees (directional mode) | `45` |
+| `--light-pos-x` | Light X position in % (point mode) | `25` |
+| `--light-pos-y` | Light Y position in % (point mode) | `25` |
+| `--falloff-radius` | Distance where light drops to 50% (point mode, mm) | `100` |
+| `--light-strength` | Light influence strength (0-1) | `0.8` |
+| `--base-weight` | Minimum density in highlights (0-0.5) | `0.2` |
+| `--shadow-softness` | Transition smoothness (0-1) | `0.5` |
+| `--shadow-bias` | Shift hatches toward shadow (0-1, per-surface only) | `0.5` |
+| `--hatch-angles` | Comma-separated angles (e.g., "0,45,90") | `"0,45,90"` |
+| `--hatch-spacing` | Base spacing between hatches (mm) | `1` |
+
+### Web Interface
+
+The web UI includes comprehensive hatch gradient controls:
+
+1. **Fill Mode**: Select "Hatch Gradient" from dropdown
+2. **Light Mode**: Toggle between Directional and Point light
+3. **Directional Controls** (when directional):
+   - Light Angle slider (0-360°)
+4. **Point Light Controls** (when point):
+   - Light Position X/Y sliders (percentage of canvas)
+   - Falloff Radius slider
+   - Visual overlay showing light position and falloff radius
+5. **Shading Settings**:
+   - Light Strength (0-1)
+   - Base Density (minimum in highlights)
+   - Shadow Softness (transition smoothness)
+6. **Shading Mode** ⭐:
+   - **Per-Surface**: Independent calculation per path
+   - **Global Field**: Spatially coherent scene-level lighting
+7. **Shadow Bias** (per-surface mode only):
+   - Shifts hatch origin toward shadow edge
+8. **Debug Mode**:
+   - Per-Surface: Shows highlight (blue) and shadow (red) edges
+   - Global Field: Displays density field overlay with color ramp
+9. **Hatch Preset**: Single, Cross, Triple, or Custom angles
+10. **Hatch Spacing** slider
+
+### Style Examples
+
+**Classic Crosshatch Shading:**
+```
+--fill-mode hatch-gradient --hatch-angles "45,-45"
+--light-angle 45 --light-strength 0.8 --hatch-spacing 1.5
+```
+
+**Soft Atmospheric Lighting:**
+```
+--fill-mode hatch-gradient --light-mode point
+--light-pos-x 30 --light-pos-y 30 --falloff-radius 150
+--light-strength 0.6 --shadow-softness 0.9 --base-weight 0.3
+```
+
+**High Contrast Dramatic Lighting:**
+```
+--fill-mode hatch-gradient --light-angle 90
+--light-strength 1.0 --base-weight 0.05 --shadow-softness 0.2
+```
+
+**Perpendicular Hatching (Woodcut Style):**
+```
+--fill-mode hatch-gradient --hatch-angles "90"
+--light-angle 45 --hatch-spacing 1 --light-strength 0.9
+```
+
+### Use Cases
+
+- **Volume & Form** - Create illusion of 3D form on 2D paths
+- **Atmospheric Perspective** - Suggest depth with consistent lighting
+- **Focal Points** - Use point light to draw attention
+- **Technical Illustration** - Show surface orientation and form
+- **Artistic Shading** - Traditional pen-and-ink rendering techniques
+
+### Technical Details
+
+**Per-Surface Mode:**
+- Calculates surface normal for each point along path centerline
+- Dot product between surface normal and light direction determines density
+- Shadow bias offsets hatch starting point toward shadow edge
+- Each path shaded independently
+
+**Global Field Mode:**
+- Precomputes 128×128 density grid across viewport
+- Bilinear interpolation for smooth sampling
+- All paths sample same field = spatial coherence
+- Updates automatically when light settings change
+- Visualize with debug mode (blue=highlight, yellow, red=shadow)
+
+**Performance:**
+- Global field computation: ~1-2ms for 128×128 grid
+- Field cached and reused until lighting changes
+- Negligible overhead compared to hatch generation
 
 ---
 
