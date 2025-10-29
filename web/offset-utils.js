@@ -421,6 +421,73 @@ function lineSegmentIntersection(a1, a2, b1, b2) {
 }
 
 /**
+ * Calculate density multiplier for hatch spacing based on profile
+ * @param {string} profile - Density profile: 'uniform', 'light-direction', 'left-shadow', 'center-boost', 'curvature-boost'
+ * @param {Object} sample - Sample point with {x, y, nx, ny, t, arcLength}
+ * @param {Object} params - Profile-specific parameters
+ * @param {number} curvatureScore - Optional curvature score (0-1) for curvature-boost profile
+ * @returns {number} Density multiplier (0.2-2.0), where higher = denser hatching = smaller spacing
+ */
+function getDensityMultiplier(profile, sample, params = {}, curvatureScore = 0) {
+  const {
+    lightAngle = 90,
+    lightStrength = 0.7,
+    centerPos = 0.5,
+    centerSpread = 0.3,
+    curvatureStrength = 0.5
+  } = params;
+
+  if (profile === 'uniform') {
+    return 1.0;
+  }
+
+  if (profile === 'light-direction') {
+    // Compute light direction vector
+    const lightAngleRad = (lightAngle * Math.PI) / 180;
+    const lightDirX = Math.cos(lightAngleRad);
+    const lightDirY = Math.sin(lightAngleRad);
+
+    // Dot product of surface normal with light direction
+    // +1 = surface faces light (sparse), -1 = surface faces away (dense)
+    const dot = sample.nx * lightDirX + sample.ny * lightDirY;
+
+    // Remap: facing light → 0.2 (sparse), facing away → 1.0 (dense)
+    const rawDensity = ((1 - dot) / 2) * lightStrength + (1 - lightStrength) * 0.5;
+    return Math.max(0.2, Math.min(2.0, rawDensity));
+  }
+
+  if (profile === 'left-shadow') {
+    // Constant light from the right (90° pointing down in SVG space)
+    // Surfaces with nx < 0 (facing left) get denser hatching
+    const lightDirX = 1.0; // Light from right
+    const lightDirY = 0.0;
+
+    const dot = sample.nx * lightDirX + sample.ny * lightDirY;
+    const rawDensity = ((1 - dot) / 2) * lightStrength + (1 - lightStrength) * 0.5;
+    return Math.max(0.2, Math.min(2.0, rawDensity));
+  }
+
+  if (profile === 'center-boost') {
+    // Bell curve centered at centerPos along normalized arc-length (t)
+    const dist = Math.abs(sample.t - centerPos);
+    const gaussianFactor = Math.exp(-(dist * dist) / (2 * centerSpread * centerSpread));
+
+    // Map gaussian [0,1] to density [0.5, 1.5] so center is denser
+    const rawDensity = 0.5 + gaussianFactor * 1.0;
+    return Math.max(0.2, Math.min(2.0, rawDensity));
+  }
+
+  if (profile === 'curvature-boost') {
+    // Use curvature score to increase density in tight curves
+    // curvatureScore: 0 (straight) → 1 (tight curve)
+    const rawDensity = 0.5 + curvatureScore * curvatureStrength * 1.5;
+    return Math.max(0.2, Math.min(2.0, rawDensity));
+  }
+
+  return 1.0; // Fallback
+}
+
+/**
  * Generate crosshatch fill for a path
  * Fills the path's ribbon with angled hatch lines instead of parallel offsets
  * @param {string} pathData - Original SVG path
@@ -434,9 +501,11 @@ function lineSegmentIntersection(a1, a2, b1, b2) {
  * @param {number} noiseFrequency - Noise wavelength in mm
  * @param {Object} organicOptions - Organic/hand-drawn options: {enabled, wiggle, wiggleFreq, angleJitter, lengthJitter, positionJitter, spacingJitter}
  * @param {boolean} extractOutline - Return outline paths separately (default: false)
+ * @param {Object} densityOptions - Density profile options: {profile, lightAngle, lightStrength, centerPos, centerSpread, curvatureStrength}
+ * @param {number} curvatureScore - Curvature score for the path (0-1, used with curvature-boost profile)
  * @returns {Array<string>|Object} Array of hatch line path strings, or {fills: Array, outlines: Array} if extractOutline=true
  */
-function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50, organicOptions = {}, extractOutline = false) {
+function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, noise = 0, seed = 0, pathId = '', offsetEnvelope = null, noiseFrequency = 50, organicOptions = {}, extractOutline = false, densityOptions = {}, curvatureScore = 0) {
   // Extract organic options with defaults
   const {
     enabled: organicEnabled = false,
@@ -447,6 +516,16 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
     positionJitter = 0,
     spacingJitter = 0
   } = organicOptions;
+
+  // Extract density options with defaults
+  const {
+    profile: densityProfile = 'uniform',
+    lightAngle: densityLightAngle = 90,
+    lightStrength: densityLightStrength = 0.7,
+    centerPos: densityCenterPos = 0.5,
+    centerSpread: densityCenterSpread = 0.3,
+    curvatureStrength: densityCurvatureStrength = 0.5
+  } = densityOptions;
 
   if (!pathData || typeof pathData !== 'string') {
     return [];
@@ -644,7 +723,23 @@ function generateCrosshatchFill(pathData, baseWidth, hatchAngles, hatchSpacing, 
           noiseValue += randomJitter * spacingJitter * hatchSpacing;
         }
 
-        const spacing = Math.max(0.1, hatchSpacing + noiseValue);
+        // Apply density profile to modulate spacing
+        const densityMultiplier = getDensityMultiplier(
+          densityProfile,
+          sample,
+          {
+            lightAngle: densityLightAngle,
+            lightStrength: densityLightStrength,
+            centerPos: densityCenterPos,
+            centerSpread: densityCenterSpread,
+            curvatureStrength: densityCurvatureStrength
+          },
+          curvatureScore
+        );
+
+        // Spacing inversely proportional to density: higher density = smaller spacing
+        const baseSpacingValue = hatchSpacing + noiseValue;
+        const spacing = Math.max(0.1, baseSpacingValue / densityMultiplier);
         currentArcLength += spacing;
       }
     }
@@ -1101,7 +1196,10 @@ function generateHatchGradientFill(
   lightMode = 'directional',
   lightPosX = 0,
   lightPosY = 0,
-  falloffRadius = 100
+  falloffRadius = 100,
+  densityOptions = {},
+  curvatureScore = 0,
+  shadowBias = 0.5
 ) {
   // Extract organic options with defaults
   const {
@@ -1113,6 +1211,16 @@ function generateHatchGradientFill(
     positionJitter = 0,
     spacingJitter = 0
   } = organicOptions;
+
+  // Extract density options with defaults
+  const {
+    profile: densityProfile = 'uniform',
+    lightAngle: densityLightAngle = 90,
+    lightStrength: densityLightStrength = 0.7,
+    centerPos: densityCenterPos = 0.5,
+    centerSpread: densityCenterSpread = 0.3,
+    curvatureStrength: densityCurvatureStrength = 0.5
+  } = densityOptions;
 
   try {
     const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
@@ -1235,49 +1343,51 @@ function generateHatchGradientFill(
           Math.abs(pt.arcLength - currentArcLength) < Math.abs(closest.arcLength - currentArcLength) ? pt : closest
         );
 
-        // Calculate weight based on lighting mode
-        let rawWeight;
+        // NEW: Calculate highlight factor (which side faces the light)
+        let highlightFactor; // 0 = shadow side, 1 = highlight side
 
         if (lightMode === 'point') {
-          // POINT LIGHT MODE: Calculate direction and distance from sample to light
           const toLightX = lightPosX - sample.x;
           const toLightY = lightPosY - sample.y;
-          const dist = Math.sqrt(toLightX * toLightX + toLightY * toLightY);
+          const dist = Math.hypot(toLightX, toLightY);
 
           if (dist < 0.001) {
-            rawWeight = baseWeight;
+            highlightFactor = 1.0; // At light position, fully lit
           } else {
             const lightDirX = toLightX / dist;
             const lightDirY = toLightY / dist;
 
-            const orientDot = sample.nx * lightDirX + sample.ny * lightDirY;
-            // Remap signed dot to [0,1]: +1 (facing) → 0 (sparse), -1 (away) → 1 (dense)
-            const orientWeight = (1 - orientDot) / 2;
+            // Dot product: +1 = facing light (highlight), -1 = facing away (shadow)
+            const dot = sample.nx * lightDirX + sample.ny * lightDirY;
 
+            // Map to [0,1]: 1 = highlight, 0 = shadow
+            highlightFactor = (dot + 1) * 0.5;
+
+            // Optional: Apply softness for smoother transitions
+            if (shadowSoftness > 0) {
+              highlightFactor = Math.pow(highlightFactor, 1 + shadowSoftness);
+            }
+
+            // Optional: Apply distance falloff
             const distanceFalloff = 1 / (1 + dist / falloffRadius);
-            const distWeight = 1 - distanceFalloff; // 0 at light, 1 at infinity
-
-            // Combine with separate strengths
-            const orientStrength = 0.7; // How much surface orientation matters
-            const distStrength = 0.3;   // How much distance matters
-            rawWeight = (orientWeight * orientStrength + distWeight * distStrength) * lightStrength + baseWeight;
+            highlightFactor *= distanceFalloff;
           }
         } else {
-          // DIRECTIONAL MODE: Global light direction
-          const dotProduct = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
-          // Map dot product [-1, 1] to weight [0, 1]
-          // +1 (facing light) → 0 (low weight = sparse = bright)
-          // -1 (facing away) → 1 (high weight = dense = shadow)
-          rawWeight = ((1 - dotProduct) / 2) * lightStrength + baseWeight;
+          // Directional mode
+          const dot = sample.nx * globalLightDirX + sample.ny * globalLightDirY;
+          highlightFactor = (dot + 1) * 0.5;
+
+          if (shadowSoftness > 0) {
+            highlightFactor = Math.pow(highlightFactor, 1 + shadowSoftness);
+          }
         }
 
-        // Apply shadow softness (easing)
-        if (shadowSoftness > 0) {
-          rawWeight = smoothstep(baseWeight, 1.0, rawWeight);
-        }
+        // Shadow factor: inverse of highlight
+        const shadowFactor = 1 - highlightFactor;
 
-        // Clamp weight
-        const weight = Math.max(0, Math.min(1, rawWeight));
+        // Density: sparse on highlight, dense on shadow
+        const density = baseWeight + shadowFactor * lightStrength;
+        const weight = Math.max(0.05, Math.min(1.0, density));
 
         // Skip if weight is too low
         const epsilon = 0.05;
@@ -1286,9 +1396,13 @@ function generateHatchGradientFill(
           continue;
         }
 
-        // Apply position jitter if organic mode enabled
-        let sampleX = sample.x;
-        let sampleY = sample.y;
+        // NEW: Bias hatch origin toward shadow edge
+        // This shifts more hatch lines to the shadow side
+        const shadowOffset = sample.halfWidth * shadowFactor * shadowBias;
+        let sampleX = sample.x - sample.nx * shadowOffset;
+        let sampleY = sample.y - sample.ny * shadowOffset;
+
+        // Apply position jitter if organic mode enabled (on top of shadow bias)
         if (organicEnabled && positionJitter > 0) {
           const jitterAmount = simpleNoise(currentArcLength / 20 + seed * 500, seed + hatchIndex) * positionJitter;
           sampleX += sample.nx * jitterAmount;
@@ -1361,6 +1475,23 @@ function generateHatchGradientFill(
           const randomJitter = (simpleNoise(hatchIndex * 30 + seed * 300, seed) - 0.5) * 2;
           spacing += randomJitter * spacingJitter * baseSpacing;
         }
+
+        // Apply additional density profile modulation
+        const densityMultiplier = getDensityMultiplier(
+          densityProfile,
+          sample,
+          {
+            lightAngle: densityLightAngle,
+            lightStrength: densityLightStrength,
+            centerPos: densityCenterPos,
+            centerSpread: densityCenterSpread,
+            curvatureStrength: densityCurvatureStrength
+          },
+          curvatureScore
+        );
+
+        // Further modulate spacing by density profile: higher density = smaller spacing
+        spacing = spacing / densityMultiplier;
 
         // Ensure minimum spacing
         spacing = Math.max(0.1, spacing);

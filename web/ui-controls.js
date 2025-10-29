@@ -237,6 +237,75 @@ function initializeControls() {
     updateCrosshatchPreview();
   });
 
+  // Density profile selector (crosshatch)
+  const densityProfileSelect = document.getElementById('density-profile');
+  if (densityProfileSelect) {
+    densityProfileSelect.addEventListener('change', (e) => {
+      densityProfile = e.target.value;
+
+      // Show/hide density profile controls
+      const densityControls = document.getElementById('density-profile-controls');
+      const lightControls = document.getElementById('density-light-controls');
+      const centerControls = document.getElementById('density-center-controls');
+      const curvatureControls = document.getElementById('density-curvature-controls');
+
+      if (densityProfile === 'uniform') {
+        densityControls.style.display = 'none';
+      } else {
+        densityControls.style.display = 'block';
+        lightControls.style.display = (densityProfile === 'light-direction' || densityProfile === 'left-shadow') ? 'block' : 'none';
+        centerControls.style.display = densityProfile === 'center-boost' ? 'block' : 'none';
+        curvatureControls.style.display = densityProfile === 'curvature-boost' ? 'block' : 'none';
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateCrosshatchPreview();
+    });
+  }
+
+  // Density profile controls (crosshatch)
+  setupSlider('density-light-angle', (value) => {
+    densityLightAngle = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('density-light-strength', (value) => {
+    densityLightStrength = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('density-center-pos', (value) => {
+    densityCenterPos = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('density-center-spread', (value) => {
+    densityCenterSpread = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
+  setupSlider('density-curvature-strength', (value) => {
+    densityCurvatureStrength = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateCrosshatchPreview();
+  });
+
   // Stippling controls
   setupSlider('dot-spacing', (value) => {
     dotSpacing = value;
@@ -324,7 +393,7 @@ function initializeControls() {
     updateGradientPreview();
   });
 
-  setupSlider('falloff-radius', (value) => {
+  setupSlider('light-falloff-radius', (value) => {
     falloffRadius = value;
     needsRedraw = true;
     redraw();
@@ -405,6 +474,94 @@ function initializeControls() {
     updateCLICommand();
     updateGradientPreview();
   });
+
+  // Density profile selector (gradient hatch)
+  const gradientDensityProfileSelect = document.getElementById('gradient-density-profile');
+  if (gradientDensityProfileSelect) {
+    gradientDensityProfileSelect.addEventListener('change', (e) => {
+      gradientDensityProfile = e.target.value;
+
+      // Show/hide density profile controls
+      const densityControls = document.getElementById('gradient-density-profile-controls');
+      const lightControls = document.getElementById('gradient-density-light-controls');
+      const centerControls = document.getElementById('gradient-density-center-controls');
+      const curvatureControls = document.getElementById('gradient-density-curvature-controls');
+
+      if (gradientDensityProfile === 'uniform') {
+        densityControls.style.display = 'none';
+      } else {
+        densityControls.style.display = 'block';
+        lightControls.style.display = (gradientDensityProfile === 'light-direction' || gradientDensityProfile === 'left-shadow') ? 'block' : 'none';
+        centerControls.style.display = gradientDensityProfile === 'center-boost' ? 'block' : 'none';
+        curvatureControls.style.display = gradientDensityProfile === 'curvature-boost' ? 'block' : 'none';
+      }
+
+      needsRedraw = true;
+      redraw();
+      updateCLICommand();
+      updateGradientPreview();
+    });
+  }
+
+  // Density profile controls (gradient hatch)
+  setupSlider('gradient-density-light-angle', (value) => {
+    gradientDensityLightAngle = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('gradient-density-light-strength', (value) => {
+    gradientDensityLightStrength = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('gradient-density-center-pos', (value) => {
+    gradientDensityCenterPos = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('gradient-density-center-spread', (value) => {
+    gradientDensityCenterSpread = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  setupSlider('gradient-density-curvature-strength', (value) => {
+    gradientDensityCurvatureStrength = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  // Shadow bias control
+  setupSlider('shadow-bias', (value) => {
+    shadowBias = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+    updateGradientPreview();
+  });
+
+  // Shadow debug mode toggle
+  const shadowDebugCheckbox = document.getElementById('shadow-debug-mode');
+  if (shadowDebugCheckbox) {
+    shadowDebugCheckbox.addEventListener('change', (e) => {
+      shadowDebugMode = e.target.checked;
+      needsRedraw = true;
+      redraw();
+    });
+  }
 
   // Offset mode toggle
   document.querySelectorAll('input[name="offset-mode"]').forEach(radio => {
@@ -1041,7 +1198,16 @@ async function prepareExport() {
         spacingJitter: spacingJitter
       };
 
-      const hatchResult = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke);
+      const densityOptions = {
+        profile: densityProfile,
+        lightAngle: densityLightAngle,
+        lightStrength: densityLightStrength,
+        centerPos: densityCenterPos,
+        centerSpread: densityCenterSpread,
+        curvatureStrength: densityCurvatureStrength
+      };
+
+      const hatchResult = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke, densityOptions, path.curvatureScore || 0);
 
       // Handle result (either array or {fills, outlines} object)
       let hatchPathStrings, outlinePathStrings;
@@ -1151,11 +1317,21 @@ async function prepareExport() {
       const lightX = svgData ? (lightPosX / 100) * svgData.viewBox.width : 0;
       const lightY = svgData ? (lightPosY / 100) * svgData.viewBox.height : 0;
 
+      const gradientDensityOptions = {
+        profile: gradientDensityProfile,
+        lightAngle: gradientDensityLightAngle,
+        lightStrength: gradientDensityLightStrength,
+        centerPos: gradientDensityCenterPos,
+        centerSpread: gradientDensityCenterSpread,
+        curvatureStrength: gradientDensityCurvatureStrength
+      };
+
       const gradientResult = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
         noise, seed, path.id, envelope, noiseFrequency, organicOptions, addOutlineStroke,
-        lightMode, lightX, lightY, falloffRadius
+        lightMode, lightX, lightY, falloffRadius, gradientDensityOptions,
+        path.curvatureScore || 0, shadowBias
       );
 
       // Handle result (either array or {fills, outlines} object)
@@ -1205,9 +1381,9 @@ async function prepareExport() {
       let leftOutline = null;
       let rightOutline = null;
 
-      // For striped mode with outlines, generate outline paths separately
-      // so they're always present regardless of stripe pattern
-      if (fillMode === 'striped' && addOutlineStroke && passes > 0) {
+      // If outlines requested, generate outermost offset paths separately
+      // This ensures they're always present regardless of stripe pattern
+      if (addOutlineStroke && passes > 0) {
         // Generate right outline (furthest right)
         const rightPassIndex = Math.floor((passes - 1) / 2) + 1;
         const rightDistance = rightPassIndex * baseOffset;
@@ -1279,19 +1455,6 @@ async function prepareExport() {
           if (!enableBinning) {
             // If not binning, add directly to output
             processedPaths.push(pathData);
-          }
-
-          // Track outermost offsets for outline extraction (non-striped modes only)
-          if (fillMode !== 'striped' && addOutlineStroke && passes > 0) {
-            const isLastRight = isRight && passIndex === Math.floor((passes - 1) / 2) + 1;
-            const isLastLeft = !isRight && passIndex === Math.floor((passes - 2) / 2) + 1 + 1;
-
-            if (passes === 1 || isLastRight) {
-              rightOutline = offsetPathData;
-            }
-            if (passes > 1 && isLastLeft) {
-              leftOutline = offsetPathData;
-            }
           }
         }
       }

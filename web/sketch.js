@@ -54,6 +54,8 @@ let gradientBaseWeight = 0.2; // Minimum density weight
 let shadowSoftness = 0.5; // Easing factor for smooth transitions
 let gradientHatchAngles = [0, 45, 90]; // Gradient hatch angles
 let gradientHatchSpacing = 1; // Base spacing for gradient hatches
+let shadowBias = 0.5; // Bias hatch origin toward shadow edge (0 = centered, 1 = fully shifted)
+let shadowDebugMode = false; // Visualize shadow/highlight edges for debugging
 
 // Organic crosshatch state
 let organicHatchEnabled = false;
@@ -63,6 +65,22 @@ let angleJitter = 5;
 let lengthJitter = 0.1;
 let positionJitter = 0.2;
 let spacingJitter = 0.2;
+
+// Density profile state (for crosshatch)
+let densityProfile = 'uniform'; // 'uniform', 'light-direction', 'left-shadow', 'center-boost', 'curvature-boost'
+let densityLightAngle = 90; // Light direction for density modulation
+let densityLightStrength = 0.7; // Contrast strength for light-based density
+let densityCenterPos = 0.5; // Center position for center-boost profile
+let densityCenterSpread = 0.3; // Spread for center-boost profile
+let densityCurvatureStrength = 0.5; // Strength for curvature-boost profile
+
+// Density profile state (for gradient hatch)
+let gradientDensityProfile = 'uniform';
+let gradientDensityLightAngle = 90;
+let gradientDensityLightStrength = 0.7;
+let gradientDensityCenterPos = 0.5;
+let gradientDensityCenterSpread = 0.3;
+let gradientDensityCurvatureStrength = 0.5;
 
 // Drag state
 let draggedAttractor = null;
@@ -148,6 +166,11 @@ function draw() {
     // Draw attractors if enabled (attractor mode only)
     if (useAttractors && showAttractors) {
       drawAttractors();
+    }
+
+    // Draw point light if in point mode and hatch gradient fill
+    if (fillMode === 'hatch-gradient' && lightMode === 'point') {
+      drawPointLight();
     }
 
     // Draw focus window if enabled
@@ -371,7 +394,16 @@ function renderOffsetPreview() {
         spacingJitter: spacingJitter
       };
 
-      const hatchPaths = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions);
+      const densityOptions = {
+        profile: densityProfile,
+        lightAngle: densityLightAngle,
+        lightStrength: densityLightStrength,
+        centerPos: densityCenterPos,
+        centerSpread: densityCenterSpread,
+        curvatureStrength: densityCurvatureStrength
+      };
+
+      const hatchPaths = generateCrosshatchFill(path.d, baseWidth, hatchAngles, hatchSpacing, noise, seed, path.id, envelope, noiseFrequency, organicOptions, false, densityOptions, path.curvatureScore || 0);
 
       hatchPaths.forEach(hatchPath => {
         // Parse and render hatch line (can be straight or wiggly polyline)
@@ -419,11 +451,21 @@ function renderOffsetPreview() {
       const lightX = svgData ? (lightPosX / 100) * svgData.viewBox.width : 0;
       const lightY = svgData ? (lightPosY / 100) * svgData.viewBox.height : 0;
 
+      const gradientDensityOptions = {
+        profile: gradientDensityProfile,
+        lightAngle: gradientDensityLightAngle,
+        lightStrength: gradientDensityLightStrength,
+        centerPos: gradientDensityCenterPos,
+        centerSpread: gradientDensityCenterSpread,
+        curvatureStrength: gradientDensityCurvatureStrength
+      };
+
       const hatchPaths = generateHatchGradientFill(
         path.d, baseWidth, gradientHatchAngles, gradientHatchSpacing,
         lightAngle, lightStrength, gradientBaseWeight, shadowSoftness,
         noise, seed, path.id, envelope, noiseFrequency, organicOptions, false,
-        lightMode, lightX, lightY, falloffRadius
+        lightMode, lightX, lightY, falloffRadius, gradientDensityOptions,
+        path.curvatureScore || 0, shadowBias
       );
 
       hatchPaths.forEach(hatchPath => {
@@ -807,6 +849,50 @@ function drawAttractors() {
     const label = hasCustom ? `#${attractor.id}★` : `#${attractor.id}`;
     text(label, attractor.x, attractor.y - radius - 10);
   });
+}
+
+/**
+ * Draw point light visualization overlay
+ */
+function drawPointLight() {
+  if (!svgData) return;
+
+  // Convert light position from % to user units
+  const lightX = (lightPosX / 100) * svgData.viewBox.width;
+  const lightY = (lightPosY / 100) * svgData.viewBox.height;
+
+  // Draw falloff radius circle
+  noFill();
+  stroke(255, 200, 0, 80); // Yellow/orange for light
+  strokeWeight(2);
+  circle(lightX, lightY, falloffRadius * 2);
+
+  // Draw inner bright circle (50% falloff radius)
+  stroke(255, 200, 0, 120);
+  strokeWeight(1);
+  circle(lightX, lightY, falloffRadius);
+
+  // Draw light source point
+  fill(255, 220, 0);
+  noStroke();
+  circle(lightX, lightY, 8);
+
+  // Draw center dot
+  fill(255, 255, 0);
+  circle(lightX, lightY, 3);
+
+  // Label
+  fill(255, 200, 0);
+  textAlign(CENTER, CENTER);
+  textSize(11);
+  textStyle(BOLD);
+  text('LIGHT', lightX, lightY - falloffRadius - 15);
+
+  // Show position info
+  textSize(9);
+  textStyle(NORMAL);
+  fill(200, 150, 0);
+  text(`${lightPosX.toFixed(0)}%, ${lightPosY.toFixed(0)}%`, lightX, lightY + falloffRadius + 15);
 }
 
 /**

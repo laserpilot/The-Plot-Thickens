@@ -255,6 +255,64 @@
             <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
 
             <label>
+              Density Profile:
+              <select id="density-profile">
+                <option value="uniform" selected>Uniform (constant spacing)</option>
+                <option value="light-direction">Light Direction (shadow/sun)</option>
+                <option value="left-shadow">Left Shadow (constant)</option>
+                <option value="center-boost">Center Boost (middle dense)</option>
+                <option value="curvature-boost">Curvature Boost (corners dense)</option>
+              </select>
+              <span class="hint-icon"
+                title="Modulate hatch density across the path. Uniform = constant spacing, Light Direction = denser on shadow side, Center Boost = denser in middle, Curvature = denser in curves.">?</span>
+            </label>
+
+            <div id="density-profile-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fffaeb; border-radius: 4px;">
+              <div id="density-light-controls" style="display: none;">
+                <label>
+                  Light Direction (degrees):
+                  <input type="range" id="density-light-angle" min="0" max="360" step="5" value="90">
+                  <span id="density-light-angle-value">90</span>
+                  <span class="hint-icon" title="Direction of light source for density. 0° = right, 90° = down, 180° = left, 270° = up.">?</span>
+                </label>
+
+                <label>
+                  Density Contrast:
+                  <input type="range" id="density-light-strength" min="0" max="1" step="0.05" value="0.7">
+                  <span id="density-light-strength-value">0.70</span>
+                  <span class="hint-icon" title="How much the light direction affects density. 0 = no effect, 1 = maximum contrast.">?</span>
+                </label>
+              </div>
+
+              <div id="density-center-controls" style="display: none;">
+                <label>
+                  Center Position:
+                  <input type="range" id="density-center-pos" min="0" max="1" step="0.05" value="0.5">
+                  <span id="density-center-pos-value">0.50</span>
+                  <span class="hint-icon" title="Position of density peak along path. 0 = start, 0.5 = middle, 1 = end.">?</span>
+                </label>
+
+                <label>
+                  Center Spread:
+                  <input type="range" id="density-center-spread" min="0.1" max="1" step="0.05" value="0.3">
+                  <span id="density-center-spread-value">0.30</span>
+                  <span class="hint-icon" title="Width of density peak. Lower = sharper peak, higher = gradual spread.">?</span>
+                </label>
+              </div>
+
+              <div id="density-curvature-controls" style="display: none;">
+                <label>
+                  Curvature Strength:
+                  <input type="range" id="density-curvature-strength" min="0" max="1" step="0.05" value="0.5">
+                  <span id="density-curvature-strength-value">0.50</span>
+                  <span class="hint-icon" title="How much curvature affects density. 0 = no effect, 1 = maximum density in tight curves.">?</span>
+                </label>
+              </div>
+            </div>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
               <input type="checkbox" id="organic-hatch-enabled">
               Enable Organic Mode (hand-drawn quality)
               <span class="hint-icon"
@@ -380,8 +438,8 @@
 
               <label>
                 Falloff Radius (mm):
-                <input type="range" id="falloff-radius" min="10" max="500" step="10" value="100">
-                <span id="falloff-radius-value">100</span>
+                <input type="range" id="light-falloff-radius" min="10" max="500" step="10" value="100">
+                <span id="light-falloff-radius-value">100</span>
                 <span class="hint-icon" title="Distance where light intensity drops to 50%. Larger = softer falloff, smaller = harsher shadows.">?</span>
               </label>
             </div>
@@ -408,6 +466,23 @@
             </label>
 
             <label>
+              Shadow Bias (edge shift):
+              <input type="range" id="shadow-bias" min="0" max="1" step="0.05" value="0.5">
+              <span id="shadow-bias-value">0.50</span>
+              <span class="hint-icon"
+                title="How far to shift hatch lines toward shadow edge. 0 = centered (uniform), 1 = fully shifted to shadow side.">?</span>
+            </label>
+
+            <label>
+              <input type="checkbox" id="shadow-debug-mode">
+              Debug: Show Shadow/Highlight Edges
+              <span class="hint-icon"
+                title="Visualize which edges face the light (blue = highlight, red = shadow). Helps verify gradient orientation.">?</span>
+            </label>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
               Gradient Preset:
               <select id="gradient-hatch-preset">
                 <option value="single">Single Angle</option>
@@ -430,6 +505,64 @@
               <span id="gradient-hatch-spacing-value">1.0</span>
               <span class="hint-icon" title="Base spacing between hatch lines. Will vary based on light direction.">?</span>
             </label>
+
+            <hr style="margin: 12px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
+              Density Profile:
+              <select id="gradient-density-profile">
+                <option value="uniform" selected>Uniform (constant spacing)</option>
+                <option value="light-direction">Light Direction (shadow/sun)</option>
+                <option value="left-shadow">Left Shadow (constant)</option>
+                <option value="center-boost">Center Boost (middle dense)</option>
+                <option value="curvature-boost">Curvature Boost (corners dense)</option>
+              </select>
+              <span class="hint-icon"
+                title="Additional density modulation on top of light shading. Can combine with existing light controls.">?</span>
+            </label>
+
+            <div id="gradient-density-profile-controls" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fffaeb; border-radius: 4px;">
+              <div id="gradient-density-light-controls" style="display: none;">
+                <label>
+                  Light Direction (degrees):
+                  <input type="range" id="gradient-density-light-angle" min="0" max="360" step="5" value="90">
+                  <span id="gradient-density-light-angle-value">90</span>
+                  <span class="hint-icon" title="Direction of light source for density. Independent of main light controls.">?</span>
+                </label>
+
+                <label>
+                  Density Contrast:
+                  <input type="range" id="gradient-density-light-strength" min="0" max="1" step="0.05" value="0.7">
+                  <span id="gradient-density-light-strength-value">0.70</span>
+                  <span class="hint-icon" title="How much the light direction affects density.">?</span>
+                </label>
+              </div>
+
+              <div id="gradient-density-center-controls" style="display: none;">
+                <label>
+                  Center Position:
+                  <input type="range" id="gradient-density-center-pos" min="0" max="1" step="0.05" value="0.5">
+                  <span id="gradient-density-center-pos-value">0.50</span>
+                  <span class="hint-icon" title="Position of density peak along path.">?</span>
+                </label>
+
+                <label>
+                  Center Spread:
+                  <input type="range" id="gradient-density-center-spread" min="0.1" max="1" step="0.05" value="0.3">
+                  <span id="gradient-density-center-spread-value">0.30</span>
+                  <span class="hint-icon" title="Width of density peak.">?</span>
+                </label>
+              </div>
+
+              <div id="gradient-density-curvature-controls" style="display: none;">
+                <label>
+                  Curvature Strength:
+                  <input type="range" id="gradient-density-curvature-strength" min="0" max="1" step="0.05" value="0.5">
+                  <span id="gradient-density-curvature-strength-value">0.50</span>
+                  <span class="hint-icon" title="How much curvature affects density.">?</span>
+                </label>
+              </div>
+            </div>
 
             <div
               style="margin-top: 1rem; padding: 0.5rem; background: white; border-radius: 4px; border: 1px solid #ddd;">
