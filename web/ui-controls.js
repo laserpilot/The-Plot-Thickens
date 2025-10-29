@@ -2303,6 +2303,33 @@ function generateCLICommand() {
     params.push(`--fill-mode striped`);
     params.push(`--stripe-filled ${stripeFilled}`);
     params.push(`--stripe-empty ${stripeEmpty}`);
+  } else if (fillModeValue === 'focus-blur') {
+    params.push(`--fill-mode focus-blur`);
+
+    // Add light mode
+    params.push(`--focus-blur-light-mode ${focusBlurLightMode}`);
+
+    if (focusBlurLightMode === 'directional') {
+      params.push(`--focus-blur-light-angle ${focusBlurLightAngle}`);
+    } else {
+      params.push(`--focus-blur-light-pos-x ${focusBlurLightPosX}`);
+      params.push(`--focus-blur-light-pos-y ${focusBlurLightPosY}`);
+      params.push(`--focus-blur-falloff-radius ${focusBlurFalloffRadius}`);
+    }
+
+    // Add noise parameters
+    params.push(`--focus-blur-noise-min ${focusNoiseMin}`);
+    params.push(`--focus-blur-noise-max ${focusNoiseMax}`);
+    params.push(`--focus-blur-freq-min ${focusFreqMin}`);
+    params.push(`--focus-blur-freq-max ${focusFreqMax}`);
+
+    // Add pass modulation if enabled
+    const focusBlurModulateCheckbox = document.getElementById('focus-blur-modulate-passes');
+    if (focusBlurModulateCheckbox && focusBlurModulateCheckbox.checked) {
+      params.push(`--focus-blur-modulate-passes`);
+      params.push(`--focus-blur-passes-min ${focusPassesMin}`);
+      params.push(`--focus-blur-passes-max ${focusPassesMax}`);
+    }
   }
 
   // Add outline stroke option
