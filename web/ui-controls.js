@@ -374,6 +374,7 @@ function initializeControls() {
       needsRedraw = true;
       redraw();
       updateCLICommand();
+      if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
     });
   });
 
@@ -383,6 +384,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-blur-light-pos-x', (value) => {
@@ -391,6 +393,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-blur-light-pos-y', (value) => {
@@ -399,6 +402,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-blur-falloff-radius', (value) => {
@@ -407,6 +411,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-noise-min', (value) => {
@@ -414,6 +419,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-noise-max', (value) => {
@@ -421,6 +427,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-freq-min', (value) => {
@@ -428,6 +435,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   setupSlider('focus-freq-max', (value) => {
@@ -435,6 +443,7 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+    if (typeof updateFocusBlurPreview === 'function') updateFocusBlurPreview();
   });
 
   // Focus blur pass modulation checkbox
@@ -463,6 +472,26 @@ function initializeControls() {
     needsRedraw = true;
     redraw();
     updateCLICommand();
+  });
+
+  // Focus blur preview pattern selector
+  const previewPatternSelect = document.getElementById('focus-blur-preview-pattern');
+  if (previewPatternSelect) {
+    previewPatternSelect.addEventListener('change', (e) => {
+      if (focusBlurPreview && focusBlurPreview.updatePattern) {
+        focusBlurPreview.updatePattern(e.target.value);
+      }
+    });
+  }
+
+  // Show/hide focus blur preview section based on fill mode
+  document.querySelectorAll('input[name="fill-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const previewSection = document.getElementById('focus-blur-preview-section');
+      if (previewSection) {
+        previewSection.style.display = fillMode === 'focus-blur' ? 'block' : 'none';
+      }
+    });
   });
 
   // Light mode toggle (directional vs point)
