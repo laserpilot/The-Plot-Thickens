@@ -2423,13 +2423,31 @@ function generateCLICommand() {
   // Check if single-line format is requested
   const singleLine = document.getElementById('cli-single-line')?.checked ?? true;
 
+  // Generate input/output filenames
+  let inputFile = 'input.svg';
+  let outputFile = 'output.svg';
+
+  if (typeof originalFilename !== 'undefined' && originalFilename) {
+    // Use loaded filename
+    inputFile = originalFilename + '.svg';
+
+    // Generate timestamped output filename
+    const now = new Date();
+    const timestamp = now.getFullYear().toString().slice(-2) +
+                     (now.getMonth() + 1).toString().padStart(2, '0') +
+                     now.getDate().toString().padStart(2, '0') + '_' +
+                     now.getHours().toString().padStart(2, '0') +
+                     now.getMinutes().toString().padStart(2, '0');
+    outputFile = `${originalFilename}_${timestamp}.svg`;
+  }
+
   let command;
   if (singleLine) {
     // Single-line format (ready to paste in terminal)
-    command = `node process-svg.js input.svg output.svg ${params.join(' ')}`;
+    command = `node process-svg.js ${inputFile} ${outputFile} ${params.join(' ')}`;
   } else {
     // Multi-line format with backslashes for readability
-    command = `node process-svg.js input.svg output.svg \\\n  ${params.join(' \\\n  ')}`;
+    command = `node process-svg.js ${inputFile} ${outputFile} \\\n  ${params.join(' \\\n  ')}`;
   }
 
   return command;

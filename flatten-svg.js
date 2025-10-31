@@ -110,24 +110,131 @@ function shapeToPath(node) {
 }
 
 /**
+ * Parse SVG transform attribute to matrix
+ */
+function parseTransform(transformStr) {
+  if (!transformStr) return [1, 0, 0, 1, 0, 0]; // Identity matrix
+
+  // Handle matrix(...) format
+  const matrixMatch = transformStr.match(/matrix\s*\(\s*([^)]+)\s*\)/);
+  if (matrixMatch) {
+    const values = matrixMatch[1].split(/[\s,]+/).map(parseFloat);
+    if (values.length === 6) {
+      return values; // [a, b, c, d, e, f]
+    }
+  }
+
+  // Handle translate(...) format
+  const translateMatch = transformStr.match(/translate\s*\(\s*([^)]+)\s*\)/);
+  if (translateMatch) {
+    const values = translateMatch[1].split(/[\s,]+/).map(parseFloat);
+    const tx = values[0] || 0;
+    const ty = values[1] || 0;
+    return [1, 0, 0, 1, tx, ty];
+  }
+
+  // Handle scale(...) format
+  const scaleMatch = transformStr.match(/scale\s*\(\s*([^)]+)\s*\)/);
+  if (scaleMatch) {
+    const values = scaleMatch[1].split(/[\s,]+/).map(parseFloat);
+    const sx = values[0] || 1;
+    const sy = values[1] || sx;
+    return [sx, 0, 0, sy, 0, 0];
+  }
+
+  return [1, 0, 0, 1, 0, 0]; // Default to identity
+}
+
+/**
+ * Apply transform matrix to a point
+ */
+function transformPoint(x, y, matrix) {
+  const [a, b, c, d, e, f] = matrix;
+  return {
+    x: a * x + c * y + e,
+    y: b * x + d * y + f
+  };
+}
+
+/**
  * Apply transform to path data
  */
 function applyTransformToPath(pathData, transform) {
   if (!transform) return pathData;
 
   try {
-    // Parse transform attribute (basic implementation)
-    // For complex transforms, we'd need a full transform parser
-    // This handles the most common cases
+    const matrix = parseTransform(transform);
 
-    // Simple approach: convert to absolute coordinates first
+    // If identity matrix, no transform needed
+    if (matrix[0] === 1 && matrix[1] === 0 && matrix[2] === 0 &&
+        matrix[3] === 1 && matrix[4] === 0 && matrix[5] === 0) {
+      return pathData;
+    }
+
+    // Convert to absolute coordinates
     const absolutePath = pathToAbsolute(pathData);
 
-    // TODO: Full transform matrix application would go here
-    // For now, we're relying on the fact that most paths are already
-    // in absolute coordinates and transforms are mostly applied at export
+    // Parse path commands and apply transform to coordinates
+    const commandRegex = /([MLHVCSQTAZ])\s*([^MLHVCSQTAZ]*)/gi;
+    let transformedPath = '';
+    let match;
 
-    return pathToString(absolutePath);
+    while ((match = commandRegex.exec(absolutePath)) !== null) {
+      const command = match[1].toUpperCase();
+      const coords = match[2].trim();
+
+      if (!coords) {
+        transformedPath += command;
+        continue;
+      }
+
+      const numbers = coords.split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+
+      transformedPath += command;
+
+      // Apply transform to coordinate pairs
+      if (['M', 'L', 'T'].includes(command)) {
+        // Commands with (x, y) pairs
+        for (let i = 0; i < numbers.length; i += 2) {
+          const transformed = transformPoint(numbers[i], numbers[i + 1], matrix);
+          transformedPath += ` ${transformed.x.toFixed(6)} ${transformed.y.toFixed(6)}`;
+        }
+      } else if (command === 'H') {
+        // Horizontal line - transform x coordinate
+        for (let i = 0; i < numbers.length; i++) {
+          const transformed = transformPoint(numbers[i], 0, matrix);
+          transformedPath += ` ${transformed.x.toFixed(6)}`;
+        }
+      } else if (command === 'V') {
+        // Vertical line - transform y coordinate
+        for (let i = 0; i < numbers.length; i++) {
+          const transformed = transformPoint(0, numbers[i], matrix);
+          transformedPath += ` ${transformed.y.toFixed(6)}`;
+        }
+      } else if (['C', 'S', 'Q'].includes(command)) {
+        // Cubic/quadratic bezier - transform all control points
+        for (let i = 0; i < numbers.length; i += 2) {
+          const transformed = transformPoint(numbers[i], numbers[i + 1], matrix);
+          transformedPath += ` ${transformed.x.toFixed(6)} ${transformed.y.toFixed(6)}`;
+        }
+      } else if (command === 'A') {
+        // Arc - complex, needs special handling
+        // For now, transform endpoints and scale radii
+        for (let i = 0; i < numbers.length; i += 7) {
+          const rx = numbers[i] * matrix[0]; // Scale radius x
+          const ry = numbers[i + 1] * matrix[3]; // Scale radius y
+          const xRot = numbers[i + 2]; // x-axis rotation
+          const largeArc = numbers[i + 3];
+          const sweep = numbers[i + 4];
+          const endPoint = transformPoint(numbers[i + 5], numbers[i + 6], matrix);
+          transformedPath += ` ${rx.toFixed(6)} ${ry.toFixed(6)} ${xRot} ${largeArc} ${sweep} ${endPoint.x.toFixed(6)} ${endPoint.y.toFixed(6)}`;
+        }
+      } else if (command === 'Z') {
+        // Close path - no coordinates
+      }
+    }
+
+    return transformedPath.trim();
   } catch (error) {
     console.warn('Failed to apply transform:', error.message);
     return pathData;
@@ -135,10 +242,46 @@ function applyTransformToPath(pathData, transform) {
 }
 
 /**
+ * Multiply two transformation matrices
+ */
+function multiplyMatrices(m1, m2) {
+  const [a1, b1, c1, d1, e1, f1] = m1;
+  const [a2, b2, c2, d2, e2, f2] = m2;
+
+  return [
+    a1 * a2 + c1 * b2,
+    b1 * a2 + d1 * b2,
+    a1 * c2 + c1 * d2,
+    b1 * c2 + d1 * d2,
+    a1 * e2 + c1 * f2 + e1,
+    b1 * e2 + d1 * f2 + f1
+  ];
+}
+
+/**
+ * Convert matrix to transform string
+ */
+function matrixToString(matrix) {
+  return `matrix(${matrix.join(' ')})`;
+}
+
+/**
  * Recursively process SVG nodes and convert to paths
  */
-function processNode(node, inheritedAttrs = {}) {
+function processNode(node, inheritedAttrs = {}, inheritedTransform = null) {
   const { name, attributes = {}, children = [] } = node;
+
+  // Accumulate transforms from parent groups
+  let currentTransform = inheritedTransform;
+  if (attributes.transform) {
+    const nodeMatrix = parseTransform(attributes.transform);
+    if (currentTransform) {
+      const parentMatrix = parseTransform(currentTransform);
+      currentTransform = matrixToString(multiplyMatrices(parentMatrix, nodeMatrix));
+    } else {
+      currentTransform = attributes.transform;
+    }
+  }
 
   // Merge inherited attributes (stroke, fill, etc.)
   const currentAttrs = {
@@ -153,7 +296,7 @@ function processNode(node, inheritedAttrs = {}) {
   if (['line', 'rect', 'circle', 'ellipse', 'polygon', 'polyline'].includes(name)) {
     const pathData = shapeToPath(node);
     if (pathData) {
-      const transformedPath = applyTransformToPath(pathData, attributes.transform);
+      const transformedPath = applyTransformToPath(pathData, currentTransform);
       paths.push({
         d: transformedPath,
         ...currentAttrs,
@@ -163,7 +306,7 @@ function processNode(node, inheritedAttrs = {}) {
 
   // If this is already a path
   if (name === 'path' && attributes.d) {
-    const transformedPath = applyTransformToPath(attributes.d, attributes.transform);
+    const transformedPath = applyTransformToPath(attributes.d, currentTransform);
     paths.push({
       d: transformedPath,
       stroke: attributes.stroke || currentAttrs.stroke,
@@ -175,7 +318,7 @@ function processNode(node, inheritedAttrs = {}) {
   // Recurse into children (groups, layers, etc.)
   if (children && children.length > 0) {
     for (const child of children) {
-      paths.push(...processNode(child, currentAttrs));
+      paths.push(...processNode(child, currentAttrs, currentTransform));
     }
   }
 
