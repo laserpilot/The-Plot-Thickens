@@ -43,6 +43,10 @@ let dotSize = 0.3; // Radius of each dot in mm
 let stripeFilled = 1; // Number of consecutive paths to draw
 let stripeEmpty = 1; // Number of consecutive paths to skip
 
+// Spiral fill state
+let spiralTwistRate = 0.01; // Twist rate in radians per mm
+let spiralTwistOffset = 0; // Starting angle in degrees
+
 // Focus blur fill state
 let focusBlurLightMode = 'directional'; // 'directional' or 'point'
 let focusBlurLightAngle = 45;          // Light direction in degrees (directional mode)

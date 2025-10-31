@@ -225,6 +225,11 @@
           </label>
 
           <label>
+            <input type="radio" name="fill-mode" value="spiral">
+            Spiral (twisted/candy cane)
+          </label>
+
+          <label>
             <input type="radio" name="fill-mode" value="focus-blur">
             Focus Blur (noise modulation)
           </label>
@@ -605,6 +610,41 @@
 
             <div style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; font-size: 0.85em; color: #666;">
               Pattern: <span id="stripe-pattern-preview">1 filled, 1 empty (alternating)</span>
+            </div>
+          </div>
+
+          <div id="spiral-controls"
+            style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #e8f5e9; border-radius: 4px;">
+            <label>
+              Twist Rate (tightness):
+              <input type="range" id="spiral-twist-rate" min="0.001" max="0.1" step="0.001" value="0.01">
+              <span id="spiral-twist-rate-value">0.01</span>
+              <span class="hint-icon" title="How quickly lines twist along path. Higher = tighter spiral (radians per mm).">?</span>
+            </label>
+
+            <label>
+              Twist Offset (starting angle):
+              <input type="range" id="spiral-twist-offset" min="0" max="360" step="5" value="0">
+              <span id="spiral-twist-offset-value">0</span>°
+              <span class="hint-icon" title="Starting rotation angle in degrees.">?</span>
+            </label>
+
+            <label>
+              Filled Stripes:
+              <input type="range" id="spiral-filled" min="1" max="10" step="1" value="2">
+              <span id="spiral-filled-value">2</span>
+              <span class="hint-icon" title="Number of consecutive paths to draw in spiral pattern.">?</span>
+            </label>
+
+            <label>
+              Empty Stripes:
+              <input type="range" id="spiral-empty" min="1" max="10" step="1" value="1">
+              <span id="spiral-empty-value">1</span>
+              <span class="hint-icon" title="Number of consecutive paths to skip in spiral pattern.">?</span>
+            </label>
+
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; font-size: 0.85em; color: #666;">
+              <strong>💡 Tip:</strong> Spiral creates a candy cane or barber pole effect. Try twist rate 0.02-0.05 for best results!
             </div>
           </div>
 

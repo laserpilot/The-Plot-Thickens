@@ -25,9 +25,11 @@ const DEFAULT_CONFIG = {
   envelope: 'sinTaperBoth', // envelope preset name
   bins: null, // null = no binning, number = number of length quantile bins
   sampleRate: 2, // mm - spacing between sample points when converting curves
-  fillMode: 'offset', // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', or 'striped'
-  stripeFilled: 1, // Number of consecutive filled paths in striped mode
-  stripeEmpty: 1, // Number of consecutive empty paths in striped mode
+  fillMode: 'offset', // 'offset', 'crosshatch', 'stippling', 'hatch-gradient', 'striped', or 'spiral'
+  stripeFilled: 1, // Number of consecutive filled paths in striped/spiral mode
+  stripeEmpty: 1, // Number of consecutive empty paths in striped/spiral mode
+  spiralTwistRate: 0.01, // Spiral twist rate in radians per mm
+  spiralTwistOffset: 0, // Spiral starting angle in degrees
   addOutline: false, // Add outline strokes (furthermost boundaries)
   crosshatch: {
     angles: [90], // hatch angles in degrees
@@ -94,9 +96,11 @@ program
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
-  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, hatch-gradient, or striped (default: offset)')
-  .option('--stripe-filled <number>', 'Number of consecutive filled paths in striped pattern (default: 1)', parseInt)
-  .option('--stripe-empty <number>', 'Number of consecutive empty paths in striped pattern (default: 1)', parseInt)
+  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, hatch-gradient, striped, or spiral (default: offset)')
+  .option('--stripe-filled <number>', 'Number of consecutive filled paths in striped/spiral pattern (default: 1)', parseInt)
+  .option('--stripe-empty <number>', 'Number of consecutive empty paths in striped/spiral pattern (default: 1)', parseInt)
+  .option('--spiral-twist-rate <number>', 'Spiral twist rate in radians per mm (default: 0.01, range: 0.001-0.1)', parseFloat)
+  .option('--spiral-twist-offset <number>', 'Spiral starting angle in degrees (default: 0)', parseFloat)
   .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
   .option('--hatch-angles <angles>', 'Hatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
@@ -161,6 +165,8 @@ program
     if (options.fillMode !== undefined) config.fillMode = options.fillMode;
     if (options.stripeFilled !== undefined) config.stripeFilled = options.stripeFilled;
     if (options.stripeEmpty !== undefined) config.stripeEmpty = options.stripeEmpty;
+    if (options.spiralTwistRate !== undefined) config.spiralTwistRate = options.spiralTwistRate;
+    if (options.spiralTwistOffset !== undefined) config.spiralTwistOffset = options.spiralTwistOffset;
     if (options.addOutline) config.addOutline = true;
 
     // Handle crosshatch options

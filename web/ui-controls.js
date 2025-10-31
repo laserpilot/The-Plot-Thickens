@@ -105,6 +105,12 @@ function initializeControls() {
         stripedControls.style.display = fillMode === 'striped' ? 'block' : 'none';
       }
 
+      // Show/hide spiral controls
+      const spiralControls = document.getElementById('spiral-controls');
+      if (spiralControls) {
+        spiralControls.style.display = fillMode === 'spiral' ? 'block' : 'none';
+      }
+
       // Show/hide focus blur controls
       const focusBlurControls = document.getElementById('focus-blur-controls');
       if (focusBlurControls) {
@@ -115,6 +121,7 @@ function initializeControls() {
                         fillMode === 'stippling' ? 'Stippling fill mode' :
                         fillMode === 'hatch-gradient' ? 'Hatch gradient fill mode' :
                         fillMode === 'striped' ? 'Striped fill mode' :
+                        fillMode === 'spiral' ? 'Spiral fill mode' :
                         fillMode === 'focus-blur' ? 'Focus blur fill mode' : 'Offset fill mode';
       updateStatus(modeLabel);
       needsRedraw = true;
@@ -351,6 +358,35 @@ function initializeControls() {
       preview.textContent = `${stripeFilled} filled, ${stripeEmpty} empty (repeating pattern)`;
     }
   }
+
+  // Spiral fill controls
+  setupSlider('spiral-twist-rate', (value) => {
+    spiralTwistRate = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('spiral-twist-offset', (value) => {
+    spiralTwistOffset = value;
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('spiral-filled', (value) => {
+    stripeFilled = value; // Reuse stripeFilled variable
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
+
+  setupSlider('spiral-empty', (value) => {
+    stripeEmpty = value; // Reuse stripeEmpty variable
+    needsRedraw = true;
+    redraw();
+    updateCLICommand();
+  });
 
   // Focus blur fill controls
 
@@ -2330,6 +2366,12 @@ function generateCLICommand() {
     if (shadowSoftness !== 0.5) params.push(`--shadow-softness ${shadowSoftness}`);
   } else if (fillModeValue === 'striped') {
     params.push(`--fill-mode striped`);
+    params.push(`--stripe-filled ${stripeFilled}`);
+    params.push(`--stripe-empty ${stripeEmpty}`);
+  } else if (fillModeValue === 'spiral') {
+    params.push(`--fill-mode spiral`);
+    params.push(`--spiral-twist-rate ${spiralTwistRate}`);
+    params.push(`--spiral-twist-offset ${spiralTwistOffset}`);
     params.push(`--stripe-filled ${stripeFilled}`);
     params.push(`--stripe-empty ${stripeEmpty}`);
   } else if (fillModeValue === 'focus-blur') {
