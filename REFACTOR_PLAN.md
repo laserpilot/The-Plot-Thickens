@@ -83,16 +83,16 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [ ] Expose same APIs to web-v2 renderer.
 
 ### Phase 3 – Interactive Essentials
-- [ ] Flesh out UI shell: wire tabs/panels from Phase 1 skeleton, ensure controls are grouped to avoid long scrolling.
-- [ ] Implement pan/zoom + lightweight client-side preview (favor responsiveness over perfect accuracy; offer small sample preview area and optional full-canvas render toggle).
-- [ ] Add attractor placement with cached sampling.
-- [ ] Integrate live/manual preview switch + throttled recompute.
-- [ ] Expose both:
-  - [ ] A “Copy CLI command” action that mirrors current settings.
-  - [ ] An “Export via CLI” action that invokes the shared engine/CLI backend directly from the UI.
-- [ ] Hook up export pipeline to shared engine.
-- [ ] Introduce reusable sample preview testbed (simple shapes/lines) that all fill/lighting parameters can target before running against the main SVG.
-- [ ] Set up persistent progress log (`docs/refactor-progress.md`) to capture completed steps, deviations, and open questions for easy handoff between sessions.
+- [x] Flesh out UI shell: wire tabs/panels from Phase 1 skeleton, ensure controls are grouped to avoid long scrolling.
+- [x] Implement pan/zoom + lightweight client-side preview (favor responsiveness over perfect accuracy; offer small sample preview area and optional full-canvas render toggle).
+- [x] Add attractor placement with cached sampling.
+- [x] Integrate live/manual preview switch + throttled recompute.
+- [x] Expose both:
+  - [x] A "Copy CLI command" action that mirrors current settings.
+  - [x] An "Export via CLI" action that invokes the shared engine/CLI backend directly from the UI.
+- [x] Hook up export pipeline to shared engine.
+- [x] Introduce reusable sample preview testbed (simple shapes/lines) that all fill/lighting parameters can target before running against the main SVG.
+- [x] Set up persistent progress log (`docs/refactor-progress.md`) to capture completed steps, deviations, and open questions for easy handoff between sessions.
 
 ### Phase 4 – Advanced Fills & Tooling
 - [ ] Port focus blur controls + preview canvas (consider worker).

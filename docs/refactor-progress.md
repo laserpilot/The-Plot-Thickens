@@ -247,11 +247,56 @@ Track completed steps, deviations from plan, and open questions for session hand
 - Priority system for click disambiguation (attractor mode > drag > pan)
 - Throttled reprocessing (500ms) for performance
 
-**Status**: Attractor UI complete with all features from original interface. Ready for next Phase 3 task.
+**Status**: Attractor UI complete with all features from original interface.
 
-### Next Steps (Phase 3 Remaining)
+### Phase 3: Sample Preview Testbed ✓
 
-According to [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) Phase 3:
+**Work Completed:**
+- [x] Created new "Sample" tab in UI ([web-v2/index.html](../web-v2/index.html:38-80))
+  - Shape selection dropdown (circle, square, triangle, star, grid, mixed)
+  - Size control (10-200mm)
+  - Complexity selector (simple/medium/complex = 5-40 paths)
+  - "Load Sample Shape" and "Back to My SVG" buttons
+
+- [x] Implemented test shape generator ([web-v2/src/utils/sample-shapes.js](../web-v2/src/utils/sample-shapes.js))
+  - Programmatic SVG path generation for geometric primitives
+  - Circle, square, triangle, star using bezier curves
+  - Concentric shape generation for varying path lengths
+  - 3x3 grid pattern with size variation
+  - Mixed shapes composition
+
+- [x] Enhanced state management ([web-v2/src/state/store.js](../web-v2/src/state/store.js:76-80))
+  - `isSampleMode`: boolean flag tracking mode
+  - `samplePaths`: generated sample paths
+  - `sampleBounds`: sample canvas bounds
+  - `userSvgBackup`: complete backup of user's SVG when entering sample mode
+
+- [x] Integrated sample mode handlers ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:171-266))
+  - Load sample handler generates shapes and renders them
+  - Automatic backup of user's SVG before switching to sample mode
+  - "Back to My SVG" button restores original SVG with all processed paths
+  - Full integration with fast preview, live preview, and all fill modes
+
+**Key Features:**
+- Test parameters on simple shapes (renders in milliseconds)
+- No data loss: user's SVG safely backed up and easily restored
+- Full feature parity: all fill modes, attractors, and settings work on samples
+- Educational: new users can explore features without loading an SVG first
+- Debug tool: developers can quickly test edge cases with known geometries
+
+**Sample Shape Types:**
+- Circle: Concentric circles (5-25 based on complexity)
+- Square: Concentric squares
+- Triangle: Concentric triangles
+- Star: Concentric 5-pointed stars
+- Grid: 3x3 grid of circles with varying radii
+- Mixed: Combination of all shapes at different positions
+
+**Status**: Sample preview testbed complete. Phase 3 complete except optional performance optimization.
+
+### Phase 3 Summary
+
+All critical Phase 3 tasks completed:
 
 - [x] ~~Flesh out UI shell~~ ✅
 - [x] ~~Implement pan/zoom + lightweight preview~~ ✅
@@ -259,14 +304,12 @@ According to [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) Phase 3:
 - [x] ~~Integrate live/manual preview switch + throttled recompute~~ ✅
 - [x] ~~"Copy CLI command" action~~ ✅
 - [x] ~~Hook up export pipeline~~ ✅
-- [ ] **Sample preview testbed** - Simple shapes/lines for testing fill parameters before applying to main SVG
-- [ ] **Performance optimization** - Consider web worker for heavy processing
+- [x] ~~Sample preview testbed~~ ✅
+- [ ] **Performance optimization** - Consider web worker for heavy processing (optional)
 
-**Remaining Phase 3 Tasks:**
-1. Sample preview testbed (reusable test shapes panel)
-2. Performance optimization (optional web worker)
+**Phase 3 Status**: ✅ **COMPLETE** (except optional web worker optimization)
 
-**Phase 4 Preview:**
+**Ready for Phase 4:**
 - Port advanced fill modes (focus blur, gradient)
 - Restore calibration/diagnostic panels
 - Config import/export for presets

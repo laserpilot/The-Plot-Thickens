@@ -21,6 +21,7 @@
           <!-- Tab navigation -->
           <nav class="tabs">
             <button class="tab-btn active" data-tab="file">File</button>
+            <button class="tab-btn" data-tab="sample">Sample</button>
             <button class="tab-btn" data-tab="fills">Fills</button>
             <button class="tab-btn" data-tab="attractors">Attractors</button>
             <button class="tab-btn" data-tab="advanced">Advanced</button>
@@ -32,6 +33,50 @@
               <h2>Load SVG</h2>
               <input type="file" id="file-input" accept=".svg" />
               <div id="file-info" class="info-box"></div>
+            </section>
+
+            <section id="tab-sample" class="tab-panel">
+              <h2>Sample Preview</h2>
+              <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                Test fill parameters on simple shapes before processing your SVG. Perfect for quickly dialing in settings.
+              </div>
+
+              <div class="controls-grid">
+                <label>
+                  Test Shape
+                  <select id="sample-shape">
+                    <option value="circle">Circle</option>
+                    <option value="square">Square</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="star">Star</option>
+                    <option value="grid">Grid (3x3)</option>
+                    <option value="mixed">Mixed Shapes</option>
+                  </select>
+                </label>
+
+                <label>
+                  Shape Size (mm)
+                  <input type="number" id="sample-size" step="10" min="10" max="200" value="50" />
+                </label>
+
+                <label>
+                  Complexity
+                  <select id="sample-complexity">
+                    <option value="simple">Simple (5-10 paths)</option>
+                    <option value="medium">Medium (10-20 paths)</option>
+                    <option value="complex">Complex (20-40 paths)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="action-buttons">
+                <button id="btn-load-sample">Load Sample Shape</button>
+                <button id="btn-back-to-svg" style="display: none;">Back to My SVG</button>
+              </div>
+
+              <div id="sample-info" class="info-box" style="display: none; margin-top: 1rem;">
+                <strong>Sample loaded:</strong> <span id="sample-info-text"></span>
+              </div>
             </section>
 
             <section id="tab-fills" class="tab-panel">

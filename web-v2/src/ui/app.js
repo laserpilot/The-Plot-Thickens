@@ -5,6 +5,7 @@
 import { loadSVGFile } from '../utils/svg-loader.js';
 import { processPaths } from '../utils/processor.js';
 import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.js';
+import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
 
 /**
  * Throttle function to limit how often a function can be called
@@ -165,6 +166,103 @@ export function initUI(store, renderer) {
       fileInfo.innerHTML = `<span style="color: #ff4444">Error: ${err.message}</span>`;
       console.error('SVG load error:', err);
     }
+  });
+
+  // Sample preview handlers
+  const btnLoadSample = document.getElementById('btn-load-sample');
+  const btnBackToSvg = document.getElementById('btn-back-to-svg');
+  const sampleInfo = document.getElementById('sample-info');
+  const sampleInfoText = document.getElementById('sample-info-text');
+
+  btnLoadSample.addEventListener('click', () => {
+    const shapeType = document.getElementById('sample-shape').value;
+    const size = parseFloat(document.getElementById('sample-size').value) || 50;
+    const complexity = document.getElementById('sample-complexity').value;
+
+    console.log(`Loading sample: ${shapeType}, size: ${size}, complexity: ${complexity}`);
+
+    try {
+      // Generate sample shapes
+      const { paths, bounds } = generateSampleShapes(shapeType, size, complexity);
+
+      // Backup user's SVG if this is first time entering sample mode
+      const isSampleMode = store.getState('isSampleMode');
+      if (!isSampleMode) {
+        const userSvgBackup = {
+          svg: store.getState('svg'),
+          svgBounds: store.getState('svgBounds'),
+          originalPaths: store.getState('originalPaths'),
+          processedPaths: store.getState('processedPaths'),
+          originalFilename: store.getState('originalFilename')
+        };
+        store.setState({ userSvgBackup });
+      }
+
+      // Set sample mode state
+      store.setState({
+        isSampleMode: true,
+        samplePaths: paths,
+        sampleBounds: bounds,
+        originalPaths: paths,
+        svgBounds: bounds,
+        processedPaths: [] // Clear processed paths
+      });
+
+      // Update UI
+      const description = getSampleDescription(shapeType, complexity);
+      sampleInfoText.textContent = description;
+      sampleInfo.style.display = 'block';
+      btnBackToSvg.style.display = 'inline-block';
+
+      // Render sample
+      const fastPreview = store.getState('fastPreview');
+      if (fastPreview) {
+        renderer.renderFastPreview(paths, bounds);
+      } else {
+        renderer.render(paths, bounds);
+      }
+
+      console.log(`Sample loaded: ${paths.length} paths`);
+    } catch (err) {
+      console.error('Error loading sample:', err);
+      alert(`Error loading sample: ${err.message}`);
+    }
+  });
+
+  btnBackToSvg.addEventListener('click', () => {
+    const backup = store.getState('userSvgBackup');
+
+    if (!backup) {
+      console.warn('No user SVG backup found');
+      return;
+    }
+
+    // Restore user's SVG
+    store.setState({
+      isSampleMode: false,
+      svg: backup.svg,
+      svgBounds: backup.svgBounds,
+      originalPaths: backup.originalPaths,
+      processedPaths: backup.processedPaths,
+      originalFilename: backup.originalFilename,
+      samplePaths: [],
+      sampleBounds: null
+    });
+
+    // Update UI
+    sampleInfo.style.display = 'none';
+    btnBackToSvg.style.display = 'none';
+
+    // Render original SVG
+    const fastPreview = store.getState('fastPreview');
+    if (fastPreview) {
+      renderer.renderFastPreview(backup.originalPaths, backup.svgBounds);
+    } else {
+      const pathsToShow = backup.processedPaths.length > 0 ? backup.processedPaths : backup.originalPaths;
+      renderer.render(pathsToShow, backup.svgBounds);
+    }
+
+    console.log('Restored user SVG');
   });
 
   // Preview controls

@@ -73,6 +73,12 @@ const initialState = {
   processedPaths: [],
   originalFilename: null,
 
+  // Sample mode
+  isSampleMode: false,
+  samplePaths: [],
+  sampleBounds: null,
+  userSvgBackup: null, // Backup of user's SVG when in sample mode
+
   // View state
   zoom: 1,
   panX: 0,
