@@ -1,0 +1,16 @@
+{
+  "name": "@plotter/shared",
+  "version": "1.0.0",
+  "description": "Shared geometry and density utilities for CLI and web",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./geometry": "./geometry/index.js",
+    "./fields": "./fields/index.js",
+    "./utils": "./utils/index.js"
+  },
+  "dependencies": {
+    "svg-path-commander": "^2.1.11"
+  }
+}

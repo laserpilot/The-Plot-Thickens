@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plotter Line Thickener v2</title>
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Plotter Line Thickener v2</h1>
+      <p class="subtitle">SVG path offset utility for pen plotters</p>
+    </header>
+
+    <main>
+      <!-- Tab navigation -->
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="file">File</button>
+        <button class="tab-btn" data-tab="preview">Preview</button>
+        <button class="tab-btn" data-tab="fills">Fills</button>
+        <button class="tab-btn" data-tab="advanced">Advanced</button>
+      </nav>
+
+      <!-- Tab panels -->
+      <div class="tab-content">
+        <section id="tab-file" class="tab-panel active">
+          <h2>Load SVG</h2>
+          <input type="file" id="file-input" accept=".svg" />
+          <div id="file-info" class="info-box"></div>
+        </section>
+
+        <section id="tab-preview" class="tab-panel">
+          <h2>Preview</h2>
+          <div class="preview-container">
+            <canvas id="preview-canvas"></canvas>
+          </div>
+          <div class="preview-controls">
+            <button id="btn-zoom-in">Zoom In</button>
+            <button id="btn-zoom-out">Zoom Out</button>
+            <button id="btn-reset-view">Reset View</button>
+          </div>
+        </section>
+
+        <section id="tab-fills" class="tab-panel">
+          <h2>Fill Settings</h2>
+          <div class="controls-grid">
+            <label>
+              Fill Mode
+              <select id="fill-mode">
+                <option value="offset">Offset</option>
+                <option value="crosshatch">Crosshatch</option>
+                <option value="striped">Striped</option>
+                <option value="spiral">Spiral</option>
+              </select>
+            </label>
+
+            <label>
+              Base Offset (mm)
+              <input type="number" id="base-offset" step="0.05" min="0" max="2" value="0.25" />
+            </label>
+
+            <label>
+              Min Passes
+              <input type="number" id="min-passes" step="1" min="1" max="20" value="1" />
+            </label>
+
+            <label>
+              Max Passes
+              <input type="number" id="max-passes" step="1" min="1" max="20" value="10" />
+            </label>
+          </div>
+
+          <div class="action-buttons">
+            <button id="btn-process">Process Paths</button>
+            <button id="btn-reset-preview">Reset to Original</button>
+          </div>
+        </section>
+
+        <section id="tab-advanced" class="tab-panel">
+          <h2>Advanced Settings</h2>
+          <div class="controls-grid">
+            <label>
+              Noise (mm)
+              <input type="number" id="noise" step="0.05" min="0" max="2" value="0" />
+            </label>
+
+            <label>
+              Noise Frequency (mm)
+              <input type="number" id="noise-frequency" step="5" min="5" max="200" value="50" />
+            </label>
+
+            <label>
+              Sample Rate (mm)
+              <input type="number" id="sample-rate" step="0.5" min="0.5" max="10" value="2" />
+            </label>
+          </div>
+
+          <div class="action-buttons">
+            <button id="btn-copy-cli">Copy CLI Command</button>
+            <button id="btn-export">Export SVG</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
