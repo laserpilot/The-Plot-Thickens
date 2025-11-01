@@ -18,7 +18,7 @@ function init() {
   }
   console.log('Canvas element found:', canvas);
 
-  const renderer = initRenderer(canvas);
+  const renderer = initRenderer(canvas, store);
   console.log('Renderer initialized');
 
   // Initialize UI and wire up event handlers

@@ -81,9 +81,113 @@ Track completed steps, deviations from plan, and open questions for session hand
 1. Add live preview toggle (auto-reprocess on parameter change)
 2. Implement attractor placement UI
 3. Add sample preview panel for testing parameters
-4. Implement SVG export functionality
+4. ~~Implement SVG export functionality~~ ✅ **DONE**
 5. Add more fill modes (crosshatch, striped, spiral)
 6. Consider migrating CLI to use shared/ (requires ESM migration)
+
+---
+
+## Session 2 - 2025-10-31
+
+### Phase 3: SVG Export ✓
+
+**Work Completed:**
+- [x] Created SVG exporter utility ([web-v2/src/utils/svg-exporter.js](../web-v2/src/utils/svg-exporter.js))
+  - `buildSVG()` - Converts processed paths to valid SVG string
+  - `downloadSVG()` - Triggers browser download
+  - `generateFilename()` - Creates timestamped filenames
+- [x] Wired export button in UI ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js))
+- [x] Added `originalFilename` to store state for proper export naming
+- [x] Implemented XML escaping for security
+- [x] Export includes metadata comments (fill mode, timestamp, path count)
+- [x] Preserves original SVG viewBox and dimensions
+
+**Key Features:**
+- Export works for both processed and original paths
+- Filename includes: `{original-name}-{fill-mode}-{timestamp}.svg`
+- Proper SVG structure with XML declaration
+- Maintains plotter-ready format (black paths, white background)
+
+**Testing:**
+- Dev server running at http://localhost:3001
+- Can load SVG → process → export workflow complete! 🎉
+
+**Status**: Core export functionality complete. Ready for next Phase 3 task.
+
+### Phase 3: Live Preview ✓
+
+**Work Completed:**
+- [x] Added throttle utility function (500ms delay to avoid performance issues)
+- [x] Implemented live preview checkbox in Fills tab ([web-v2/index.html](../web-v2/index.html))
+- [x] Refactored path processing into shared `processPathsInternal()` function
+- [x] Auto-processing triggers when config changes if live preview is enabled
+- [x] Added visual feedback: "Processing..." button state with animated dots
+- [x] Disabled button during processing to prevent double-clicks
+- [x] Throttled recompute prevents excessive processing during rapid parameter changes
+
+**Key Features:**
+- Live preview checkbox in Fills tab
+- Throttled auto-processing (500ms delay)
+- Works for all config parameters (offset, passes, noise, etc.)
+- Visual feedback during processing
+- Manual "Process Paths" button still available
+
+**Technical Details:**
+- Throttle implementation uses setTimeout with proper cleanup
+- Processing state tracked in store
+- CSS animation for button loading state
+- Auto-processes immediately when enabling live preview if paths are loaded
+
+**Status**: Live preview complete. Ready for next Phase 3 task (attractor UI or sample preview).
+
+### Critical Fixes ✓
+
+**Issues Identified:**
+1. Canvas preview only visible on Preview tab - hard to see changes while adjusting parameters
+2. Processing button had no visual feedback
+3. Exported SVG paths were invisible (missing stroke attributes)
+4. Path count seemed excessive
+
+**Fixes Completed:**
+- [x] **Restructured UI Layout**: Changed from tab-based to split-panel layout
+  - Left panel: Controls (File, Fills, Advanced tabs)
+  - Right panel: Preview canvas (always visible)
+  - Grid layout: `400px | 1fr` for optimal space usage
+  - Canvas now visible while adjusting any parameters
+
+- [x] **Fixed Exported SVG Paths**:
+  - Added proper SVG attributes to processed paths:
+    - `fill: 'none'`
+    - `stroke: 'black'`
+    - `strokeWidth: 0.1` (mm)
+  - Paths now render correctly when exported
+
+- [x] **Fixed Path Processing**:
+  - Corrected `generatePasses()` function call signature
+  - Was passing object, function expects individual parameters
+  - Added proper parameter mapping:
+    - `passCount` rounded to integer
+    - `envelope` from preset
+    - `useNormalMode: true`
+  - Added debug logging for path count verification
+
+- [x] **Visual Feedback Improvements**:
+  - CSS animation for "Processing..." button state
+  - Button disabled during processing
+  - Animated dots: `. → .. → ...`
+
+**Technical Details:**
+- HTML restructure: `<div class="layout-container">` with grid layout
+- CSS updates: `.controls-panel` and `.preview-panel` classes
+- Processor now correctly calls shared engine with proper parameters
+- Split layout improves workflow: adjust → see changes → export
+
+**Testing:**
+- Dev server running smoothly at http://localhost:3001
+- UI hot-reloads working correctly
+- Ready for user testing
+
+**Status**: Critical UX issues resolved. UI now usable for iterative work.
 
 ---
 

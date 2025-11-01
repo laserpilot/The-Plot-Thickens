@@ -2,11 +2,13 @@
  * Canvas renderer for SVG preview
  */
 
-export function initRenderer(canvas) {
+export function initRenderer(canvas, store) {
   const ctx = canvas.getContext('2d');
   let currentPaths = [];
   let currentBounds = null;
   let viewState = { zoom: 1, panX: 0, panY: 0 };
+  let attractors = [];
+  let onAttractorClick = null;
 
   // Set canvas size to match container
   function resizeCanvas() {
@@ -46,6 +48,20 @@ export function initRenderer(canvas) {
   let lastY = 0;
 
   canvas.addEventListener('mousedown', (e) => {
+    // Check if we should place an attractor (Ctrl/Cmd + Click)
+    const isAttractorMode = e.ctrlKey || e.metaKey;
+    const isRemoveMode = e.shiftKey;
+
+    if ((isAttractorMode || isRemoveMode) && onAttractorClick) {
+      // Convert mouse coordinates to SVG coordinates
+      const coords = screenToSVG(e.clientX, e.clientY);
+      if (coords) {
+        onAttractorClick(coords.x, coords.y, isRemoveMode);
+      }
+      return;
+    }
+
+    // Normal panning
     isPanning = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -82,6 +98,36 @@ export function initRenderer(canvas) {
     viewState.zoom = Math.max(0.1, Math.min(10, viewState.zoom));
     draw();
   });
+
+  /**
+   * Convert screen coordinates to SVG coordinates
+   */
+  function screenToSVG(screenX, screenY) {
+    if (!currentBounds) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const padding = 40;
+    const availWidth = rect.width - padding * 2;
+    const availHeight = rect.height - padding * 2;
+
+    const scaleX = availWidth / currentBounds.width;
+    const scaleY = availHeight / currentBounds.height;
+    const baseScale = Math.min(scaleX, scaleY);
+    const scale = baseScale * viewState.zoom;
+
+    // Convert screen to canvas
+    const canvasX = screenX - rect.left;
+    const canvasY = screenY - rect.top;
+
+    // Reverse the transforms
+    const centerX = rect.width / 2 + viewState.panX;
+    const centerY = rect.height / 2 + viewState.panY;
+
+    const svgX = (canvasX - centerX) / scale + currentBounds.cx;
+    const svgY = (canvasY - centerY) / scale + currentBounds.cy;
+
+    return { x: svgX, y: svgY };
+  }
 
   /**
    * Draw paths on canvas
@@ -127,6 +173,37 @@ export function initRenderer(canvas) {
 
     for (const pathData of currentPaths) {
       drawPath(ctx, pathData);
+    }
+
+    // Draw attractors
+    if (attractors && attractors.length > 0) {
+      const attractorConfig = store ? store.getState('attractorConfig') : { falloffRadius: 50 };
+
+      attractors.forEach((attractor, index) => {
+        const radius = attractor.radius || attractorConfig.falloffRadius;
+        const mode = attractor.mode || attractorConfig.mode || 'attract';
+
+        // Draw influence radius (semi-transparent)
+        ctx.strokeStyle = mode === 'attract' ? 'rgba(74, 158, 255, 0.3)' : 'rgba(255, 100, 100, 0.3)';
+        ctx.fillStyle = mode === 'attract' ? 'rgba(74, 158, 255, 0.05)' : 'rgba(255, 100, 100, 0.05)';
+        ctx.lineWidth = 1 / viewState.zoom;
+
+        ctx.beginPath();
+        ctx.arc(attractor.x, attractor.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw center point
+        ctx.fillStyle = mode === 'attract' ? 'rgba(74, 158, 255, 0.8)' : 'rgba(255, 100, 100, 0.8)';
+        ctx.beginPath();
+        ctx.arc(attractor.x, attractor.y, 3 / viewState.zoom, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw index label
+        ctx.fillStyle = mode === 'attract' ? '#4a9eff' : '#ff6464';
+        ctx.font = `${12 / viewState.zoom}px sans-serif`;
+        ctx.fillText(`${index + 1}`, attractor.x + 6 / viewState.zoom, attractor.y - 6 / viewState.zoom);
+      });
     }
 
     ctx.restore();
@@ -183,6 +260,21 @@ export function initRenderer(canvas) {
     },
 
     /**
+     * Update attractors
+     */
+    updateAttractors(newAttractors) {
+      attractors = newAttractors;
+      draw();
+    },
+
+    /**
+     * Set attractor click handler
+     */
+    setAttractorClickHandler(handler) {
+      onAttractorClick = handler;
+    },
+
+    /**
      * Clear canvas
      */
     clear() {
@@ -190,6 +282,13 @@ export function initRenderer(canvas) {
       ctx.clearRect(0, 0, rect.width, rect.height);
       currentPaths = [];
       currentBounds = null;
+    },
+
+    /**
+     * Redraw (for external state changes)
+     */
+    redraw() {
+      draw();
     }
   };
 }

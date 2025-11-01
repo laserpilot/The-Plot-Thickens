@@ -42,6 +42,36 @@ h1 {
   margin-top: 5px;
 }
 
+/* Layout */
+.layout-container {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 20px;
+  min-height: 600px;
+}
+
+.controls-panel {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.preview-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
 /* Tabs */
 .tabs {
   display: flex;
@@ -72,9 +102,6 @@ h1 {
 /* Tab panels */
 .tab-panel {
   display: none;
-  padding: 20px;
-  background: var(--panel);
-  border-radius: 8px;
 }
 
 .tab-panel.active {
@@ -83,14 +110,13 @@ h1 {
 
 /* Preview canvas */
 .preview-container {
-  width: 100%;
-  height: 600px;
+  flex: 1;
   background: white;
   border: 1px solid var(--border);
   border-radius: 4px;
-  margin-bottom: 15px;
   position: relative;
   overflow: hidden;
+  min-height: 400px;
 }
 
 #preview-canvas {
@@ -106,7 +132,12 @@ h1 {
 
 .preview-controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+}
+
+.preview-controls button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 /* Controls */
@@ -162,6 +193,22 @@ button:active {
   opacity: 0.6;
 }
 
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.processing::after {
+  content: ' ...';
+  animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ' .'; }
+  40% { content: ' ..'; }
+  60%, 100% { content: ' ...'; }
+}
+
 .action-buttons {
   display: flex;
   gap: 10px;
@@ -181,4 +228,57 @@ button:active {
 
 .info-box:empty {
   display: none;
+}
+
+/* Mode-specific controls */
+.mode-specific-controls {
+  margin-top: 20px;
+  padding: 15px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.mode-specific-controls h3 {
+  margin: 0 0 15px 0;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+/* Attractor list */
+.attractor-list {
+  margin-top: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.attractor-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.attractor-item:hover {
+  background: var(--hover);
+}
+
+.attractor-coords {
+  color: var(--accent);
+  font-family: monospace;
+}
+
+.attractor-remove {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background: #ff4444;
+}
+
+.attractor-remove:hover {
+  background: #ff6666;
 }

@@ -71,6 +71,7 @@ const initialState = {
   svgBounds: null,
   originalPaths: [],
   processedPaths: [],
+  originalFilename: null,
 
   // View state
   zoom: 1,
@@ -86,13 +87,32 @@ const initialState = {
     maxPasses: 10,
     curve: 'linear',
     fillMode: 'offset',
-    sampleRate: 2
+    sampleRate: 2,
+    // Fill mode-specific options
+    stripeFilled: 1,
+    stripeEmpty: 1,
+    twistRate: 0.01,
+    twistOffset: 0,
+    crosshatchAngles: [45, 135],
+    crosshatchSpacing: 1.0,
+    fillModeOptions: null
   },
 
   // UI state
   activeTab: 'file',
   livePreview: false,
-  processing: false
+  processing: false,
+
+  // Attractor state
+  attractors: [],
+  useAttractors: false,
+  attractorConfig: {
+    mode: 'attract',
+    strength: 1.0,
+    falloffRadius: 50,
+    falloffCurve: 'linear',
+    multiMode: 'additive'
+  }
 };
 
 export const store = new Store(initialState);

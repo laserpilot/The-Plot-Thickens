@@ -14,35 +14,27 @@
     </header>
 
     <main>
-      <!-- Tab navigation -->
-      <nav class="tabs">
-        <button class="tab-btn active" data-tab="file">File</button>
-        <button class="tab-btn" data-tab="preview">Preview</button>
-        <button class="tab-btn" data-tab="fills">Fills</button>
-        <button class="tab-btn" data-tab="advanced">Advanced</button>
-      </nav>
+      <!-- Split layout: controls on left, preview on right -->
+      <div class="layout-container">
+        <!-- Left panel: controls -->
+        <div class="controls-panel">
+          <!-- Tab navigation -->
+          <nav class="tabs">
+            <button class="tab-btn active" data-tab="file">File</button>
+            <button class="tab-btn" data-tab="fills">Fills</button>
+            <button class="tab-btn" data-tab="attractors">Attractors</button>
+            <button class="tab-btn" data-tab="advanced">Advanced</button>
+          </nav>
 
-      <!-- Tab panels -->
-      <div class="tab-content">
-        <section id="tab-file" class="tab-panel active">
-          <h2>Load SVG</h2>
-          <input type="file" id="file-input" accept=".svg" />
-          <div id="file-info" class="info-box"></div>
-        </section>
+          <!-- Tab panels -->
+          <div class="tab-content">
+            <section id="tab-file" class="tab-panel active">
+              <h2>Load SVG</h2>
+              <input type="file" id="file-input" accept=".svg" />
+              <div id="file-info" class="info-box"></div>
+            </section>
 
-        <section id="tab-preview" class="tab-panel">
-          <h2>Preview</h2>
-          <div class="preview-container">
-            <canvas id="preview-canvas"></canvas>
-          </div>
-          <div class="preview-controls">
-            <button id="btn-zoom-in">Zoom In</button>
-            <button id="btn-zoom-out">Zoom Out</button>
-            <button id="btn-reset-view">Reset View</button>
-          </div>
-        </section>
-
-        <section id="tab-fills" class="tab-panel">
+            <section id="tab-fills" class="tab-panel">
           <h2>Fill Settings</h2>
           <div class="controls-grid">
             <label>
@@ -71,13 +63,125 @@
             </label>
           </div>
 
+          <!-- Mode-specific controls -->
+          <div id="mode-striped-controls" class="mode-specific-controls" style="display: none;">
+            <h3>Striped Mode Options</h3>
+            <div class="controls-grid">
+              <label>
+                Filled Stripes
+                <input type="number" id="stripe-filled" step="1" min="1" max="10" value="1" />
+              </label>
+              <label>
+                Empty Stripes
+                <input type="number" id="stripe-empty" step="1" min="0" max="10" value="1" />
+              </label>
+            </div>
+          </div>
+
+          <div id="mode-spiral-controls" class="mode-specific-controls" style="display: none;">
+            <h3>Spiral Mode Options</h3>
+            <div class="controls-grid">
+              <label>
+                Twist Rate
+                <input type="number" id="twist-rate" step="0.005" min="0" max="0.1" value="0.01" />
+              </label>
+              <label>
+                Twist Offset (rad)
+                <input type="number" id="twist-offset" step="0.1" min="0" max="6.28" value="0" />
+              </label>
+              <label>
+                Filled Stripes
+                <input type="number" id="spiral-stripe-filled" step="1" min="1" max="10" value="1" />
+              </label>
+              <label>
+                Empty Stripes
+                <input type="number" id="spiral-stripe-empty" step="1" min="0" max="10" value="1" />
+              </label>
+            </div>
+          </div>
+
+          <div id="mode-crosshatch-controls" class="mode-specific-controls" style="display: none;">
+            <h3>Crosshatch Mode Options</h3>
+            <div class="controls-grid">
+              <label>
+                Hatch Angles (comma-separated)
+                <input type="text" id="crosshatch-angles" value="45,135" placeholder="e.g., 0,90 or 45,135" />
+              </label>
+              <label>
+                Hatch Spacing (mm)
+                <input type="number" id="crosshatch-spacing" step="0.1" min="0.1" max="5" value="1.0" />
+              </label>
+            </div>
+            <div class="info-box" style="display: block; margin-top: 10px;">
+              <strong>Tip:</strong> Use 0,90 for orthogonal crosshatch, 45,135 for diagonal, or 0,60,120 for triangular pattern.
+            </div>
+          </div>
+
+          <div class="controls-grid">
+            <label>
+              <input type="checkbox" id="live-preview" />
+              Live Preview (auto-update)
+            </label>
+          </div>
+
           <div class="action-buttons">
             <button id="btn-process">Process Paths</button>
             <button id="btn-reset-preview">Reset to Original</button>
           </div>
         </section>
 
-        <section id="tab-advanced" class="tab-panel">
+            <section id="tab-attractors" class="tab-panel">
+          <h2>Attractors</h2>
+
+          <div class="controls-grid">
+            <label>
+              <input type="checkbox" id="use-attractors" />
+              Enable Attractors
+            </label>
+          </div>
+
+          <div class="info-box" id="attractor-info">
+            Click on the preview canvas to place attractors.<br>
+            Shift+Click to remove attractors.
+          </div>
+
+          <div class="controls-grid">
+            <label>
+              Mode
+              <select id="attractor-mode">
+                <option value="attract">Attract (more passes)</option>
+                <option value="repel">Repel (fewer passes)</option>
+              </select>
+            </label>
+
+            <label>
+              Strength
+              <input type="number" id="attractor-strength" step="0.1" min="0" max="2" value="1.0" />
+            </label>
+
+            <label>
+              Falloff Radius (mm)
+              <input type="number" id="attractor-radius" step="5" min="10" max="200" value="50" />
+            </label>
+
+            <label>
+              Falloff Curve
+              <select id="attractor-curve">
+                <option value="linear">Linear</option>
+                <option value="exponential">Exponential</option>
+                <option value="gaussian">Gaussian</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="action-buttons">
+            <button id="btn-clear-attractors">Clear All Attractors</button>
+          </div>
+
+          <div id="attractor-list" class="attractor-list"></div>
+        </section>
+
+            <section id="tab-advanced" class="tab-panel">
           <h2>Advanced Settings</h2>
           <div class="controls-grid">
             <label>
@@ -100,7 +204,24 @@
             <button id="btn-copy-cli">Copy CLI Command</button>
             <button id="btn-export">Export SVG</button>
           </div>
-        </section>
+            </section>
+          </div>
+        </div>
+
+        <!-- Right panel: preview (always visible) -->
+        <div class="preview-panel">
+          <div class="preview-header">
+            <h2>Preview</h2>
+            <div class="preview-controls">
+              <button id="btn-zoom-in">Zoom In</button>
+              <button id="btn-zoom-out">Zoom Out</button>
+              <button id="btn-reset-view">Reset View</button>
+            </div>
+          </div>
+          <div class="preview-container">
+            <canvas id="preview-canvas"></canvas>
+          </div>
+        </div>
       </div>
     </main>
   </div>
