@@ -1,0 +1,139 @@
+# Refactor Roadmap
+
+Guiding plan for rebuilding the Plotter Line Thickener with a cleaner UI and maintainable architecture. Check off items as they land; edit or reprioritize as the project evolves.
+
+---
+
+## 1. Goals & Guardrails
+- [ ] Preserve ability to load SVG, preview offsets, and export processed SVGs at every major milestone.
+- [ ] Keep one “known good” branch/tag to fall back on while experimenting.
+- [ ] Share geometry / density logic between CLI and web builds to avoid future drift.
+- [ ] Replace ad-hoc globals with explicit state management and typed configuration.
+- [ ] Bias toward incremental migrations; delete legacy code only after ported features are validated.
+- [ ] Keep v2 artifacts isolated (dedicated folder/workspace, prefixed config files) so legacy and new stacks can run side-by-side until parity is reached.
+
+---
+
+## 2. Architecture Principles
+- **Module boundaries**: isolate parsing, state, rendering, and UI components.
+- **Shared core**: move math/utilities into a `shared/` package consumed by CLI + web.
+- **Event-driven UI**: UI dispatches actions; render layer subscribes to derived state.
+- **Async heavy work**: long-running computations happen in workers or async tasks.
+- **Config-first**: every feature derives from a schema so CLI and UI stay aligned.
+
+---
+
+## 2.5 North Star & Plotter Constraints
+- **Purpose**: enhance existing SVG artwork for pen plotting by duplicating/offsetting paths (“echoes”) to simulate variable stroke weight with a single-width pen.
+- **Medium constraints**:
+  - Pen plotters only respect path geometry; stroke width, opacity, and fills rarely translate.
+  - Overlapping passes are the primary lever for perceived darkness/thickness.
+  - Output must remain pure `<path>` data with consistent viewBox and scale.
+- **Success criteria**:
+  - Artist can load an SVG, audition adjustments in a fast preview, then export plotter-ready paths.
+  - UI and CLI expose the same mental model (offset distance, noise, pass counts, attractor influence).
+  - Optional diagnostics never compromise the core plotting pipeline.
+
+---
+
+## 3. Feature Inventory & Priority
+
+| Feature / Capability | Priority | Notes |
+| --- | --- | --- |
+| Core SVG loader & bounds fitting | 🟥 Critical | baseline for any preview |
+| Preview canvas with pan/zoom | 🟥 Critical | minimal UI scaffolding |
+| Offset fill rendering (length-based) | 🟥 Critical | foundation for CLI parity |
+| Export processed SVG | 🟥 Critical | CLI + UI alignment |
+| CLI parity for base offset/noise | 🟥 Critical | ensure shared engine |
+| Attractor placement & weight preview | 🟧 High | essential interactive workflow |
+| Live preview toggle | 🟧 High | keep but optimize for performance |
+| Focus blur fill (point/directional) | 🟧 High | anchor advanced fill modes |
+| Stripe / crosshatch / gradient fills | 🟨 Medium | port once core stable |
+| Organic hatch controls | 🟨 Medium | depend on shared random/seed logic |
+| Focus window tooling | 🟨 Medium | nice for large files; postpone if needed |
+| Preview pattern generators (focus blur) | 🟨 Medium | reintroduce after base UI |
+| Calibration sandbox (`calibration.html`) | 🟩 Optional | keep separate playground |
+| Curvature diagnostics & debug overlays | 🟩 Optional | add once pipeline solid |
+| Deprecated experiments / one-off scripts | ⬜ Deprioritize | archive or drop if unused |
+
+Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remove
+
+---
+
+## 4. Phase Breakdown
+
+### Phase 0 – Baseline Snapshot
+- [ ] Tag current repo (e.g., `pre-refactor`).
+- [ ] Document “must work” workflows (CLI command combos, UI attractor flow).
+- [ ] Capture sample input/output pairs for regression comparison.
+- [ ] Maintain legacy directories (root scripts, web/) untouched until parity is confirmed
+
+### Phase 1 – web-v2 Scaffold
+- [ ] Create `web-v2/` workspace (own `package.json`, configs prefixed with `web-v2.*`) to avoid blending with legacy files.
+- [ ] Set up bundler (Vite/Rollup) and optionally TypeScript inside that workspace.
+- [ ] Implement minimal app shell: state store, React/Lit/vanilla modules.
+- [ ] Load SVG → compute bounds → render static paths.
+- [ ] Mirror CLI config schema in shared module.
+- [ ] Establish UI layout skeleton: top-level tabs/panels (`File`, `Preview`, `Fills`, `Advanced`) and a dedicated “Sample Preview” region placeholder shared by upcoming controls.
+
+### Phase 2 – Core Engine Extraction
+- [ ] Move geometry + density code to `shared/engine`.
+- [ ] Write unit tests for density field, noise, offset helpers.
+- [ ] Wire CLI to shared engine; ensure existing commands pass.
+- [ ] Expose same APIs to web-v2 renderer.
+
+### Phase 3 – Interactive Essentials
+- [ ] Flesh out UI shell: wire tabs/panels from Phase 1 skeleton, ensure controls are grouped to avoid long scrolling.
+- [ ] Implement pan/zoom + lightweight client-side preview (favor responsiveness over perfect accuracy; offer small sample preview area and optional full-canvas render toggle).
+- [ ] Add attractor placement with cached sampling.
+- [ ] Integrate live/manual preview switch + throttled recompute.
+- [ ] Expose both:
+  - [ ] A “Copy CLI command” action that mirrors current settings.
+  - [ ] An “Export via CLI” action that invokes the shared engine/CLI backend directly from the UI.
+- [ ] Hook up export pipeline to shared engine.
+- [ ] Introduce reusable sample preview testbed (simple shapes/lines) that all fill/lighting parameters can target before running against the main SVG.
+- [ ] Set up persistent progress log (`docs/refactor-progress.md`) to capture completed steps, deviations, and open questions for easy handoff between sessions.
+
+### Phase 4 – Advanced Fills & Tooling
+- [ ] Port focus blur controls + preview canvas (consider worker).
+- [ ] Reintroduce crosshatch/striped/gradient modes via shared modules.
+- [ ] Restore calibration / diagnostic panels selectively.
+- [ ] Add config import/export for presets.
+
+### Phase 5 – Polish & Cleanup
+- [ ] Remove redundant legacy files once parity verified.
+- [ ] Enable linting, formatting, and automated tests in CI (local script ok).
+- [ ] Update documentation + screenshots for new UI.
+
+---
+
+## 5. Workstreams & Owners
+
+| Workstream | Tasks | Status |
+| --- | --- | --- |
+| Shared Engine | Extract path utils, density, randomness | ☐ |
+| UI Framework | Decide tech (vanilla modules vs. framework), set conventions | ☐ |
+| State Management | Introduce store, action patterns, derived selectors | ☐ |
+| Rendering | Canvas/SVG renderer with layering + performance tuning | ☐ |
+| Testing | Snapshot diffs for SVG, unit tests for math, integration scripts | ☐ |
+| Documentation | Update README, add architecture guide, maintain checklist | ☐ |
+
+Feel free to annotate with owner initials or target dates.
+
+---
+
+## 6. Risk Log
+- High risk of feature drift if CLI and web use different engines → mitigate by prioritizing shared modules early.
+- Performance regressions when recomputing weights → plan worker-based sampling & caching.
+- Scope creep from legacy experiments → enforce priority table, archive or delete low-value tools.
+
+---
+
+## 7. Parking Lot (Future Ideas)
+- GPU-accelerated rendering for previews.
+- Preset gallery with saved attractor layouts.
+- Batch processing UI for multiple SVGs.
+- Plugin hooks for custom noise fields.
+- Batch “gallery” export mode: queue multiple fill configurations (optionally randomized) against a single SVG to explore unexpected outcomes.
+
+Add or remove items as plans change.
