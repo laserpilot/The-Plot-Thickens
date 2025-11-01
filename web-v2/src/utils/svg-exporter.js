@@ -8,15 +8,23 @@
  * @param {Array} paths - Array of processed path objects with 'd' attribute
  * @param {Object} bounds - SVG bounds {x, y, width, height}
  * @param {Object} metadata - Optional metadata for SVG comments
+ * @param {boolean} enableBinning - Whether to group paths by length bins
+ * @param {number} binCount - Number of bins if binning is enabled
+ * @param {Array} originalPaths - Original paths with lengths for binning
  * @returns {string} Complete SVG string
  */
-export function buildSVG(paths, bounds, metadata = {}) {
+export function buildSVG(paths, bounds, metadata = {}, enableBinning = false, binCount = 4, originalPaths = []) {
   if (!paths || paths.length === 0) {
     throw new Error('No paths to export');
   }
 
   if (!bounds || !bounds.width || !bounds.height) {
     throw new Error('Invalid bounds for SVG export');
+  }
+
+  // If binning is enabled, use binned version
+  if (enableBinning && originalPaths.length > 0) {
+    return buildBinnedSVG(paths, bounds, metadata, binCount, originalPaths);
   }
 
   const parts = [];
@@ -34,29 +42,170 @@ export function buildSVG(paths, bounds, metadata = {}) {
   parts.push(`  <!-- Generated: ${timestamp} -->`);
   parts.push(`  <!-- Paths: ${paths.length} -->`);
 
-  // Group for all paths
-  parts.push('  <g id="processed-paths">');
+  // Separate outlines if they exist
+  const fillPaths = paths.filter(p => !p.isOutline);
+  const outlinePaths = paths.filter(p => p.isOutline);
 
-  // Add each path
-  paths.forEach((path, index) => {
-    if (!path.d || typeof path.d !== 'string') {
-      console.warn(`Path ${index}: invalid d attribute, skipping`);
-      return;
-    }
+  // Group for fill paths
+  if (fillPaths.length > 0) {
+    parts.push('  <g id="fill-paths">');
+    fillPaths.forEach((path, index) => {
+      if (!path.d || typeof path.d !== 'string') {
+        console.warn(`Path ${index}: invalid d attribute, skipping`);
+        return;
+      }
 
-    // Escape any special characters in path data (security measure)
-    const escapedD = escapeXML(path.d);
+      const escapedD = escapeXML(path.d);
+      const fill = path.fill || 'none';
+      const stroke = path.stroke || 'black';
+      const strokeWidth = path.strokeWidth || 0.1;
 
-    const fill = path.fill || 'none';
-    const stroke = path.stroke || 'black';
-    const strokeWidth = path.strokeWidth || 0.1;
+      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+    });
+    parts.push('  </g>');
+  }
 
-    parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
-  });
+  // Group for outlines
+  if (outlinePaths.length > 0) {
+    parts.push('  <g id="outline-paths">');
+    outlinePaths.forEach((path, index) => {
+      if (!path.d || typeof path.d !== 'string') {
+        console.warn(`Outline path ${index}: invalid d attribute, skipping`);
+        return;
+      }
 
-  parts.push('  </g>');
+      const escapedD = escapeXML(path.d);
+      const fill = path.fill || 'none';
+      const stroke = path.stroke || 'black';
+      const strokeWidth = path.strokeWidth || 0.1;
+
+      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+    });
+    parts.push('  </g>');
+  }
+
   parts.push('</svg>');
 
+  return parts.join('\n');
+}
+
+/**
+ * Build SVG with length binning (groups paths by length percentiles)
+ * @param {Array} paths - Processed paths
+ * @param {Object} bounds - SVG bounds
+ * @param {Object} metadata - Metadata
+ * @param {number} binCount - Number of bins
+ * @param {Array} originalPaths - Original paths with length data
+ * @returns {string} SVG string with binned groups
+ */
+function buildBinnedSVG(paths, bounds, metadata, binCount, originalPaths) {
+  const parts = [];
+  const { x = 0, y = 0, width, height } = bounds;
+
+  // Import measurePathLength for length calculation
+  import('../../../shared/geometry/path-utils.js').then(module => {
+    const measurePathLength = module.measurePathLength;
+  });
+
+  // Calculate lengths for original paths to determine bin boundaries
+  const pathsWithLength = paths.map(path => ({
+    ...path,
+    sourceLength: path.originalIndex !== undefined && originalPaths[path.originalIndex]
+      ? (originalPaths[path.originalIndex].length || 0)
+      : 0
+  }));
+
+  // Get unique source lengths and sort them
+  const sourceLengths = [...new Set(pathsWithLength.map(p => p.sourceLength).filter(l => l > 0))].sort((a, b) => a - b);
+
+  if (sourceLengths.length === 0) {
+    // No length data, fall back to non-binned export
+    return buildSVG(paths, bounds, metadata, false);
+  }
+
+  // Calculate bin boundaries (quantiles)
+  const boundaries = [];
+  for (let i = 0; i <= binCount; i++) {
+    const quantile = i / binCount;
+    const index = Math.floor(quantile * (sourceLengths.length - 1));
+    boundaries.push(sourceLengths[index]);
+  }
+  boundaries[boundaries.length - 1] = sourceLengths[sourceLengths.length - 1];
+
+  console.log(`Binning paths into ${binCount} bins, boundaries: ${boundaries.map(b => b.toFixed(2)).join(', ')}`);
+
+  // Assign paths to bins
+  const bins = Array.from({ length: binCount }, () => []);
+  pathsWithLength.forEach(path => {
+    let binIndex = binCount - 1; // Default to last bin
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      if (path.sourceLength >= boundaries[i] && path.sourceLength <= boundaries[i + 1]) {
+        binIndex = i;
+        break;
+      }
+    }
+    bins[binIndex].push(path);
+  });
+
+  // SVG header
+  const fillMode = metadata.fillMode || 'offset';
+  const timestamp = new Date().toISOString();
+  parts.push('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
+  parts.push(`<svg width="${width}mm" height="${height}mm" viewBox="${x} ${y} ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`);
+  parts.push(`  <!-- Generated by Plotter Line Thickener v2 -->`);
+  parts.push(`  <!-- Fill mode: ${fillMode} -->`);
+  parts.push(`  <!-- Generated: ${timestamp} -->`);
+  parts.push(`  <!-- Bins: ${binCount} -->`);
+
+  // Separate outlines across all bins
+  const allOutlines = [];
+  bins.forEach(bin => {
+    const outlines = bin.filter(p => p.isOutline);
+    allOutlines.push(...outlines);
+  });
+
+  // Write each bin as a group
+  bins.forEach((bin, binIndex) => {
+    const fillPaths = bin.filter(p => !p.isOutline);
+    if (fillPaths.length === 0) return;
+
+    const binMin = boundaries[binIndex].toFixed(2);
+    const binMax = boundaries[binIndex + 1].toFixed(2);
+
+    parts.push(`  <g id="bin-${binIndex}" data-length-range="${binMin}-${binMax}mm">`);
+    parts.push(`    <!-- Bin ${binIndex + 1}/${binCount}: ${binMin}-${binMax}mm (${fillPaths.length} paths) -->`);
+
+    fillPaths.forEach(path => {
+      if (!path.d || typeof path.d !== 'string') return;
+
+      const escapedD = escapeXML(path.d);
+      const fill = path.fill || 'none';
+      const stroke = path.stroke || 'black';
+      const strokeWidth = path.strokeWidth || 0.1;
+
+      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+    });
+
+    parts.push('  </g>');
+  });
+
+  // Add outlines in separate group
+  if (allOutlines.length > 0) {
+    parts.push('  <g id="outlines">');
+    allOutlines.forEach(path => {
+      if (!path.d || typeof path.d !== 'string') return;
+
+      const escapedD = escapeXML(path.d);
+      const fill = path.fill || 'none';
+      const stroke = path.stroke || 'black';
+      const strokeWidth = path.strokeWidth || 0.1;
+
+      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+    });
+    parts.push('  </g>');
+  }
+
+  parts.push('</svg>');
   return parts.join('\n');
 }
 

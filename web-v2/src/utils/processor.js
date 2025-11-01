@@ -17,9 +17,10 @@ import { AttractorSystem } from '../../../shared/fields/attractor.js';
  * @param {Object} config - Processing configuration
  * @param {Array} attractors - Optional array of attractors
  * @param {Object} attractorConfig - Optional attractor configuration
+ * @param {Object} viewBox - Optional viewBox for focus blur (required for focus-blur mode)
  * @returns {Array} Processed paths
  */
-export function processPaths(paths, config, attractors = [], attractorConfig = null) {
+export function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null) {
   const processed = [];
 
   // Set up attractor system if attractors provided
@@ -109,9 +110,49 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
       };
     }
 
+    // For focus blur mode, pass all focus blur parameters and viewBox
+    if (config.fillMode === 'focus-blur') {
+      const focusBlur = config.focusBlur || {};
+      modeOptions = {
+        ...(modeOptions || {}),
+        lightMode: focusBlur.lightMode || 'directional',
+        lightAngle: focusBlur.lightAngle || 45,
+        lightPosX: focusBlur.lightPosX || 50,
+        lightPosY: focusBlur.lightPosY || 50,
+        falloffRadius: focusBlur.falloffRadius || 150,
+        noiseMin: focusBlur.noiseMin || 0.05,
+        noiseMax: focusBlur.noiseMax || 0.6,
+        freqMin: focusBlur.freqMin || 100,
+        freqMax: focusBlur.freqMax || 10,
+        modulatePasses: focusBlur.modulatePasses || false,
+        passesMin: focusBlur.passesMin || 1.0,
+        passesMax: focusBlur.passesMax || 1.5,
+        viewBox: viewBox || { x: 0, y: 0, width: 100, height: 100 }
+      };
+    }
+
+    // For hatch gradient mode, pass all hatch gradient parameters and viewBox
+    if (config.fillMode === 'hatch-gradient') {
+      const hatchGradient = config.hatchGradient || {};
+      modeOptions = {
+        ...(modeOptions || {}),
+        angles: hatchGradient.angles || [0, 45, 90],
+        spacing: hatchGradient.spacing || 1.0,
+        lightMode: hatchGradient.lightMode || 'directional',
+        lightAngle: hatchGradient.lightAngle || 45,
+        lightPosX: hatchGradient.lightPosX || 25,
+        lightPosY: hatchGradient.lightPosY || 25,
+        falloffRadius: hatchGradient.falloffRadius || 100,
+        lightStrength: hatchGradient.lightStrength || 0.8,
+        baseWeight: hatchGradient.baseWeight || 0.2,
+        shadowSoftness: hatchGradient.shadowSoftness || 0.5,
+        viewBox: viewBox || { x: 0, y: 0, width: 100, height: 100 }
+      };
+    }
+
     // Generate offset passes for this path
     // Note: generatePasses expects individual parameters, not an object
-    const passes = generatePasses(
+    const result = generatePasses(
       path.d,                 // pathData
       passCount,              // passes (number)
       config.baseOffset,      // baseOffset
@@ -124,10 +165,14 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
       config.sampleRate,      // sampleRate
       config.fillMode || 'offset',  // fillMode
       modeOptions,            // crosshatchOptions (or mode-specific options)
-      false,                  // extractOutline
+      config.addOutline || false,  // extractOutline
       config.stripeFilled || 1,  // stripeFilled
       config.stripeEmpty || 1    // stripeEmpty
     );
+
+    // Handle result - could be array of paths or {fills, outlines} object
+    const passes = config.addOutline && result.fills ? result.fills : (Array.isArray(result) ? result : []);
+    const outlines = config.addOutline && result.outlines ? result.outlines : [];
 
     // Add each pass as a separate path with proper SVG attributes
     passes.forEach((passData, passIndex) => {
@@ -140,6 +185,20 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
         fill: 'none',
         stroke: 'black',
         strokeWidth: 0.1  // 0.1mm default pen width
+      });
+    });
+
+    // Add outline paths with special ID prefix for grouping
+    outlines.forEach((outlineData, outlineIndex) => {
+      processed.push({
+        id: `${path.id || i}-outline-${outlineIndex}`,
+        d: outlineData,
+        originalIndex: i,
+        isOutline: true,
+        // SVG display attributes for rendering and export
+        fill: 'none',
+        stroke: 'black',
+        strokeWidth: 0.1
       });
     });
   }

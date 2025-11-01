@@ -104,7 +104,40 @@ const initialState = {
     twistOffset: 0,
     crosshatchAngles: [45, 135],
     crosshatchSpacing: 1.0,
-    fillModeOptions: null
+    fillModeOptions: null,
+    // Focus blur configuration
+    focusBlur: {
+      lightMode: 'directional',
+      lightAngle: 45,
+      lightPosX: 50,
+      lightPosY: 50,
+      falloffRadius: 150,
+      noiseMin: 0.05,
+      noiseMax: 0.6,
+      freqMin: 100,
+      freqMax: 10,
+      modulatePasses: false,
+      passesMin: 1.0,
+      passesMax: 1.5
+    },
+    // Hatch gradient configuration
+    hatchGradient: {
+      angles: [0, 45, 90],
+      spacing: 1.0,
+      lightMode: 'directional',
+      lightAngle: 45,
+      lightPosX: 25,
+      lightPosY: 25,
+      falloffRadius: 100,
+      lightStrength: 0.8,
+      baseWeight: 0.2,
+      shadowSoftness: 0.5
+    },
+    // Outline extraction
+    addOutline: false,
+    // Length binning for SVG organization
+    enableBinning: false,
+    binCount: 4
   },
 
   // UI state

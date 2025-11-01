@@ -62,12 +62,16 @@ export function initUI(store, renderer) {
       const attractors = store.getState('attractors');
       const attractorConfig = store.getState('attractorConfig');
 
+      // Get viewBox for focus blur mode
+      const viewBox = store.getState('svgBounds');
+
       // Process with or without attractors
       const processed = await processPaths(
         originalPaths,
         config,
         useAttractors ? attractors : [],
-        useAttractors ? attractorConfig : null
+        useAttractors ? attractorConfig : null,
+        viewBox
       );
 
       store.setState({
@@ -402,16 +406,231 @@ export function initUI(store, renderer) {
     }
   });
 
+  // Focus blur controls
+  const focusBlurLightModeSelect = document.getElementById('focus-blur-light-mode');
+  const focusBlurDirectionalControls = document.getElementById('focus-blur-directional-controls');
+  const focusBlurPointControls = document.getElementById('focus-blur-point-controls');
+  const focusBlurPassesControls = document.getElementById('focus-blur-passes-controls');
+
+  // Helper to update focus blur config
+  const updateFocusBlurConfig = (updates) => {
+    const config = store.getState('config');
+    store.setState({
+      config: {
+        ...config,
+        focusBlur: { ...config.focusBlur, ...updates }
+      }
+    });
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  };
+
+  // Light mode selector
+  focusBlurLightModeSelect.addEventListener('change', () => {
+    const mode = focusBlurLightModeSelect.value;
+    updateFocusBlurConfig({ lightMode: mode });
+
+    // Toggle visibility of mode-specific controls
+    if (mode === 'directional') {
+      focusBlurDirectionalControls.style.display = 'block';
+      focusBlurPointControls.style.display = 'none';
+    } else {
+      focusBlurDirectionalControls.style.display = 'none';
+      focusBlurPointControls.style.display = 'block';
+    }
+  });
+
+  // Light angle (directional)
+  document.getElementById('focus-blur-light-angle').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ lightAngle: parseFloat(e.target.value) });
+  });
+
+  // Light position (point)
+  document.getElementById('focus-blur-light-pos-x').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ lightPosX: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('focus-blur-light-pos-y').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ lightPosY: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('focus-blur-falloff-radius').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ falloffRadius: parseFloat(e.target.value) });
+  });
+
+  // Noise amplitude
+  document.getElementById('focus-noise-min').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ noiseMin: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('focus-noise-max').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ noiseMax: parseFloat(e.target.value) });
+  });
+
+  // Noise frequency
+  document.getElementById('focus-freq-min').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ freqMin: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('focus-freq-max').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ freqMax: parseFloat(e.target.value) });
+  });
+
+  // Pass modulation checkbox
+  document.getElementById('focus-blur-modulate-passes').addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    updateFocusBlurConfig({ modulatePasses: enabled });
+
+    // Show/hide pass multiplier controls
+    focusBlurPassesControls.style.display = enabled ? 'block' : 'none';
+  });
+
+  // Pass multipliers
+  document.getElementById('focus-passes-min').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ passesMin: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('focus-passes-max').addEventListener('change', (e) => {
+    updateFocusBlurConfig({ passesMax: parseFloat(e.target.value) });
+  });
+
+  // Hatch gradient controls
+  const hatchLightModeSelect = document.getElementById('hatch-light-mode');
+  const hatchDirectionalControls = document.getElementById('hatch-directional-controls');
+  const hatchPointControls = document.getElementById('hatch-point-controls');
+
+  // Helper to update hatch gradient config
+  const updateHatchGradientConfig = (updates) => {
+    const config = store.getState('config');
+    store.setState({
+      config: {
+        ...config,
+        hatchGradient: { ...config.hatchGradient, ...updates }
+      }
+    });
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  };
+
+  // Light mode selector
+  hatchLightModeSelect.addEventListener('change', () => {
+    const mode = hatchLightModeSelect.value;
+    updateHatchGradientConfig({ lightMode: mode });
+
+    // Toggle visibility of mode-specific controls
+    if (mode === 'directional') {
+      hatchDirectionalControls.style.display = 'block';
+      hatchPointControls.style.display = 'none';
+    } else {
+      hatchDirectionalControls.style.display = 'none';
+      hatchPointControls.style.display = 'block';
+    }
+  });
+
+  // Light angle (directional)
+  document.getElementById('hatch-light-angle').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ lightAngle: parseFloat(e.target.value) });
+  });
+
+  // Light position (point)
+  document.getElementById('hatch-light-pos-x').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ lightPosX: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('hatch-light-pos-y').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ lightPosY: parseFloat(e.target.value) });
+  });
+
+  document.getElementById('hatch-falloff-radius').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ falloffRadius: parseFloat(e.target.value) });
+  });
+
+  // Light strength
+  document.getElementById('hatch-light-strength').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ lightStrength: parseFloat(e.target.value) });
+  });
+
+  // Base density
+  document.getElementById('hatch-base-weight').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ baseWeight: parseFloat(e.target.value) });
+  });
+
+  // Shadow softness
+  document.getElementById('hatch-shadow-softness').addEventListener('change', (e) => {
+    updateHatchGradientConfig({ shadowSoftness: parseFloat(e.target.value) });
+  });
+
+  // Outline extraction control
+  document.getElementById('add-outline').addEventListener('change', (e) => {
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, addOutline: e.target.checked }
+    });
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  });
+
+  // Length binning controls
+  const enableBinningCheckbox = document.getElementById('enable-binning');
+  const binningControls = document.getElementById('binning-controls');
+  const binCountSlider = document.getElementById('bin-count');
+  const binCountValue = document.getElementById('bin-count-value');
+  const binPreview = document.getElementById('bin-preview');
+
+  enableBinningCheckbox.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, enableBinning: enabled }
+    });
+
+    // Show/hide binning controls
+    binningControls.style.display = enabled ? 'block' : 'none';
+  });
+
+  binCountSlider.addEventListener('input', (e) => {
+    const count = parseInt(e.target.value);
+    binCountValue.textContent = count;
+
+    // Update preview text
+    const percentages = [];
+    for (let i = 0; i < count; i++) {
+      const start = Math.round((i / count) * 100);
+      const end = Math.round(((i + 1) / count) * 100);
+      percentages.push(`${start}-${end}%`);
+    }
+    binPreview.textContent = percentages.join(', ');
+
+    // Update config
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, binCount: count }
+    });
+  });
+
   // Function to show/hide mode-specific controls
   function updateFillModeControls(mode) {
     const stripedControls = document.getElementById('mode-striped-controls');
     const spiralControls = document.getElementById('mode-spiral-controls');
     const crosshatchControls = document.getElementById('mode-crosshatch-controls');
+    const focusBlurControls = document.getElementById('mode-focus-blur-controls');
+    const hatchGradientControls = document.getElementById('mode-hatch-gradient-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
     spiralControls.style.display = 'none';
     crosshatchControls.style.display = 'none';
+    focusBlurControls.style.display = 'none';
+    hatchGradientControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -420,6 +639,10 @@ export function initUI(store, renderer) {
       spiralControls.style.display = 'block';
     } else if (mode === 'crosshatch') {
       crosshatchControls.style.display = 'block';
+    } else if (mode === 'focus-blur') {
+      focusBlurControls.style.display = 'block';
+    } else if (mode === 'hatch-gradient') {
+      hatchGradientControls.style.display = 'block';
     }
   }
 
@@ -535,7 +758,15 @@ export function initUI(store, renderer) {
         passes: `${config.minPasses}-${config.maxPasses}`
       };
 
-      const svgContent = buildSVG(pathsToExport, bounds, metadata);
+      // Build SVG with optional binning
+      const svgContent = buildSVG(
+        pathsToExport,
+        bounds,
+        metadata,
+        config.enableBinning || false,
+        config.binCount || 4,
+        originalPaths
+      );
 
       // Generate filename
       const originalFilename = store.getState('originalFilename') || 'processed.svg';
@@ -545,7 +776,7 @@ export function initUI(store, renderer) {
       // Trigger download
       downloadSVG(svgContent, filename);
 
-      console.log(`✓ Exported ${pathsToExport.length} paths`);
+      console.log(`✓ Exported ${pathsToExport.length} paths${config.enableBinning ? ` (binned into ${config.binCount} groups)` : ''}`);
 
     } catch (err) {
       console.error('Export error:', err);
@@ -956,6 +1187,96 @@ function generateCLICommand(config) {
       if (config.crosshatchSpacing !== 1.0) {
         parts.push(`--crosshatch-spacing ${config.crosshatchSpacing}`);
       }
+    } else if (config.fillMode === 'focus-blur') {
+      const fb = config.focusBlur || {};
+
+      // Light mode parameters
+      if (fb.lightMode) {
+        parts.push(`--focus-blur-light-mode ${fb.lightMode}`);
+      }
+
+      if (fb.lightMode === 'directional') {
+        if (fb.lightAngle !== undefined && fb.lightAngle !== 45) {
+          parts.push(`--focus-blur-light-angle ${fb.lightAngle}`);
+        }
+      } else if (fb.lightMode === 'point') {
+        if (fb.lightPosX !== undefined && fb.lightPosX !== 50) {
+          parts.push(`--focus-blur-light-pos-x ${fb.lightPosX}`);
+        }
+        if (fb.lightPosY !== undefined && fb.lightPosY !== 50) {
+          parts.push(`--focus-blur-light-pos-y ${fb.lightPosY}`);
+        }
+        if (fb.falloffRadius !== undefined && fb.falloffRadius !== 150) {
+          parts.push(`--focus-blur-falloff-radius ${fb.falloffRadius}`);
+        }
+      }
+
+      // Noise parameters
+      if (fb.noiseMin !== undefined && fb.noiseMin !== 0.05) {
+        parts.push(`--focus-blur-noise-min ${fb.noiseMin}`);
+      }
+      if (fb.noiseMax !== undefined && fb.noiseMax !== 0.6) {
+        parts.push(`--focus-blur-noise-max ${fb.noiseMax}`);
+      }
+      if (fb.freqMin !== undefined && fb.freqMin !== 100) {
+        parts.push(`--focus-blur-freq-min ${fb.freqMin}`);
+      }
+      if (fb.freqMax !== undefined && fb.freqMax !== 10) {
+        parts.push(`--focus-blur-freq-max ${fb.freqMax}`);
+      }
+
+      // Pass modulation
+      if (fb.modulatePasses) {
+        parts.push(`--focus-blur-modulate-passes`);
+        if (fb.passesMin !== undefined && fb.passesMin !== 1.0) {
+          parts.push(`--focus-blur-passes-min ${fb.passesMin}`);
+        }
+        if (fb.passesMax !== undefined && fb.passesMax !== 1.5) {
+          parts.push(`--focus-blur-passes-max ${fb.passesMax}`);
+        }
+      }
+    } else if (config.fillMode === 'hatch-gradient') {
+      const hg = config.hatchGradient || {};
+
+      // Hatch angles and spacing
+      if (hg.angles && hg.angles.length > 0 && JSON.stringify(hg.angles) !== JSON.stringify([0, 45, 90])) {
+        parts.push(`--hatch-angles ${hg.angles.join(',')}`);
+      }
+      if (hg.spacing !== undefined && hg.spacing !== 1.0) {
+        parts.push(`--hatch-spacing ${hg.spacing}`);
+      }
+
+      // Light mode parameters
+      if (hg.lightMode) {
+        parts.push(`--hatch-light-mode ${hg.lightMode}`);
+      }
+
+      if (hg.lightMode === 'directional') {
+        if (hg.lightAngle !== undefined && hg.lightAngle !== 45) {
+          parts.push(`--hatch-light-angle ${hg.lightAngle}`);
+        }
+      } else if (hg.lightMode === 'point') {
+        if (hg.lightPosX !== undefined && hg.lightPosX !== 25) {
+          parts.push(`--hatch-light-pos-x ${hg.lightPosX}`);
+        }
+        if (hg.lightPosY !== undefined && hg.lightPosY !== 25) {
+          parts.push(`--hatch-light-pos-y ${hg.lightPosY}`);
+        }
+        if (hg.falloffRadius !== undefined && hg.falloffRadius !== 100) {
+          parts.push(`--hatch-falloff-radius ${hg.falloffRadius}`);
+        }
+      }
+
+      // Density modulation parameters
+      if (hg.lightStrength !== undefined && hg.lightStrength !== 0.8) {
+        parts.push(`--hatch-light-strength ${hg.lightStrength}`);
+      }
+      if (hg.baseWeight !== undefined && hg.baseWeight !== 0.2) {
+        parts.push(`--hatch-base-weight ${hg.baseWeight}`);
+      }
+      if (hg.shadowSoftness !== undefined && hg.shadowSoftness !== 0.5) {
+        parts.push(`--hatch-shadow-softness ${hg.shadowSoftness}`);
+      }
     }
   }
 
@@ -967,6 +1288,11 @@ function generateCLICommand(config) {
   }
   if (config.maxLength && config.maxLength > 0) {
     parts.push(`--max-length ${config.maxLength}`);
+  }
+
+  // Outline extraction
+  if (config.addOutline) {
+    parts.push(`--add-outline`);
   }
 
   return parts.join(' \\\n  ');

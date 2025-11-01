@@ -316,6 +316,216 @@ All critical Phase 3 tasks completed:
 
 ---
 
+## Session 4 - 2025-11-01
+
+### Phase 4: Focus Blur Fill Mode ✓
+
+**Work Completed:**
+- [x] Researched original focus blur implementation from web/index.html and shared/geometry/path-utils.js
+- [x] Added focus blur configuration to store ([web-v2/src/state/store.js](../web-v2/src/state/store.js:109-122))
+  - Light mode settings (directional/point)
+  - Directional light (angle)
+  - Point light (x, y, falloff radius)
+  - Noise amplitude range (min/max)
+  - Noise frequency range (min/max)
+  - Pass modulation (optional thickness variation)
+
+- [x] Created comprehensive UI controls ([web-v2/index.html](../web-v2/index.html:166-267))
+  - Added "focus-blur" to fill mode dropdown
+  - Light mode selector with conditional visibility
+  - Directional light angle slider (0-360°)
+  - Point light position controls (x%, y%, falloff radius)
+  - Noise amplitude controls (min/max in mm)
+  - Noise frequency controls (min/max)
+  - Pass modulation checkbox with min/max multipliers
+  - Info box explaining the effect
+
+- [x] Wired up all event handlers ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:405-494))
+  - Created helper function `updateFocusBlurConfig` for DRY code
+  - Light mode selector toggles directional vs point controls
+  - All 10 parameters trigger live preview when enabled
+  - Pass modulation checkbox shows/hides multiplier controls
+
+- [x] Integrated with processor ([web-v2/src/utils/processor.js](../web-v2/src/utils/processor.js))
+  - Updated `processPaths()` to accept viewBox parameter
+  - Added focus blur parameter mapping (all 12 parameters + viewBox)
+  - Passes all config to shared engine via `crosshatchOptions`
+  - Updated all `processPaths()` calls to include viewBox
+
+- [x] Updated CLI command generator ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:1058-1106))
+  - Added all focus blur CLI flags
+  - Conditional output based on light mode (directional vs point)
+  - Only includes non-default values to keep command clean
+  - Full parity with CLI tool flags
+
+**Key Features:**
+- Full parity with original web interface and CLI tool
+- Two light modes: directional (angle-based gradient) and point (radial falloff)
+- Per-point noise modulation based on density field
+- Optional pass count modulation for thickness variation
+- Live preview integration with throttled reprocessing
+- Complete CLI command generation
+
+**Technical Implementation:**
+- Focus blur uses density field (128x128 grid) to modulate noise/frequency per point
+- Shared engine creates field on first use, caches as static property
+- ViewBox required for density field initialization (width/height)
+- Light mode determines field computation:
+  - Directional: uniform gradient from infinite distance at angle
+  - Point: radial falloff from (x%, y%) position
+- Noise amplitude interpolates: `noiseMin` (focus/light) → `noiseMax` (blur/shadow)
+- Noise frequency interpolates: `freqMin` (focus) → `freqMax` (blur)
+- Pass modulation (optional): multiplies base pass count by `passesMin` → `passesMax`
+
+**Testing Notes:**
+- Dev server running at http://localhost:3001
+- No compilation or runtime errors
+- All hot reloads successful
+- Ready for user testing with sample shapes
+
+**Status**: Focus blur complete and ready for testing. First Phase 4 task complete!
+
+### Phase 4: Outline Extraction & Length Binning ✓
+
+**Work Completed:**
+- [x] Researched original implementation (web/index.html, web/ui-controls.js)
+- [x] Added config to store ([web-v2/src/state/store.js](../web-v2/src/state/store.js:123-127))
+  - `addOutline`: boolean flag for outline extraction
+  - `enableBinning`: boolean flag for length binning
+  - `binCount`: number of bins (2-10, default 4)
+
+- [x] Created UI controls in Advanced tab ([web-v2/index.html](../web-v2/index.html:463-498))
+  - Outline extraction checkbox with explanation
+  - Length binning checkbox with collapsible controls
+  - Bin count slider with live preview showing percentile ranges
+  - Visual styling matches existing advanced controls
+
+- [x] Wired up event handlers ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:500-549))
+  - Outline extraction toggles `addOutline` config
+  - Binning checkbox shows/hides bin count controls
+  - Bin count slider updates preview text (e.g., "0-25%, 25-50%, 50-75%, 75-100%")
+  - Both integrate with live preview for auto-reprocessing
+
+- [x] Integrated outline extraction with processor ([web-v2/src/utils/processor.js](../web-v2/src/utils/processor.js:136-184))
+  - Updated `generatePasses` call to pass `config.addOutline`
+  - Handles result as either array or `{fills, outlines}` object
+  - Adds outline paths with `isOutline: true` flag for grouping
+  - Outline paths get special ID prefix for SVG organization
+
+- [x] Implemented length binning in SVG export ([web-v2/src/utils/svg-exporter.js](../web-v2/src/utils/svg-exporter.js))
+  - Updated `buildSVG()` to accept binning parameters
+  - Created `buildBinnedSVG()` for quantile-based binning
+  - Calculates bin boundaries from source path lengths
+  - Groups paths by length percentiles
+  - Separates outlines into dedicated group
+  - Adds metadata comments for each bin (length range, path count)
+
+- [x] Updated CLI command generator ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:1178-1181))
+  - Adds `--add-outline` flag when enabled
+  - Note: Binning is export-only (no CLI equivalent)
+
+**Key Features:**
+- **Outline Extraction**: Adds furthermost boundary paths as separate strokes
+  - Useful for striped/spiral patterns to create defined edges
+  - Works with all fill modes
+  - Integrates with shared engine's existing outline extraction
+
+- **Length Binning**: Groups paths by length percentiles for better SVG organization
+  - Configurable bin count (2-10 bins)
+  - Uses quantile-based boundaries for even distribution
+  - Each bin is a separate SVG group with metadata
+  - Outlines separated into dedicated group
+  - Helps manage complex SVGs in vector editors
+
+**Technical Implementation:**
+- Outline extraction uses shared engine's existing `extractOutline` parameter
+- Returns `{fills: Array, outlines: Array}` object when enabled
+- Binning assigns paths to bins based on source path length
+- Quantile calculation ensures even distribution across bins
+- Each bin group includes data attributes for length range
+- Falls back to non-binned export if no length data available
+
+**Testing Notes:**
+- Dev server running at http://localhost:3001
+- No compilation or runtime errors
+- All hot reloads successful
+- Ready for user testing
+
+**Status**: Outline extraction and length binning complete!
+
+### Phase 4: Hatch Gradient Fill Mode ✓
+
+**Work Completed:**
+- [x] Researched original hatch-gradient implementation from web/index.html and process-svg.js
+- [x] Added hatch gradient configuration to store ([web-v2/src/state/store.js](../web-v2/src/state/store.js:124-135))
+  - Hatch angles (default: [0, 45, 90])
+  - Spacing between hatches
+  - Light mode settings (directional/point)
+  - Directional light (angle)
+  - Point light (x, y, falloff radius)
+  - Light strength (0-1, how much light affects density)
+  - Base density (minimum density in lightest areas)
+  - Shadow softness (transition smoothness)
+
+- [x] Created comprehensive UI controls ([web-v2/index.html](../web-v2/index.html:270-328))
+  - Added "hatch-gradient" to fill mode dropdown
+  - Light mode selector with conditional visibility
+  - Directional light angle control (0-360°)
+  - Point light position controls (x%, y%, falloff radius)
+  - Light strength slider (0-1)
+  - Base density slider (0-0.5)
+  - Shadow softness slider (0-1)
+  - Info box explaining the effect
+
+- [x] Wired up all event handlers ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:500-567))
+  - Created helper function `updateHatchGradientConfig` for DRY code
+  - Light mode selector toggles directional vs point controls
+  - All 8 parameters trigger live preview when enabled
+  - Follows same pattern as focus-blur implementation
+
+- [x] Integrated with processor ([web-v2/src/utils/processor.js](../web-v2/src/utils/processor.js:134-151))
+  - Added hatch gradient parameter mapping (all 10 parameters + viewBox)
+  - Passes all config to shared engine via `modeOptions`
+  - Includes viewBox for density field initialization
+
+- [x] Updated CLI command generator ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js:1238-1280))
+  - Added all hatch gradient CLI flags
+  - Conditional output based on light mode (directional vs point)
+  - Only includes non-default values to keep command clean
+  - Full parity with CLI tool flags
+
+**Key Features:**
+- Full parity with original web interface and CLI tool
+- Two light modes: directional (angle-based gradient) and point (radial falloff)
+- Per-point density modulation based on lighting simulation
+- Creates crosshatch fills with varying density for shading effect
+- Light areas get sparse hatching, dark areas get dense hatching
+- Live preview integration with throttled reprocessing
+- Complete CLI command generation
+
+**Technical Implementation:**
+- Hatch gradient uses density field (128x128 grid) to modulate hatch density per point
+- Shared engine creates field on first use, caches as static property
+- ViewBox required for density field initialization (width/height)
+- Light mode determines field computation:
+  - Directional: uniform gradient from infinite distance at angle
+  - Point: radial falloff from (x%, y%) position
+- Light strength controls contrast (0=uniform, 1=max contrast)
+- Base weight ensures minimum density in lightest areas (prevents empty regions)
+- Shadow softness controls transition smoothness using smoothstep interpolation
+- Angles array determines hatch directions (default: 0°, 45°, 90°)
+- Spacing controls distance between parallel hatches
+
+**Testing Notes:**
+- Dev server running at http://localhost:3001
+- No compilation or runtime errors
+- All hot reloads successful
+- Ready for user testing with sample shapes
+
+**Status**: Hatch gradient complete and ready for testing!
+
+---
+
 ## Session Template
 
 Copy this for future sessions:
