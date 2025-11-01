@@ -122,6 +122,15 @@
               <input type="checkbox" id="live-preview" />
               Live Preview (auto-update)
             </label>
+
+            <label>
+              <input type="checkbox" id="fast-preview" />
+              Fast Preview Mode
+            </label>
+          </div>
+
+          <div class="info-box" id="fast-preview-info" style="display: none; margin-top: 0.5rem;">
+            <strong>Fast Preview:</strong> Shows color-coded stroke widths (green=min, red=max) that approximate the final result. Much faster than full processing.
           </div>
 
           <div class="action-buttons">
@@ -131,7 +140,7 @@
         </section>
 
             <section id="tab-attractors" class="tab-panel">
-          <h2>Attractors</h2>
+          <h2>Attractors <span style="font-size: 0.8em; color: #666;" id="attractor-count">(0/10)</span></h2>
 
           <div class="controls-grid">
             <label>
@@ -141,9 +150,44 @@
           </div>
 
           <div class="info-box" id="attractor-info">
-            Click on the preview canvas to place attractors.<br>
-            Shift+Click to remove attractors.
+            <strong>Ctrl/Cmd+Click:</strong> Add attractor<br>
+            <strong>Shift+Click:</strong> Remove nearest<br>
+            <strong>Click &amp; Drag:</strong> Move attractor
           </div>
+
+          <!-- Manual entry form -->
+          <details style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 4px;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em; color: #4a9eff;">➕ Add Attractor Manually</summary>
+            <div style="margin-top: 0.75rem;">
+              <div class="controls-grid">
+                <label style="font-size: 0.9em;">
+                  X Position (mm)
+                  <input type="number" id="manual-x" placeholder="X" step="1" style="width: 100%;">
+                </label>
+                <label style="font-size: 0.9em;">
+                  Y Position (mm)
+                  <input type="number" id="manual-y" placeholder="Y" step="1" style="width: 100%;">
+                </label>
+                <label style="font-size: 0.9em;">
+                  Strength (optional)
+                  <input type="number" id="manual-strength" placeholder="Use global" step="0.1" min="0" max="5" style="width: 100%;">
+                </label>
+                <label style="font-size: 0.9em;">
+                  Radius (optional, mm)
+                  <input type="number" id="manual-radius" placeholder="Use global" step="5" min="5" max="300" style="width: 100%;">
+                </label>
+              </div>
+              <button id="add-manual-attractor" style="margin-top: 0.5rem; width: 100%;">Add Attractor</button>
+            </div>
+          </details>
+
+          <div class="action-buttons">
+            <button id="btn-clear-attractors">Clear All Attractors</button>
+          </div>
+
+          <div id="attractor-list" class="attractor-list"></div>
+
+          <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Global Attractor Settings</h3>
 
           <div class="controls-grid">
             <label>
@@ -155,30 +199,78 @@
             </label>
 
             <label>
-              Strength
-              <input type="number" id="attractor-strength" step="0.1" min="0" max="2" value="1.0" />
+              Default Strength
+              <input type="number" id="attractor-strength" step="0.1" min="0" max="5" value="1.0" />
             </label>
 
             <label>
-              Falloff Radius (mm)
-              <input type="number" id="attractor-radius" step="5" min="10" max="200" value="50" />
+              Default Falloff Radius (mm)
+              <input type="number" id="attractor-radius" step="5" min="10" max="300" value="50" />
             </label>
 
             <label>
               Falloff Curve
               <select id="attractor-curve">
                 <option value="linear">Linear</option>
-                <option value="exponential">Exponential</option>
-                <option value="gaussian">Gaussian</option>
+                <option value="exponential">Exponential (x²)</option>
+                <option value="power">Power (configurable)</option>
+                <option value="gaussian">Gaussian (smooth)</option>
+                <option value="inverse-square">Inverse Square</option>
               </select>
             </label>
           </div>
 
-          <div class="action-buttons">
-            <button id="btn-clear-attractors">Clear All Attractors</button>
+          <div id="falloff-exponent-control" class="mode-specific-controls" style="display: none;">
+            <label>
+              Falloff Exponent
+              <input type="range" id="falloff-exponent" min="1" max="10" step="0.5" value="2" />
+              <span id="falloff-exponent-value">2.0</span>
+            </label>
+            <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
+              Higher = sharper center, steeper falloff
+            </div>
           </div>
 
-          <div id="attractor-list" class="attractor-list"></div>
+          <div class="controls-grid">
+            <label>
+              Multiple Attractor Mode
+              <select id="multi-mode">
+                <option value="additive">Additive (sum influences)</option>
+                <option value="strongest">Strongest Only</option>
+                <option value="average">Average</option>
+                <option value="soft">Soft (averaged by count)</option>
+                <option value="weighted-average">Weighted Average (by distance)</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- Advanced options -->
+          <details style="margin-top: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em;">⚙️ Advanced Filtering</summary>
+            <div style="margin-top: 0.75rem;">
+              <div class="controls-grid">
+                <label style="font-size: 0.9em;">
+                  Min Influence Threshold (0-1)
+                  <input type="number" id="min-influence-threshold" step="0.05" min="0" max="1" value="0" style="width: 100%;" />
+                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect paths with max influence above this</div>
+                </label>
+
+                <label style="font-size: 0.9em;">
+                  Min Coverage % (0-100)
+                  <input type="number" id="min-coverage-percent" step="5" min="0" max="100" value="0" style="width: 100%;" />
+                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect if this % of path is in radius</div>
+                </label>
+
+                <label style="font-size: 0.9em;">
+                  Influence Calculation
+                  <select id="influence-calc-mode" style="width: 100%;">
+                    <option value="average">Average (whole path)</option>
+                    <option value="maximum">Maximum (closest point)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
         </section>
 
             <section id="tab-advanced" class="tab-panel">
@@ -197,6 +289,25 @@
             <label>
               Sample Rate (mm)
               <input type="number" id="sample-rate" step="0.5" min="0.5" max="10" value="2" />
+            </label>
+          </div>
+
+          <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Length Thresholding</h3>
+          <div class="info-box" style="display: block; margin-bottom: 1rem;">
+            Override auto-detected min/max path lengths for normalization. Useful for handling outliers or focusing effects on specific length ranges.
+          </div>
+
+          <div class="controls-grid">
+            <label>
+              Min Length (mm)
+              <input type="number" id="min-length" step="10" min="0" value="0" placeholder="Auto" />
+              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
+            </label>
+
+            <label>
+              Max Length (mm)
+              <input type="number" id="max-length" step="10" min="0" value="0" placeholder="Auto" />
+              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
             </label>
           </div>
 

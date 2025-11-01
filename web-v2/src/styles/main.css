@@ -282,3 +282,22 @@ button.processing::after {
 .attractor-remove:hover {
   background: #ff6666;
 }
+
+/* Details/summary styling for collapsible sections */
+details summary {
+  user-select: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details[open] summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Attractor item custom parameters highlight */
+.attractor-item.has-custom {
+  border-left: 3px solid #4a9eff;
+}

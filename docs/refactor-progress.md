@@ -191,6 +191,88 @@ Track completed steps, deviations from plan, and open questions for session hand
 
 ---
 
+## Session 3 - 2025-11-01
+
+### Phase 3: Attractor UI Polish ✓
+
+**Work Completed:**
+- [x] Enhanced HTML with comprehensive attractor controls ([web-v2/index.html](../web-v2/index.html))
+  - Per-attractor editable properties (x, y, strength, radius)
+  - Manual entry form for precise placement
+  - Falloff exponent slider for power/gaussian curves
+  - Multi-attractor combination modes (additive, strongest, average, soft, weighted-average)
+  - Advanced filtering controls (minInfluenceThreshold, minCoveragePercent, influenceCalcMode)
+
+- [x] Updated state management ([web-v2/src/state/store.js](../web-v2/src/state/store.js))
+  - Added comprehensive attractorConfig with all parameters
+  - Falloff exponent, multi-mode, and advanced filtering options
+
+- [x] Implemented interactive attractor placement ([web-v2/src/renderer/canvas.js](../web-v2/src/renderer/canvas.js))
+  - Ctrl/Cmd+Click to add attractor
+  - Shift+Click to remove nearest attractor
+  - Click & drag to move attractors
+  - Visual rendering with stronger strokes and higher opacity
+  - Numbered labels with dark backgrounds for visibility
+
+- [x] Enhanced UI event handlers ([web-v2/src/ui/app.js](../web-v2/src/ui/app.js))
+  - Editable attractor list with expandable details panels
+  - Custom parameter overrides (null = use global default)
+  - Visual indicators for attractors with custom parameters (★ symbol + blue border)
+  - Live preview auto-reprocesses on attractor changes
+
+- [x] Integrated with processor ([web-v2/src/utils/processor.js](../web-v2/src/utils/processor.js))
+  - Passes all attractor config to shared AttractorSystem
+  - Supports all falloff curves, multi-modes, and filtering options
+
+**Key Features:**
+- Full parity with original web interface attractor features
+- Interactive placement and drag-to-move
+- Per-attractor property overrides
+- 5 falloff curves: linear, exponential, power, gaussian, inverse-square
+- 5 multi-attractor modes: additive, strongest, average, soft, weighted-average
+- Advanced filtering: influence threshold, coverage percent, calc mode
+- Visual feedback: circles with numbered IDs, color-coded by mode (blue=attract, red=repel)
+
+**Visual Improvements:**
+- Stroke opacity increased from 0.3 to 0.6
+- Fill opacity increased from 0.05 to 0.15
+- Stroke width increased from 1px to 2px
+- Center point radius increased from 3px to 4px
+- Bold labels with dark backgrounds for better visibility
+
+**Technical Details:**
+- HTML5 `<details>` elements for collapsible attractor items
+- Event delegation for dynamic list items
+- Coordinate transformation for drag (screenToSVG)
+- Priority system for click disambiguation (attractor mode > drag > pan)
+- Throttled reprocessing (500ms) for performance
+
+**Status**: Attractor UI complete with all features from original interface. Ready for next Phase 3 task.
+
+### Next Steps (Phase 3 Remaining)
+
+According to [REFACTOR_PLAN.md](../REFACTOR_PLAN.md) Phase 3:
+
+- [x] ~~Flesh out UI shell~~ ✅
+- [x] ~~Implement pan/zoom + lightweight preview~~ ✅
+- [x] ~~Add attractor placement with cached sampling~~ ✅
+- [x] ~~Integrate live/manual preview switch + throttled recompute~~ ✅
+- [x] ~~"Copy CLI command" action~~ ✅
+- [x] ~~Hook up export pipeline~~ ✅
+- [ ] **Sample preview testbed** - Simple shapes/lines for testing fill parameters before applying to main SVG
+- [ ] **Performance optimization** - Consider web worker for heavy processing
+
+**Remaining Phase 3 Tasks:**
+1. Sample preview testbed (reusable test shapes panel)
+2. Performance optimization (optional web worker)
+
+**Phase 4 Preview:**
+- Port advanced fill modes (focus blur, gradient)
+- Restore calibration/diagnostic panels
+- Config import/export for presets
+
+---
+
 ## Session Template
 
 Copy this for future sessions:

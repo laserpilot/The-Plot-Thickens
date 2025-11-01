@@ -88,6 +88,9 @@ const initialState = {
     curve: 'linear',
     fillMode: 'offset',
     sampleRate: 2,
+    // Length thresholding
+    minLength: 0,  // 0 = auto-detect
+    maxLength: 0,  // 0 = auto-detect
     // Fill mode-specific options
     stripeFilled: 1,
     stripeEmpty: 1,
@@ -101,6 +104,7 @@ const initialState = {
   // UI state
   activeTab: 'file',
   livePreview: false,
+  fastPreview: false,
   processing: false,
 
   // Attractor state
@@ -111,7 +115,12 @@ const initialState = {
     strength: 1.0,
     falloffRadius: 50,
     falloffCurve: 'linear',
-    multiMode: 'additive'
+    falloffExponent: 2,
+    multiMode: 'additive',
+    // Advanced filtering
+    minInfluenceThreshold: 0,
+    minCoveragePercent: 0,
+    influenceCalcMode: 'average'
   }
 };
 

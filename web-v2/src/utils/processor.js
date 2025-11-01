@@ -27,15 +27,20 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
   if (attractors && attractors.length > 0 && attractorConfig) {
     attractorSystem = new AttractorSystem();
 
-    // Configure system
+    // Configure system with all options
     Object.assign(attractorSystem.config, {
       mode: attractorConfig.mode || 'attract',
       strength: attractorConfig.strength || 1.0,
       falloffRadius: attractorConfig.falloffRadius || 50,
       falloffCurve: attractorConfig.falloffCurve || 'linear',
+      falloffExponent: attractorConfig.falloffExponent || 2,
       multiMode: attractorConfig.multiMode || 'additive',
       minPasses: config.minPasses,
-      maxPasses: config.maxPasses
+      maxPasses: config.maxPasses,
+      // Advanced filtering options
+      minInfluenceThreshold: attractorConfig.minInfluenceThreshold || 0,
+      minCoveragePercent: attractorConfig.minCoveragePercent || 0,
+      influenceCalcMode: attractorConfig.influenceCalcMode || 'average'
     });
 
     // Add attractors
@@ -48,8 +53,16 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
 
   // Measure all path lengths first for relative scaling
   const lengths = paths.map(p => measurePathLength(p.d));
-  const minLength = Math.min(...lengths);
-  const maxLength = Math.max(...lengths);
+
+  // Use config overrides if provided (non-zero), otherwise auto-detect
+  const minLength = (config.minLength && config.minLength > 0)
+    ? config.minLength
+    : Math.min(...lengths);
+  const maxLength = (config.maxLength && config.maxLength > 0)
+    ? config.maxLength
+    : Math.max(...lengths);
+
+  console.log(`Length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)} mm ${config.minLength || config.maxLength ? '(manual override)' : '(auto-detected)'}`);
 
   for (let i = 0; i < paths.length; i++) {
     const path = paths[i];

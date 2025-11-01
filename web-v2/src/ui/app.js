@@ -74,9 +74,17 @@ export function initUI(store, renderer) {
         processing: false
       });
 
-      // Render processed paths
+      // Render processed paths (unless fast preview is enabled)
       const bounds = store.getState('svgBounds');
-      renderer.render(processed, bounds);
+      const fastPreview = store.getState('fastPreview');
+
+      if (fastPreview) {
+        // In fast preview mode, show original paths with color coding
+        renderer.renderFastPreview(originalPaths, bounds);
+      } else {
+        // Normal mode: show fully processed paths
+        renderer.render(processed, bounds);
+      }
 
       console.log(`Rendered ${processed.length} processed paths`);
 
@@ -185,7 +193,9 @@ export function initUI(store, renderer) {
     maxPasses: document.getElementById('max-passes'),
     noise: document.getElementById('noise'),
     noiseFrequency: document.getElementById('noise-frequency'),
-    sampleRate: document.getElementById('sample-rate')
+    sampleRate: document.getElementById('sample-rate'),
+    minLength: document.getElementById('min-length'),
+    maxLength: document.getElementById('max-length')
   };
 
   Object.entries(fillInputs).forEach(([key, input]) => {
@@ -333,6 +343,38 @@ export function initUI(store, renderer) {
     }
   });
 
+  // Fast preview toggle
+  const fastPreviewCheckbox = document.getElementById('fast-preview');
+  const fastPreviewInfo = document.getElementById('fast-preview-info');
+
+  fastPreviewCheckbox.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    store.setState({ fastPreview: enabled });
+
+    // Show/hide info box
+    if (fastPreviewInfo) {
+      fastPreviewInfo.style.display = enabled ? 'block' : 'none';
+    }
+
+    console.log(`Fast preview ${enabled ? 'enabled' : 'disabled'}`);
+
+    // Trigger render update
+    const originalPaths = store.getState('originalPaths');
+    const bounds = store.getState('svgBounds');
+
+    if (originalPaths && originalPaths.length > 0) {
+      if (enabled) {
+        // Switch to fast preview mode
+        renderer.renderFastPreview(originalPaths, bounds);
+      } else {
+        // Switch back to regular rendering
+        const processedPaths = store.getState('processedPaths');
+        const pathsToShow = processedPaths.length > 0 ? processedPaths : originalPaths;
+        renderer.render(pathsToShow, bounds);
+      }
+    }
+  });
+
   // Process paths (manual button)
   document.getElementById('btn-process').addEventListener('click', async () => {
     const originalPaths = store.getState('originalPaths');
@@ -457,8 +499,8 @@ export function initUI(store, renderer) {
         x,
         y,
         mode: attractorConfig.mode,
-        strength: attractorConfig.strength,
-        radius: attractorConfig.falloffRadius
+        strength: null,  // Use global default
+        radius: null     // Use global default
       };
 
       const newAttractors = [...attractors, newAttractor];
@@ -473,28 +515,85 @@ export function initUI(store, renderer) {
     }
   });
 
-  // Update attractor list UI
+  // Set up attractor drag handlers
+  renderer.setAttractorDragHandlers(
+    // During drag: update position in real-time
+    (index, x, y) => {
+      const attractors = store.getState('attractors');
+      if (index >= 0 && index < attractors.length) {
+        const newAttractors = [...attractors];
+        newAttractors[index] = { ...newAttractors[index], x, y };
+        store.setState({ attractors: newAttractors });
+        // Don't update list during drag for performance
+      }
+    },
+    // On drag end: finalize and reprocess
+    (index) => {
+      updateAttractorList();
+      // Auto-reprocess if live preview enabled
+      if (store.getState('livePreview') && store.getState('useAttractors')) {
+        throttledProcess();
+      }
+    }
+  );
+
+  // Update attractor list UI with editable properties
   function updateAttractorList() {
     const attractors = store.getState('attractors');
+    const attractorConfig = store.getState('attractorConfig');
     const listEl = document.getElementById('attractor-list');
+    const countEl = document.getElementById('attractor-count');
+
+    // Update count
+    if (countEl) {
+      countEl.textContent = `(${attractors.length}/10)`;
+    }
 
     if (attractors.length === 0) {
-      listEl.innerHTML = '<p style="color: #666; font-size: 0.85rem;">No attractors placed</p>';
+      listEl.innerHTML = '<p style="color: #666; font-size: 0.85rem; margin-top: 0.5rem;">No attractors placed</p>';
       return;
     }
 
-    listEl.innerHTML = attractors.map((attractor, index) => `
-      <div class="attractor-item">
-        <span>
-          <strong>#${index + 1}</strong>
-          <span class="attractor-coords">
-            (${attractor.x.toFixed(1)}, ${attractor.y.toFixed(1)})
-          </span>
-          - ${attractor.mode}
-        </span>
-        <button class="attractor-remove" data-index="${index}">Remove</button>
-      </div>
-    `).join('');
+    listEl.innerHTML = attractors.map((attractor, index) => {
+      const hasCustomStrength = attractor.strength !== null && attractor.strength !== undefined && attractor.strength !== attractorConfig.strength;
+      const hasCustomRadius = attractor.radius !== null && attractor.radius !== undefined && attractor.radius !== attractorConfig.falloffRadius;
+      const hasCustom = hasCustomStrength || hasCustomRadius;
+      const customLabel = hasCustom ? ' ★' : '';
+
+      return `
+        <details class="attractor-item ${hasCustom ? 'has-custom' : ''}" data-index="${index}" style="margin-bottom: 8px;">
+          <summary style="cursor: pointer; padding: 8px; background: ${hasCustom ? 'rgba(74, 158, 255, 0.08)' : 'var(--bg)'}; border: 1px solid var(--border); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="flex: 1;">
+              <strong style="color: ${attractor.mode === 'repel' ? '#ff6464' : '#4a9eff'};">#${index + 1}${customLabel}</strong>
+              <span style="font-family: monospace; font-size: 0.85em; color: #888; margin-left: 8px;">
+                (${attractor.x.toFixed(1)}, ${attractor.y.toFixed(1)})
+              </span>
+            </span>
+            <button class="attractor-remove" data-index="${index}" style="padding: 4px 8px; font-size: 0.8rem; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer; margin-left: 8px;" onclick="event.stopPropagation();">×</button>
+          </summary>
+          <div style="padding: 12px; background: var(--bg); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9em;">
+              <label style="display: flex; flex-direction: column;">
+                X (mm)
+                <input type="number" class="attractor-x" data-index="${index}" value="${attractor.x.toFixed(1)}" step="1" style="margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-dark); color: var(--fg);">
+              </label>
+              <label style="display: flex; flex-direction: column;">
+                Y (mm)
+                <input type="number" class="attractor-y" data-index="${index}" value="${attractor.y.toFixed(1)}" step="1" style="margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-dark); color: var(--fg);">
+              </label>
+              <label style="display: flex; flex-direction: column;">
+                Strength <span style="font-size: 0.8em; color: #888;">(${attractorConfig.strength} default)</span>
+                <input type="number" class="attractor-strength" data-index="${index}" value="${attractor.strength !== null && attractor.strength !== undefined ? attractor.strength : ''}" placeholder="${attractorConfig.strength}" step="0.1" min="0" max="5" style="margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-dark); color: var(--fg);">
+              </label>
+              <label style="display: flex; flex-direction: column;">
+                Radius (mm) <span style="font-size: 0.8em; color: #888;">(${attractorConfig.falloffRadius} default)</span>
+                <input type="number" class="attractor-radius" data-index="${index}" value="${attractor.radius !== null && attractor.radius !== undefined ? attractor.radius : ''}" placeholder="${attractorConfig.falloffRadius}" step="5" min="5" max="300" style="margin-top: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-dark); color: var(--fg);">
+              </label>
+            </div>
+          </div>
+        </details>
+      `;
+    }).join('');
 
     // Wire up remove buttons
     listEl.querySelectorAll('.attractor-remove').forEach(btn => {
@@ -502,6 +601,44 @@ export function initUI(store, renderer) {
         const index = parseInt(btn.dataset.index);
         const attractors = store.getState('attractors');
         const newAttractors = attractors.filter((_, i) => i !== index);
+        store.setState({ attractors: newAttractors });
+        renderer.updateAttractors(newAttractors);
+        updateAttractorList();
+
+        if (store.getState('livePreview')) {
+          throttledProcess();
+        }
+      });
+    });
+
+    // Wire up property editors
+    listEl.querySelectorAll('.attractor-x, .attractor-y, .attractor-strength, .attractor-radius').forEach(input => {
+      input.addEventListener('change', () => {
+        const index = parseInt(input.dataset.index);
+        const attractors = store.getState('attractors');
+        const attractor = attractors[index];
+
+        if (!attractor) return;
+
+        const property = input.classList.contains('attractor-x') ? 'x' :
+                        input.classList.contains('attractor-y') ? 'y' :
+                        input.classList.contains('attractor-strength') ? 'strength' :
+                        'radius';
+
+        let value = input.value.trim();
+
+        // Empty value means use global default (set to null)
+        if (value === '') {
+          value = null;
+        } else {
+          value = parseFloat(value);
+          if (isNaN(value)) return;
+        }
+
+        // Update attractor
+        const newAttractors = [...attractors];
+        newAttractors[index] = { ...attractor, [property]: value };
+
         store.setState({ attractors: newAttractors });
         renderer.updateAttractors(newAttractors);
         updateAttractorList();
@@ -533,7 +670,8 @@ export function initUI(store, renderer) {
     mode: document.getElementById('attractor-mode'),
     strength: document.getElementById('attractor-strength'),
     radius: document.getElementById('attractor-radius'),
-    curve: document.getElementById('attractor-curve')
+    curve: document.getElementById('attractor-curve'),
+    multiMode: document.getElementById('multi-mode')
   };
 
   Object.entries(attractorInputs).forEach(([key, input]) => {
@@ -542,11 +680,19 @@ export function initUI(store, renderer) {
       const value = input.type === 'number' ? parseFloat(input.value) : input.value;
 
       // Map UI keys to config keys
-      const configKey = key === 'radius' ? 'falloffRadius' : key === 'curve' ? 'falloffCurve' : key;
+      const configKey = key === 'radius' ? 'falloffRadius' :
+                        key === 'curve' ? 'falloffCurve' :
+                        key;
 
       store.setState({
         attractorConfig: { ...attractorConfig, [configKey]: value }
       });
+
+      // Show/hide falloff exponent control
+      if (key === 'curve') {
+        const exponentControl = document.getElementById('falloff-exponent-control');
+        exponentControl.style.display = (value === 'power' || value === 'gaussian') ? 'block' : 'none';
+      }
 
       // Redraw to update visualization
       renderer.redraw();
@@ -558,6 +704,105 @@ export function initUI(store, renderer) {
         throttledProcess();
       }
     });
+  });
+
+  // Falloff exponent slider
+  const falloffExponentSlider = document.getElementById('falloff-exponent');
+  const falloffExponentValue = document.getElementById('falloff-exponent-value');
+
+  falloffExponentSlider.addEventListener('input', () => {
+    falloffExponentValue.textContent = parseFloat(falloffExponentSlider.value).toFixed(1);
+  });
+
+  falloffExponentSlider.addEventListener('change', () => {
+    const attractorConfig = store.getState('attractorConfig');
+    const value = parseFloat(falloffExponentSlider.value);
+
+    store.setState({
+      attractorConfig: { ...attractorConfig, falloffExponent: value }
+    });
+
+    renderer.redraw();
+
+    const useAttractors = store.getState('useAttractors');
+    const livePreview = store.getState('livePreview');
+    if (useAttractors && livePreview) {
+      throttledProcess();
+    }
+  });
+
+  // Advanced filtering controls
+  const advancedInputs = {
+    minInfluenceThreshold: document.getElementById('min-influence-threshold'),
+    minCoveragePercent: document.getElementById('min-coverage-percent'),
+    influenceCalcMode: document.getElementById('influence-calc-mode')
+  };
+
+  Object.entries(advancedInputs).forEach(([key, input]) => {
+    input.addEventListener('change', () => {
+      const attractorConfig = store.getState('attractorConfig');
+      const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+
+      store.setState({
+        attractorConfig: { ...attractorConfig, [key]: value }
+      });
+
+      const useAttractors = store.getState('useAttractors');
+      const livePreview = store.getState('livePreview');
+      if (useAttractors && livePreview) {
+        throttledProcess();
+      }
+    });
+  });
+
+  // Manual attractor entry
+  document.getElementById('add-manual-attractor').addEventListener('click', () => {
+    const xInput = document.getElementById('manual-x');
+    const yInput = document.getElementById('manual-y');
+    const strengthInput = document.getElementById('manual-strength');
+    const radiusInput = document.getElementById('manual-radius');
+
+    const x = parseFloat(xInput.value);
+    const y = parseFloat(yInput.value);
+    const strength = strengthInput.value.trim() !== '' ? parseFloat(strengthInput.value) : null;
+    const radius = radiusInput.value.trim() !== '' ? parseFloat(radiusInput.value) : null;
+
+    if (isNaN(x) || isNaN(y)) {
+      alert('Please enter valid X and Y coordinates');
+      return;
+    }
+
+    const attractors = store.getState('attractors');
+    if (attractors.length >= 10) {
+      alert('Maximum of 10 attractors reached');
+      return;
+    }
+
+    const attractorConfig = store.getState('attractorConfig');
+    const newAttractor = {
+      id: nextAttractorId++,
+      x,
+      y,
+      mode: attractorConfig.mode,
+      strength,
+      radius
+    };
+
+    const newAttractors = [...attractors, newAttractor];
+    store.setState({ attractors: newAttractors });
+    renderer.updateAttractors(newAttractors);
+    updateAttractorList();
+
+    // Clear inputs
+    xInput.value = '';
+    yInput.value = '';
+    strengthInput.value = '';
+    radiusInput.value = '';
+
+    // Auto-reprocess if live preview enabled
+    if (store.getState('livePreview') && store.getState('useAttractors')) {
+      throttledProcess();
+    }
   });
 
   // Clear all attractors
@@ -575,6 +820,9 @@ export function initUI(store, renderer) {
   store.subscribe('attractors', (state) => {
     renderer.updateAttractors(state.attractors);
   });
+
+  // Initialize attractor list
+  updateAttractorList();
 
   console.log('✓ UI initialized');
 }
@@ -614,6 +862,14 @@ function generateCLICommand(config) {
   }
 
   parts.push(`--sample-rate ${config.sampleRate}`);
+
+  // Length thresholding
+  if (config.minLength && config.minLength > 0) {
+    parts.push(`--min-length ${config.minLength}`);
+  }
+  if (config.maxLength && config.maxLength > 0) {
+    parts.push(`--max-length ${config.maxLength}`);
+  }
 
   return parts.join(' \\\n  ');
 }
