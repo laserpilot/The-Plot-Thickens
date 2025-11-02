@@ -439,9 +439,10 @@
                 <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Noise & Variation</h3>
 
                 <div class="controls-grid">
-                  <label>
-                    Noise (mm)
+                  <label id="base-noise-label">
+                    Base Noise (mm)
                     <input type="number" id="noise" step="0.05" min="0" max="2" value="0" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Uniform noise when gradient disabled</div>
                   </label>
 
                   <label>
@@ -453,6 +454,55 @@
                     Sample Rate (mm)
                     <input type="number" id="sample-rate" step="0.5" min="0.5" max="10" value="2" />
                   </label>
+                </div>
+
+                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="checkbox" id="enable-noise-gradient" style="margin: 0;" />
+                  <span>Noise Gradient</span>
+                </h4>
+
+                <div id="noise-gradient-controls" style="display: none; padding-left: 1rem; border-left: 2px solid #e0e0e0;">
+                  <div class="controls-grid">
+                    <label>
+                      Gradient Mode
+                      <select id="noise-gradient-mode">
+                        <option value="flat">Flat (Uniform)</option>
+                        <option value="fuzzy-crisp">Fuzzy → Crisp</option>
+                        <option value="crisp-fuzzy">Crisp → Fuzzy</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">
+                        Fuzzy→Crisp: soft edges, crisp core<br>
+                        Crisp→Fuzzy: clean boundary, textured interior
+                      </div>
+                    </label>
+
+                    <label>
+                      Noise Min (mm)
+                      <input type="number" id="noise-min" step="0.01" min="0" max="2" value="0.05" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Crisp end of gradient</div>
+                    </label>
+
+                    <label>
+                      Noise Max (mm)
+                      <input type="number" id="noise-max" step="0.05" min="0" max="2" value="0.4" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Fuzzy end of gradient</div>
+                    </label>
+
+                    <label>
+                      Gradient Curve
+                      <select id="gradient-curve">
+                        <option value="linear">Linear</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="inverse">Inverse</option>
+                        <option value="smoothstep">Smooth Step</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Shape of transition between min and max</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="margin-top: 0.75rem; font-size: 0.85em;">
+                    <strong>Note:</strong> Noise gradient works with Offset and Striped fill modes. Creates per-path texture transitions across fill width (2-3mm fills with 0.38mm pen).
+                  </div>
                 </div>
               </div>
             </section>

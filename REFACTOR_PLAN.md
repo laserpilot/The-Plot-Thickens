@@ -102,8 +102,9 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [x] Show detected min/max length values after processing
 - [x] Add output size controls (keep original, A3 landscape, A3 portrait)
 - [x] Fix SVG export dimension bug (was outputting viewBox coords as mm)
-- [ ] Port focus blur controls + preview canvas (consider worker).
-- [ ] Reintroduce crosshatch/striped/gradient modes via shared modules.
+- [x] Port focus blur controls + preview canvas (consider worker).
+- [x] Reintroduce crosshatch/striped/gradient modes via shared modules.
+- [x] Add Noise Gradient fill effect (per-path fuzzy→crisp or crisp→fuzzy transitions).
 - [ ] Restore calibration / diagnostic panels selectively.
 - [ ] Add config import/export for presets.
 
@@ -141,6 +142,203 @@ Feel free to annotate with owner initials or target dates.
 - Preset gallery with saved attractor layouts.
 - Batch processing UI for multiple SVGs.
 - Plugin hooks for custom noise fields.
-- Batch “gallery” export mode: queue multiple fill configurations (optionally randomized) against a single SVG to explore unexpected outcomes.
+- Batch "gallery" export mode: queue multiple fill configurations (optionally randomized) against a single SVG to explore unexpected outcomes.
 
 Add or remove items as plans change.
+
+---
+
+## 8. Feature Specifications
+
+### Noise Gradient Fill Effect
+
+**Purpose**: Create per-path noise intensity gradients across fill width, transitioning from fuzzy to crisp (or vice versa) to add dimensional texture at small plotter scale (2-3mm fills with 0.38mm pen).
+
+**Design Goals**:
+- Avoid "shower door" global pattern effects - each path is independent
+- Work naturally at small scale (5-8 pen strokes)
+- Provide clear visual distinction from existing effects (focus-blur, light-based)
+- User-controllable parameters matching existing UI patterns
+
+#### Scope & Compatibility
+
+**Works with**:
+- Offset Fill mode
+- Striped Fill mode
+
+**Disabled for**:
+- Crosshatch mode
+- Hatch Gradient mode
+- Spiral/Twisted mode
+
+**Independent of**:
+- Focus-Blur effect (no interaction)
+- Light-Based effects (no override)
+
+#### Parameters
+
+| Parameter | Type | Range | Default | Description |
+|-----------|------|-------|---------|-------------|
+| `noiseGradientMode` | enum | `flat`, `fuzzy-crisp`, `crisp-fuzzy` | `flat` | Gradient direction across passes |
+| `noiseMin` | float | 0-2mm | 0.05 | Noise at "crisp" end of gradient |
+| `noiseMax` | float | 0-2mm | 0.4 | Noise at "fuzzy" end of gradient |
+| `gradientCurve` | enum | `linear`, `exponential`, `inverse`, `smoothstep` | `linear` | Transition curve shape |
+
+#### Modes
+
+**Flat** (default):
+- Current behavior: uniform noise across all passes
+- Uses existing `noise` parameter
+- Backward compatible with existing configs
+
+**Fuzzy→Crisp**:
+- Outermost passes: high noise (soft/fuzzy edges)
+- Innermost passes: low noise (tight/crisp core)
+- Visual effect: halo or glow around path
+- Use case: soft atmospheric edges that fade into background
+
+**Crisp→Fuzzy**:
+- Outermost passes: low noise (defined boundary)
+- Innermost passes: high noise (textured interior)
+- Visual effect: contained energy within clean edges
+- Use case: clear shapes with interior texture/detail
+
+#### Gradient Curves
+
+**Linear**: Steady proportional change across passes
+```
+t = passIndex / totalPasses
+noise = lerp(noiseMin, noiseMax, t)
+```
+
+**Exponential**: Slow start, rapid finish (emphasizes one end)
+```
+t = pow(passIndex / totalPasses, 2)
+noise = lerp(noiseMin, noiseMax, t)
+```
+
+**Inverse**: Rapid start, slow finish (reverse emphasis)
+```
+t = 1 - pow(1 - passIndex/totalPasses, 2)
+noise = lerp(noiseMin, noiseMax, t)
+```
+
+**Smooth Step**: Sigmoidal ease-in-out (gentle transition)
+```
+t = smoothstep(passIndex / totalPasses)
+noise = lerp(noiseMin, noiseMax, t)
+```
+
+#### Implementation Notes
+
+**Pass Indexing**:
+- Pass 0 = centerline (original path)
+- Pass 1, 2, 3... = offsets outward from centerline
+- Gradient applies to offset passes only (not centerline)
+
+**Direction Mapping**:
+- `fuzzy-crisp`: outer passes (high index) use `noiseMax`, inner (low index) use `noiseMin`
+- `crisp-fuzzy`: reverse mapping (outer = min, inner = max)
+
+**Backward Compatibility**:
+- When `noiseGradientMode = flat`, ignore `noiseMin`/`noiseMax` and use existing `noise` parameter
+- Existing CLI commands and saved configs continue to work unchanged
+- Default mode is `flat` for zero breaking changes
+
+**Integration Points**:
+- Modify `generatePasses()` in `shared/geometry/path-utils.js`
+- Add gradient calculation before noise application in offset generation
+- Per-pass noise value calculated from gradient function
+- No changes needed to envelope or taper logic
+
+#### CLI Examples
+
+```bash
+# Fuzzy outer edges, crisp core (default linear gradient)
+node process-svg.js input.svg output.svg \
+  --fill-mode offset \
+  --noise-gradient fuzzy-crisp \
+  --noise-min 0.05 \
+  --noise-max 0.4
+
+# Crisp boundary, textured interior with exponential falloff
+node process-svg.js input.svg output.svg \
+  --fill-mode offset \
+  --noise-gradient crisp-fuzzy \
+  --noise-min 0.02 \
+  --noise-max 0.6 \
+  --gradient-curve exponential
+
+# Dramatic halo effect with smooth transition
+node process-svg.js input.svg output.svg \
+  --fill-mode offset \
+  --max-passes 8 \
+  --noise-gradient fuzzy-crisp \
+  --noise-min 0.0 \
+  --noise-max 0.8 \
+  --gradient-curve smoothstep
+
+# Backward compatible - traditional uniform noise
+node process-svg.js input.svg output.svg \
+  --fill-mode offset \
+  --noise 0.2
+  # (noiseGradientMode defaults to 'flat')
+```
+
+#### Web UI Integration
+
+**Location**: Fills tab, in Noise section (below base noise controls)
+
+**UI Structure**:
+```
+Noise Controls
+  Base Noise: [0.2mm] ─────────────── (shown when gradient mode = flat)
+
+  [ ] Enable Noise Gradient
+
+  (When enabled, show:)
+    Mode: [Flat ▼]
+          Options: Flat | Fuzzy→Crisp | Crisp→Fuzzy
+
+    Noise Min:  [0.05mm] ────────────── 0-2mm
+    Noise Max:  [0.4mm]  ────────────── 0-2mm
+
+    Gradient Curve: [Linear ▼]
+                    Options: Linear | Exponential | Inverse | Smooth Step
+```
+
+**Behavior**:
+- Checkbox defaults to unchecked (mode = flat)
+- When unchecked: uses simple "Base Noise" slider
+- When checked: reveals gradient controls
+- Mode selector shows directional arrows for clarity
+- Min/max sliders validate (min < max)
+- Live preview updates when enabled
+
+#### Testing & Validation
+
+**Unit Tests**:
+- [ ] Gradient curve functions produce correct interpolation values
+- [ ] Pass indexing correctly maps outer→inner or inner→outer
+- [ ] Edge cases: 1 pass, 2 passes, 50 passes
+- [ ] Backward compatibility: flat mode matches current behavior
+
+**Visual Tests**:
+- [ ] 2-3mm fills at plotter scale show clear gradient effect
+- [ ] Fuzzy→Crisp creates visible halo without overlap chaos
+- [ ] Crisp→Fuzzy maintains clean boundaries
+- [ ] Exponential/inverse curves show distinct visual character vs linear
+- [ ] Works correctly with striped fill (skipped passes still follow gradient)
+
+**Regression Tests**:
+- [ ] Existing CLI commands produce identical output
+- [ ] Existing config files load and process correctly
+- [ ] Default behavior unchanged when feature not explicitly enabled
+
+#### Use Cases
+
+- **Soft atmospheric edges**: Fuzzy→Crisp for paths fading into background
+- **Defined shapes with texture**: Crisp→Fuzzy for clear boundaries with interior detail
+- **Variable emphasis**: Combine with length-based or attractor weighting for mixed modes per path
+- **Small-scale detail**: Creates perceptible dimensional texture at 2-3mm without overwhelming form
+- **Stylistic control**: Offers new aesthetic vocabulary beyond density/spacing variation

@@ -90,12 +90,21 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
     const envelope = getEnvelopePreset(config.envelope || 'flat');
 
     // Prepare mode-specific options
-    let modeOptions = config.fillModeOptions || null;
+    let modeOptions = config.fillModeOptions || {};
+
+    // Add noise gradient parameters to mode options (works for offset, striped, spiral modes)
+    modeOptions = {
+      ...modeOptions,
+      noiseGradientMode: config.noiseGradientMode || 'flat',
+      noiseMin: config.noiseMin || 0.05,
+      noiseMax: config.noiseMax || 0.4,
+      gradientCurve: config.gradientCurve || 'linear'
+    };
 
     // For spiral mode, ensure twist parameters are in the options object
     if (config.fillMode === 'spiral') {
       modeOptions = {
-        ...(modeOptions || {}),
+        ...modeOptions,
         twistRate: config.twistRate || 0.01,
         twistOffset: config.twistOffset || 0
       };

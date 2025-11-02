@@ -66,6 +66,16 @@ function buildCLICommand(config) {
     parts.push(`--noise-frequency ${config.noiseFrequency}`);
   }
 
+  // Noise gradient parameters
+  if (config.noiseGradientMode && config.noiseGradientMode !== 'flat') {
+    parts.push(`--noise-gradient ${config.noiseGradientMode}`);
+    parts.push(`--noise-min ${config.noiseMin}`);
+    parts.push(`--noise-max ${config.noiseMax}`);
+    if (config.gradientCurve && config.gradientCurve !== 'linear') {
+      parts.push(`--gradient-curve ${config.gradientCurve}`);
+    }
+  }
+
   // Add mode-specific parameters
   if (config.fillMode === 'striped') {
     if (config.stripeFilled !== 1) parts.push(`--stripe-filled ${config.stripeFilled}`);
@@ -474,6 +484,63 @@ export function initUI(store, renderer) {
           config: { ...config, [configKey]: value }
         });
       }
+
+      // Update CLI command display
+      updateCLICommandDisplay(store.getState('config'));
+
+      // Auto-process if live preview is enabled
+      const livePreview = store.getState('livePreview');
+      if (livePreview) {
+        throttledProcess();
+      }
+    });
+  });
+
+  // Noise gradient controls
+  const enableNoiseGradientCheckbox = document.getElementById('enable-noise-gradient');
+  const noiseGradientControls = document.getElementById('noise-gradient-controls');
+  const noiseGradientInputs = {
+    noiseGradientMode: document.getElementById('noise-gradient-mode'),
+    noiseMin: document.getElementById('noise-min'),
+    noiseMax: document.getElementById('noise-max'),
+    gradientCurve: document.getElementById('gradient-curve')
+  };
+
+  // Toggle noise gradient controls visibility
+  enableNoiseGradientCheckbox.addEventListener('change', () => {
+    const enabled = enableNoiseGradientCheckbox.checked;
+    noiseGradientControls.style.display = enabled ? 'block' : 'none';
+
+    // Update config
+    const config = store.getState('config');
+    store.setState({
+      config: {
+        ...config,
+        noiseGradientMode: enabled ? 'fuzzy-crisp' : 'flat'
+      }
+    });
+
+    // Update CLI command display
+    updateCLICommandDisplay(store.getState('config'));
+
+    // Auto-process if live preview is enabled
+    const livePreview = store.getState('livePreview');
+    if (livePreview) {
+      throttledProcess();
+    }
+  });
+
+  // Wire up noise gradient control handlers
+  Object.entries(noiseGradientInputs).forEach(([key, input]) => {
+    if (!input) return;
+
+    input.addEventListener('change', () => {
+      const config = store.getState('config');
+      const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+
+      store.setState({
+        config: { ...config, [key]: value }
+      });
 
       // Update CLI command display
       updateCLICommandDisplay(store.getState('config'));

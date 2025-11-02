@@ -89,6 +89,11 @@ const initialState = {
     baseOffset: 0.25,
     noise: 0.0,
     noiseFrequency: 50,
+    // Noise gradient configuration
+    noiseGradientMode: 'flat',      // 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
+    noiseMin: 0.05,
+    noiseMax: 0.4,
+    gradientCurve: 'linear',        // 'linear', 'exponential', 'inverse', 'smoothstep'
     minPasses: 1,
     maxPasses: 10,
     curve: 'linear',

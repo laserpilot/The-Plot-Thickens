@@ -487,6 +487,57 @@ function offsetPath(pathData, offset, noise = 0, seed = 0, pathId = '', offsetEn
 }
 
 /**
+ * Calculate noise value for a pass based on gradient mode
+ * @param {number} passIndex - Pass index (0 = center)
+ * @param {number} totalPasses - Total number of passes
+ * @param {string} gradientMode - 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
+ * @param {number} noiseMin - Minimum noise value (crisp end)
+ * @param {number} noiseMax - Maximum noise value (fuzzy end)
+ * @param {string} curve - Gradient curve: 'linear', 'exponential', 'inverse', 'smoothstep'
+ * @param {number} baseNoise - Base noise value (used when gradientMode = 'flat')
+ * @returns {number} Noise value for this pass
+ */
+function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, noiseMax, curve, baseNoise) {
+  // Flat mode: use base noise for all passes (backward compatible)
+  if (gradientMode === 'flat' || totalPasses <= 1) {
+    return baseNoise;
+  }
+
+  // Calculate normalized position (0 = centerline, 1 = outermost)
+  // Pass 0 is centerline, passes 1+ are offsets
+  const t = totalPasses > 1 ? passIndex / (totalPasses - 1) : 0;
+
+  // Apply curve transform
+  let curvedT;
+  switch (curve) {
+    case 'exponential':
+      curvedT = Math.pow(t, 2);
+      break;
+    case 'inverse':
+      curvedT = 1 - Math.pow(1 - t, 2);
+      break;
+    case 'smoothstep':
+      curvedT = t * t * (3 - 2 * t);
+      break;
+    case 'linear':
+    default:
+      curvedT = t;
+      break;
+  }
+
+  // Map to noise range based on gradient direction
+  if (gradientMode === 'fuzzy-crisp') {
+    // Outer passes (high index) = fuzzy (noiseMax), inner = crisp (noiseMin)
+    return noiseMin + curvedT * (noiseMax - noiseMin);
+  } else if (gradientMode === 'crisp-fuzzy') {
+    // Outer passes = crisp (noiseMin), inner = fuzzy (noiseMax)
+    return noiseMax - curvedT * (noiseMax - noiseMin);
+  }
+
+  return baseNoise; // Fallback
+}
+
+/**
  * Generate multiple offset passes of a path with centered distribution
  * @param {string} pathData - Original SVG path
  * @param {number} passes - Number of times to duplicate
@@ -508,6 +559,12 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
   if (seed === null) {
     seed = hashString(pathData);
   }
+
+  // Extract noise gradient parameters from crosshatchOptions if present
+  const noiseGradientMode = crosshatchOptions?.noiseGradientMode || 'flat';
+  const noiseMin = crosshatchOptions?.noiseMin || 0.05;
+  const noiseMax = crosshatchOptions?.noiseMax || 0.4;
+  const gradientCurve = crosshatchOptions?.gradientCurve || 'linear';
 
   // Route to crosshatch fill if requested
   if (fillMode === 'crosshatch' && crosshatchOptions) {
@@ -691,7 +748,10 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       const offsetDistance = i * baseOffset;
       const passSeed = seed + i;
 
-      const offsetPathData = offsetPath(pathData, offsetDistance, noise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+      // Calculate per-pass noise based on gradient mode
+      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+
+      const offsetPathData = offsetPath(pathData, offsetDistance, passNoise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
       paths.push(offsetPathData);
       pathCount++;
     }
@@ -719,10 +779,13 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       // This creates the helical/barber pole effect where stripes spiral outward
       const passPhaseOffset = twistOffset + (offsetDistance * twistRate);
 
+      // Calculate per-pass noise based on gradient mode
+      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+
       const offsetPathData = offsetPathSpiral(
         pathData,
         offsetDistance,
-        noise,
+        passNoise,
         passSeed,
         pathId,
         offsetEnvelope,
@@ -745,7 +808,10 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       const offsetDistance = direction * passIndex * baseOffset;
       const passSeed = seed + i; // Unique seed per pass
 
-      const offsetPathData = offsetPath(pathData, offsetDistance, noise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+      // Calculate per-pass noise based on gradient mode
+      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+
+      const offsetPathData = offsetPath(pathData, offsetDistance, passNoise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
       paths.push(offsetPathData);
     }
   }
