@@ -489,6 +489,18 @@
                     </label>
 
                     <label>
+                      Frequency Min (mm)
+                      <input type="number" id="freq-min" step="5" min="5" max="200" value="50" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Crisp end: higher = tighter wiggle</div>
+                    </label>
+
+                    <label>
+                      Frequency Max (mm)
+                      <input type="number" id="freq-max" step="5" min="5" max="200" value="10" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Fuzzy end: lower = smoother wiggle</div>
+                    </label>
+
+                    <label>
                       Gradient Curve
                       <select id="gradient-curve">
                         <option value="linear">Linear</option>

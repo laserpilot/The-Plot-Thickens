@@ -71,6 +71,8 @@ function buildCLICommand(config) {
     parts.push(`--noise-gradient ${config.noiseGradientMode}`);
     parts.push(`--noise-min ${config.noiseMin}`);
     parts.push(`--noise-max ${config.noiseMax}`);
+    parts.push(`--freq-min ${config.freqMin}`);
+    parts.push(`--freq-max ${config.freqMax}`);
     if (config.gradientCurve && config.gradientCurve !== 'linear') {
       parts.push(`--gradient-curve ${config.gradientCurve}`);
     }
@@ -503,6 +505,8 @@ export function initUI(store, renderer) {
     noiseGradientMode: document.getElementById('noise-gradient-mode'),
     noiseMin: document.getElementById('noise-min'),
     noiseMax: document.getElementById('noise-max'),
+    freqMin: document.getElementById('freq-min'),
+    freqMax: document.getElementById('freq-max'),
     gradientCurve: document.getElementById('gradient-curve')
   };
 

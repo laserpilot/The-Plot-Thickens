@@ -487,20 +487,23 @@ function offsetPath(pathData, offset, noise = 0, seed = 0, pathId = '', offsetEn
 }
 
 /**
- * Calculate noise value for a pass based on gradient mode
+ * Calculate noise parameters for a pass based on gradient mode
  * @param {number} passIndex - Pass index (0 = center)
  * @param {number} totalPasses - Total number of passes
  * @param {string} gradientMode - 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
- * @param {number} noiseMin - Minimum noise value (crisp end)
- * @param {number} noiseMax - Maximum noise value (fuzzy end)
+ * @param {number} noiseMin - Minimum noise amplitude (crisp end)
+ * @param {number} noiseMax - Maximum noise amplitude (fuzzy end)
+ * @param {number} freqMin - Minimum noise frequency (crisp end, higher = tighter)
+ * @param {number} freqMax - Maximum noise frequency (fuzzy end, lower = smoother)
  * @param {string} curve - Gradient curve: 'linear', 'exponential', 'inverse', 'smoothstep'
  * @param {number} baseNoise - Base noise value (used when gradientMode = 'flat')
- * @returns {number} Noise value for this pass
+ * @param {number} baseFreq - Base frequency value (used when gradientMode = 'flat')
+ * @returns {Object} {amplitude, frequency} - Noise parameters for this pass
  */
-function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, noiseMax, curve, baseNoise) {
-  // Flat mode: use base noise for all passes (backward compatible)
+function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, noiseMax, freqMin, freqMax, curve, baseNoise, baseFreq) {
+  // Flat mode: use base values for all passes (backward compatible)
   if (gradientMode === 'flat' || totalPasses <= 1) {
-    return baseNoise;
+    return { amplitude: baseNoise, frequency: baseFreq };
   }
 
   // Calculate normalized position (0 = centerline, 1 = outermost)
@@ -525,16 +528,23 @@ function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, nois
       break;
   }
 
+  let amplitude, frequency;
+
   // Map to noise range based on gradient direction
   if (gradientMode === 'fuzzy-crisp') {
-    // Outer passes (high index) = fuzzy (noiseMax), inner = crisp (noiseMin)
-    return noiseMin + curvedT * (noiseMax - noiseMin);
+    // Outer passes (high index) = fuzzy (high amp, low freq), inner = crisp (low amp, high freq)
+    amplitude = noiseMin + curvedT * (noiseMax - noiseMin);
+    frequency = freqMax - curvedT * (freqMax - freqMin);
   } else if (gradientMode === 'crisp-fuzzy') {
-    // Outer passes = crisp (noiseMin), inner = fuzzy (noiseMax)
-    return noiseMax - curvedT * (noiseMax - noiseMin);
+    // Outer passes = crisp (low amp, high freq), inner = fuzzy (high amp, low freq)
+    amplitude = noiseMax - curvedT * (noiseMax - noiseMin);
+    frequency = freqMin + curvedT * (freqMax - freqMin);
+  } else {
+    amplitude = baseNoise;
+    frequency = baseFreq;
   }
 
-  return baseNoise; // Fallback
+  return { amplitude, frequency };
 }
 
 /**
@@ -564,6 +574,8 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
   const noiseGradientMode = crosshatchOptions?.noiseGradientMode || 'flat';
   const noiseMin = crosshatchOptions?.noiseMin || 0.05;
   const noiseMax = crosshatchOptions?.noiseMax || 0.4;
+  const freqMin = crosshatchOptions?.freqMin || 50;   // Crisp end: higher frequency (tighter)
+  const freqMax = crosshatchOptions?.freqMax || 10;   // Fuzzy end: lower frequency (smoother)
   const gradientCurve = crosshatchOptions?.gradientCurve || 'linear';
 
   // Route to crosshatch fill if requested
@@ -748,10 +760,10 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       const offsetDistance = i * baseOffset;
       const passSeed = seed + i;
 
-      // Calculate per-pass noise based on gradient mode
-      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+      // Calculate per-pass noise parameters based on gradient mode
+      const noiseParams = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, freqMin, freqMax, gradientCurve, noise, noiseFrequency);
 
-      const offsetPathData = offsetPath(pathData, offsetDistance, passNoise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+      const offsetPathData = offsetPath(pathData, offsetDistance, noiseParams.amplitude, passSeed, pathId, offsetEnvelope, useNormalMode, noiseParams.frequency, sampleRate);
       paths.push(offsetPathData);
       pathCount++;
     }
@@ -779,17 +791,17 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       // This creates the helical/barber pole effect where stripes spiral outward
       const passPhaseOffset = twistOffset + (offsetDistance * twistRate);
 
-      // Calculate per-pass noise based on gradient mode
-      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+      // Calculate per-pass noise parameters based on gradient mode
+      const noiseParams = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, freqMin, freqMax, gradientCurve, noise, noiseFrequency);
 
       const offsetPathData = offsetPathSpiral(
         pathData,
         offsetDistance,
-        passNoise,
+        noiseParams.amplitude,
         passSeed,
         pathId,
         offsetEnvelope,
-        noiseFrequency,
+        noiseParams.frequency,
         sampleRate,
         twistRate,
         passPhaseOffset
@@ -808,10 +820,10 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
       const offsetDistance = direction * passIndex * baseOffset;
       const passSeed = seed + i; // Unique seed per pass
 
-      // Calculate per-pass noise based on gradient mode
-      const passNoise = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, gradientCurve, noise);
+      // Calculate per-pass noise parameters based on gradient mode
+      const noiseParams = calculatePassNoise(i, passes, noiseGradientMode, noiseMin, noiseMax, freqMin, freqMax, gradientCurve, noise, noiseFrequency);
 
-      const offsetPathData = offsetPath(pathData, offsetDistance, passNoise, passSeed, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+      const offsetPathData = offsetPath(pathData, offsetDistance, noiseParams.amplitude, passSeed, pathId, offsetEnvelope, useNormalMode, noiseParams.frequency, sampleRate);
       paths.push(offsetPathData);
     }
   }

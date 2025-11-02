@@ -93,6 +93,8 @@ const initialState = {
     noiseGradientMode: 'flat',      // 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
     noiseMin: 0.05,
     noiseMax: 0.4,
+    freqMin: 50,                    // Crisp end: higher frequency (tighter wiggle)
+    freqMax: 10,                    // Fuzzy end: lower frequency (smoother wiggle)
     gradientCurve: 'linear',        // 'linear', 'exponential', 'inverse', 'smoothstep'
     minPasses: 1,
     maxPasses: 10,

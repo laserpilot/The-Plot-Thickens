@@ -98,6 +98,8 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
       noiseGradientMode: config.noiseGradientMode || 'flat',
       noiseMin: config.noiseMin || 0.05,
       noiseMax: config.noiseMax || 0.4,
+      freqMin: config.freqMin || 50,
+      freqMax: config.freqMax || 10,
       gradientCurve: config.gradientCurve || 'linear'
     };
 
