@@ -92,8 +92,10 @@ const initialState = {
     minPasses: 1,
     maxPasses: 10,
     curve: 'linear',
+    envelope: 'flat',
     fillMode: 'offset',
     sampleRate: 2,
+    outputSize: 'original',
     // Length thresholding
     minLength: 0,  // 0 = auto-detect
     maxLength: 0,  // 0 = auto-detect
@@ -142,9 +144,21 @@ const initialState = {
 
   // UI state
   activeTab: 'file',
+  expandedSections: new Set(['file', 'fills', 'export']),
   livePreview: false,
   fastPreview: false,
   processing: false,
+
+  // Original SVG metadata (for preserving dimensions)
+  originalSvgMetadata: {
+    width: null,
+    height: null,
+    viewBox: null
+  },
+
+  // Detected path length range (updated after processing)
+  detectedMinLength: null,
+  detectedMaxLength: null,
 
   // Attractor state
   attractors: [],

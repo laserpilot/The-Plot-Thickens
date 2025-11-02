@@ -95,9 +95,13 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [x] Set up persistent progress log (`docs/refactor-progress.md`) to capture completed steps, deviations, and open questions for easy handoff between sessions.
 
 ### Phase 4 – Advanced Fills & Tooling
-- [ ] Add text field that shows the CLI command, not just offer copy/paste on advanced
-- [ ] Add the fill envelopes from the original version for controls of things like sinTaper, EaseInOut, exponential, etc - currently missing in UI and CLI
-- [ ] make sure UI tabs are arranged in a way that doesn't hide them - the width is getting too wide and Advanced is getting cut off
+- [x] Add text field that shows the CLI command, not just offer copy/paste on advanced tab
+- [x] Add the fill envelopes from the original version for controls of things like sinTaper, EaseInOut, exponential, etc - currently missing in UI and CLI
+- [x] Make sure UI tabs are arranged in a way that doesn't hide them - migrated to vertical accordion layout
+- [x] Add length-to-weight curve controls (linear, easeIn, easeOut, easeInOut)
+- [x] Show detected min/max length values after processing
+- [x] Add output size controls (keep original, A3 landscape, A3 portrait)
+- [x] Fix SVG export dimension bug (was outputting viewBox coords as mm)
 - [ ] Port focus blur controls + preview canvas (consider worker).
 - [ ] Reintroduce crosshatch/striped/gradient modes via shared modules.
 - [ ] Restore calibration / diagnostic panels selectively.

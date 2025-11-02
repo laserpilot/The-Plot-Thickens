@@ -86,8 +86,8 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
       ));
     }
 
-    // Get envelope function for normal mode
-    const envelope = getEnvelopePreset('sinTaperBoth');
+    // Get envelope function from config (default: flat)
+    const envelope = getEnvelopePreset(config.envelope || 'flat');
 
     // Prepare mode-specific options
     let modeOptions = config.fillModeOptions || null;
@@ -205,7 +205,11 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
 
   console.log(`Processed ${paths.length} source paths into ${processed.length} offset paths`);
   console.log(`Average passes per path: ${(processed.length / paths.length).toFixed(1)}`);
-  return processed;
+  return {
+    paths: processed,
+    detectedMinLength: minLength,
+    detectedMaxLength: maxLength
+  };
 }
 
 /**

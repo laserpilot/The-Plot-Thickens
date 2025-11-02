@@ -29,562 +29,665 @@
       <div class="layout-container">
         <!-- Left panel: controls -->
         <div class="controls-panel">
-          <!-- Tab navigation -->
-          <nav class="tabs">
-            <button class="tab-btn active" data-tab="file">File</button>
-            <button class="tab-btn" data-tab="sample">Sample</button>
-            <button class="tab-btn" data-tab="fills">Fills</button>
-            <button class="tab-btn" data-tab="attractors">Attractors</button>
-            <button class="tab-btn" data-tab="advanced">Advanced</button>
-          </nav>
+          <!-- Accordion sections -->
+          <div class="accordion">
 
-          <!-- Tab panels -->
-          <div class="tab-content">
-            <section id="tab-file" class="tab-panel active">
-              <h2>Load SVG</h2>
-              <input type="file" id="file-input" accept=".svg" />
-              <div id="file-info" class="info-box"></div>
-            </section>
-
-            <section id="tab-sample" class="tab-panel">
-              <h2>Sample Preview</h2>
-              <div class="info-box" style="display: block; margin-bottom: 1rem;">
-                Test fill parameters on simple shapes before processing your SVG. Perfect for quickly dialing in settings.
-              </div>
-
-              <div class="controls-grid">
-                <label>
-                  Test Shape
-                  <select id="sample-shape">
-                    <option value="circle">Circle</option>
-                    <option value="square">Square</option>
-                    <option value="triangle">Triangle</option>
-                    <option value="star">Star</option>
-                    <option value="grid">Grid (3x3)</option>
-                    <option value="mixed">Mixed Shapes</option>
-                  </select>
-                </label>
-
-                <label>
-                  Shape Size (mm)
-                  <input type="number" id="sample-size" step="10" min="10" max="200" value="50" />
-                </label>
-
-                <label>
-                  Complexity
-                  <select id="sample-complexity">
-                    <option value="simple">Simple (5-10 paths)</option>
-                    <option value="medium">Medium (10-20 paths)</option>
-                    <option value="complex">Complex (20-40 paths)</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="action-buttons">
-                <button id="btn-load-sample">Load Sample Shape</button>
-                <button id="btn-back-to-svg" style="display: none;">Back to My SVG</button>
-              </div>
-
-              <div id="sample-info" class="info-box" style="display: none; margin-top: 1rem;">
-                <strong>Sample loaded:</strong> <span id="sample-info-text"></span>
+            <!-- File Upload & Settings Section -->
+            <section class="accordion-section expanded" data-section="file">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▼</span>
+                File Upload & Settings
+              </h2>
+              <div class="accordion-content">
+                <h3>Load SVG</h3>
+                <input type="file" id="file-input" accept=".svg" />
+                <div id="file-info" class="info-box"></div>
               </div>
             </section>
 
-            <section id="tab-fills" class="tab-panel">
-          <h2>Fill Settings</h2>
-          <div class="controls-grid">
-            <label>
-              Fill Mode
-              <select id="fill-mode">
-                <option value="offset">Offset</option>
-                <option value="crosshatch">Crosshatch</option>
-                <option value="striped">Striped</option>
-                <option value="spiral">Spiral</option>
-                <option value="focus-blur">Focus Blur</option>
-                <option value="hatch-gradient">Hatch Gradient</option>
-              </select>
-            </label>
-
-            <label>
-              Base Offset (mm)
-              <input type="number" id="base-offset" step="0.05" min="0" max="2" value="0.25" />
-            </label>
-
-            <label>
-              Min Passes
-              <input type="number" id="min-passes" step="1" min="1" max="20" value="1" />
-            </label>
-
-            <label>
-              Max Passes
-              <input type="number" id="max-passes" step="1" min="1" max="20" value="10" />
-            </label>
-          </div>
-
-          <!-- Mode-specific controls -->
-          <div id="mode-striped-controls" class="mode-specific-controls" style="display: none;">
-            <h3>Striped Mode Options</h3>
-            <div class="controls-grid">
-              <label>
-                Filled Stripes
-                <input type="number" id="stripe-filled" step="1" min="1" max="10" value="1" />
-              </label>
-              <label>
-                Empty Stripes
-                <input type="number" id="stripe-empty" step="1" min="0" max="10" value="1" />
-              </label>
-            </div>
-          </div>
-
-          <div id="mode-spiral-controls" class="mode-specific-controls" style="display: none;">
-            <h3>Spiral Mode Options</h3>
-            <div class="controls-grid">
-              <label>
-                Twist Rate
-                <input type="number" id="twist-rate" step="0.005" min="0" max="0.1" value="0.01" />
-              </label>
-              <label>
-                Twist Offset (rad)
-                <input type="number" id="twist-offset" step="0.1" min="0" max="6.28" value="0" />
-              </label>
-              <label>
-                Filled Stripes
-                <input type="number" id="spiral-stripe-filled" step="1" min="1" max="10" value="1" />
-              </label>
-              <label>
-                Empty Stripes
-                <input type="number" id="spiral-stripe-empty" step="1" min="0" max="10" value="1" />
-              </label>
-            </div>
-          </div>
-
-          <div id="mode-crosshatch-controls" class="mode-specific-controls" style="display: none;">
-            <h3>Crosshatch Mode Options</h3>
-            <div class="controls-grid">
-              <label>
-                Hatch Angles (comma-separated)
-                <input type="text" id="crosshatch-angles" value="45,135" placeholder="e.g., 0,90 or 45,135" />
-              </label>
-              <label>
-                Hatch Spacing (mm)
-                <input type="number" id="crosshatch-spacing" step="0.1" min="0.1" max="5" value="1.0" />
-              </label>
-            </div>
-            <div class="info-box" style="display: block; margin-top: 10px;">
-              <strong>Tip:</strong> Use 0,90 for orthogonal crosshatch, 45,135 for diagonal, or 0,60,120 for triangular pattern.
-            </div>
-          </div>
-
-          <div id="mode-focus-blur-controls" class="mode-specific-controls" style="display: none;">
-            <h3>Focus Blur Options</h3>
-            <div class="info-box" style="display: block; margin-bottom: 1rem;">
-              Creates depth-of-field effect: tight, crisp lines in focused areas, loose sketchy lines in blurred areas.
-            </div>
-
-            <div class="controls-grid">
-              <label>
-                Light Mode
-                <select id="focus-blur-light-mode">
-                  <option value="directional">Directional Light</option>
-                  <option value="point">Point Source</option>
-                </select>
-              </label>
-            </div>
-
-            <!-- Directional Light Controls -->
-            <div id="focus-blur-directional-controls">
-              <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Directional Light</h4>
-              <div class="controls-grid">
-                <label>
-                  Light Angle (degrees)
-                  <input type="number" id="focus-blur-light-angle" step="5" min="0" max="360" value="45" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">0°=right, 90°=down, 180°=left, 270°=up</div>
-                </label>
-              </div>
-            </div>
-
-            <!-- Point Light Controls -->
-            <div id="focus-blur-point-controls" style="display: none;">
-              <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Point Light Source</h4>
-              <div class="controls-grid">
-                <label>
-                  Light Position X (%)
-                  <input type="number" id="focus-blur-light-pos-x" step="5" min="0" max="100" value="50" />
-                </label>
-                <label>
-                  Light Position Y (%)
-                  <input type="number" id="focus-blur-light-pos-y" step="5" min="0" max="100" value="50" />
-                </label>
-                <label>
-                  Falloff Radius (mm)
-                  <input type="number" id="focus-blur-falloff-radius" step="10" min="10" max="500" value="150" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance where light intensity drops to 50%</div>
-                </label>
-              </div>
-            </div>
-
-            <!-- Noise Amplitude -->
-            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Noise Amplitude</h4>
-            <div class="controls-grid">
-              <label>
-                Min - Focus (mm)
-                <input type="number" id="focus-noise-min" step="0.01" min="0" max="2" value="0.05" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Calm, precise strokes in lit areas</div>
-              </label>
-              <label>
-                Max - Blur (mm)
-                <input type="number" id="focus-noise-max" step="0.01" min="0" max="2" value="0.6" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Wild, loose strokes in shadows</div>
-              </label>
-            </div>
-
-            <!-- Noise Frequency -->
-            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Noise Frequency</h4>
-            <div class="controls-grid">
-              <label>
-                Min - Focus
-                <input type="number" id="focus-freq-min" step="10" min="1" max="200" value="100" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Tight detail in focused areas</div>
-              </label>
-              <label>
-                Max - Blur
-                <input type="number" id="focus-freq-max" step="5" min="1" max="200" value="10" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Loose waves in blurred areas</div>
-              </label>
-            </div>
-
-            <!-- Pass Count Modulation -->
-            <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Pass Count Modulation (Optional)</h4>
-            <div class="controls-grid">
-              <label>
-                <input type="checkbox" id="focus-blur-modulate-passes" />
-                Modulate Pass Count (thicker/darker in shadows)
-              </label>
-            </div>
-
-            <div id="focus-blur-passes-controls" style="display: none; margin-top: 0.5rem;">
-              <div class="controls-grid">
-                <label>
-                  Pass Multiplier Min (focus)
-                  <input type="number" id="focus-passes-min" step="0.1" min="0.5" max="2" value="1.0" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Lighter in focused areas</div>
-                </label>
-                <label>
-                  Pass Multiplier Max (blur)
-                  <input type="number" id="focus-passes-max" step="0.1" min="0.5" max="2" value="1.5" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Darker in blurred areas</div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Hatch Gradient Mode Controls -->
-          <div id="mode-hatch-gradient-controls" class="mode-specific-controls" style="display: none;">
-            <h3>Hatch Gradient Options</h3>
-            <div class="info-box" style="display: block; margin-bottom: 1rem;">
-              Creates crosshatch fills with density based on simulated lighting. Lighter areas get sparser hatching, darker areas get denser fills.
-            </div>
-
-            <label>
-              Light Mode
-              <select id="hatch-light-mode">
-                <option value="directional">Directional Light</option>
-                <option value="point">Point Source</option>
-              </select>
-            </label>
-
-            <!-- Directional Light Controls -->
-            <div id="hatch-directional-controls">
-              <label>
-                Light Direction (degrees)
-                <input type="number" id="hatch-light-angle" step="5" min="0" max="360" value="45" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">0°=right, 90°=down, 180°=left, 270°=up</div>
-              </label>
-            </div>
-
-            <!-- Point Light Controls -->
-            <div id="hatch-point-controls" style="display: none;">
-              <label>
-                Light Position X (%)
-                <input type="number" id="hatch-light-pos-x" step="1" min="0" max="100" value="25" />
-              </label>
-              <label>
-                Light Position Y (%)
-                <input type="number" id="hatch-light-pos-y" step="1" min="0" max="100" value="25" />
-              </label>
-              <label>
-                Falloff Radius (mm)
-                <input type="number" id="hatch-falloff-radius" step="10" min="10" max="500" value="100" />
-                <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance where light intensity drops to 50%</div>
-              </label>
-            </div>
-
-            <label>
-              Light Strength (0-1)
-              <input type="number" id="hatch-light-strength" step="0.05" min="0" max="1" value="0.8" />
-              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much light affects density (0=uniform, 1=max contrast)</div>
-            </label>
-
-            <label>
-              Base Density (0-0.5)
-              <input type="number" id="hatch-base-weight" step="0.05" min="0" max="0.5" value="0.2" />
-              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum hatch density in lightest areas</div>
-            </label>
-
-            <label>
-              Shadow Softness (0-1)
-              <input type="number" id="hatch-shadow-softness" step="0.05" min="0" max="1" value="0.5" />
-              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Smoothness of light-to-shadow transitions</div>
-            </label>
-          </div>
-
-          <div class="controls-grid">
-            <label>
-              <input type="checkbox" id="live-preview" />
-              Live Preview (auto-update)
-            </label>
-
-            <label>
-              <input type="checkbox" id="fast-preview" />
-              Fast Preview Mode
-            </label>
-          </div>
-
-          <div class="info-box" id="fast-preview-info" style="display: none; margin-top: 0.5rem;">
-            <strong>Fast Preview:</strong> Shows color-coded stroke widths (green=min, red=max) that approximate the final result. Much faster than full processing.
-          </div>
-
-          <div class="action-buttons">
-            <button id="btn-process">Process Paths</button>
-            <button id="btn-reset-preview">Reset to Original</button>
-          </div>
-        </section>
-
-            <section id="tab-attractors" class="tab-panel">
-          <h2>Attractors <span style="font-size: 0.8em; color: #666;" id="attractor-count">(0/10)</span></h2>
-
-          <div class="controls-grid">
-            <label>
-              <input type="checkbox" id="use-attractors" />
-              Enable Attractors
-            </label>
-          </div>
-
-          <div class="info-box" id="attractor-info">
-            <strong>Ctrl/Cmd+Click:</strong> Add attractor<br>
-            <strong>Shift+Click:</strong> Remove nearest<br>
-            <strong>Click &amp; Drag:</strong> Move attractor
-          </div>
-
-          <!-- Manual entry form -->
-          <details style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 4px;">
-            <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em; color: #4a9eff;">➕ Add Attractor Manually</summary>
-            <div style="margin-top: 0.75rem;">
-              <div class="controls-grid">
-                <label style="font-size: 0.9em;">
-                  X Position (mm)
-                  <input type="number" id="manual-x" placeholder="X" step="1" style="width: 100%;">
-                </label>
-                <label style="font-size: 0.9em;">
-                  Y Position (mm)
-                  <input type="number" id="manual-y" placeholder="Y" step="1" style="width: 100%;">
-                </label>
-                <label style="font-size: 0.9em;">
-                  Strength (optional)
-                  <input type="number" id="manual-strength" placeholder="Use global" step="0.1" min="0" max="5" style="width: 100%;">
-                </label>
-                <label style="font-size: 0.9em;">
-                  Radius (optional, mm)
-                  <input type="number" id="manual-radius" placeholder="Use global" step="5" min="5" max="300" style="width: 100%;">
-                </label>
-              </div>
-              <button id="add-manual-attractor" style="margin-top: 0.5rem; width: 100%;">Add Attractor</button>
-            </div>
-          </details>
-
-          <div class="action-buttons">
-            <button id="btn-clear-attractors">Clear All Attractors</button>
-          </div>
-
-          <div id="attractor-list" class="attractor-list"></div>
-
-          <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Global Attractor Settings</h3>
-
-          <div class="controls-grid">
-            <label>
-              Mode
-              <select id="attractor-mode">
-                <option value="attract">Attract (more passes)</option>
-                <option value="repel">Repel (fewer passes)</option>
-              </select>
-            </label>
-
-            <label>
-              Default Strength
-              <input type="number" id="attractor-strength" step="0.1" min="0" max="5" value="1.0" />
-            </label>
-
-            <label>
-              Default Falloff Radius (mm)
-              <input type="number" id="attractor-radius" step="5" min="10" max="300" value="50" />
-            </label>
-
-            <label>
-              Falloff Curve
-              <select id="attractor-curve">
-                <option value="linear">Linear</option>
-                <option value="exponential">Exponential (x²)</option>
-                <option value="power">Power (configurable)</option>
-                <option value="gaussian">Gaussian (smooth)</option>
-                <option value="inverse-square">Inverse Square</option>
-              </select>
-            </label>
-          </div>
-
-          <div id="falloff-exponent-control" class="mode-specific-controls" style="display: none;">
-            <label>
-              Falloff Exponent
-              <input type="range" id="falloff-exponent" min="1" max="10" step="0.5" value="2" />
-              <span id="falloff-exponent-value">2.0</span>
-            </label>
-            <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
-              Higher = sharper center, steeper falloff
-            </div>
-          </div>
-
-          <div class="controls-grid">
-            <label>
-              Multiple Attractor Mode
-              <select id="multi-mode">
-                <option value="additive">Additive (sum influences)</option>
-                <option value="strongest">Strongest Only</option>
-                <option value="average">Average</option>
-                <option value="soft">Soft (averaged by count)</option>
-                <option value="weighted-average">Weighted Average (by distance)</option>
-              </select>
-            </label>
-          </div>
-
-          <!-- Advanced options -->
-          <details style="margin-top: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
-            <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em;">⚙️ Advanced Filtering</summary>
-            <div style="margin-top: 0.75rem;">
-              <div class="controls-grid">
-                <label style="font-size: 0.9em;">
-                  Min Influence Threshold (0-1)
-                  <input type="number" id="min-influence-threshold" step="0.05" min="0" max="1" value="0" style="width: 100%;" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect paths with max influence above this</div>
-                </label>
-
-                <label style="font-size: 0.9em;">
-                  Min Coverage % (0-100)
-                  <input type="number" id="min-coverage-percent" step="5" min="0" max="100" value="0" style="width: 100%;" />
-                  <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect if this % of path is in radius</div>
-                </label>
-
-                <label style="font-size: 0.9em;">
-                  Influence Calculation
-                  <select id="influence-calc-mode" style="width: 100%;">
-                    <option value="average">Average (whole path)</option>
-                    <option value="maximum">Maximum (closest point)</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-          </details>
-        </section>
-
-            <section id="tab-advanced" class="tab-panel">
-          <h2>Advanced Settings</h2>
-          <div class="controls-grid">
-            <label>
-              Noise (mm)
-              <input type="number" id="noise" step="0.05" min="0" max="2" value="0" />
-            </label>
-
-            <label>
-              Noise Frequency (mm)
-              <input type="number" id="noise-frequency" step="5" min="5" max="200" value="50" />
-            </label>
-
-            <label>
-              Sample Rate (mm)
-              <input type="number" id="sample-rate" step="0.5" min="0.5" max="10" value="2" />
-            </label>
-          </div>
-
-          <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Length Thresholding</h3>
-          <div class="info-box" style="display: block; margin-bottom: 1rem;">
-            Override auto-detected min/max path lengths for normalization. Useful for handling outliers or focusing effects on specific length ranges.
-          </div>
-
-          <div class="controls-grid">
-            <label>
-              Min Length (mm)
-              <input type="number" id="min-length" step="10" min="0" value="0" placeholder="Auto" />
-              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
-            </label>
-
-            <label>
-              Max Length (mm)
-              <input type="number" id="max-length" step="10" min="0" value="0" placeholder="Auto" />
-              <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
-            </label>
-          </div>
-
-          <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Output Options</h3>
-
-          <!-- Outline Extraction -->
-          <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-              <input type="checkbox" id="add-outline" style="margin-right: 0.5rem;" />
-              <span>Add Outline Strokes</span>
-            </label>
-            <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
-              Adds the furthermost boundary paths as separate strokes. Useful for creating defined edges around fills, especially with striped/spiral patterns.
-            </div>
-          </div>
-
-          <!-- Length Binning -->
-          <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-              <input type="checkbox" id="enable-binning" style="margin-right: 0.5rem;" />
-              <span>Enable Length Binning</span>
-            </label>
-            <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
-              Groups output paths by length into bins for easier management in vector editors. Organizes paths into separate groups by length ranges.
-            </div>
-
-            <div id="binning-controls" style="display: none; margin-top: 0.75rem;">
-              <label style="display: block;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                  <span>Number of Bins:</span>
-                  <span id="bin-count-value" style="font-weight: bold;">4</span>
+            <!-- Sample Preview Section -->
+            <section class="accordion-section" data-section="sample">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▶</span>
+                Sample Preview
+              </h2>
+              <div class="accordion-content">
+                <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                  Test fill parameters on simple shapes before processing your SVG. Perfect for quickly dialing in settings.
                 </div>
-                <input type="range" id="bin-count" min="2" max="10" step="1" value="4" style="width: 100%;" />
-                <div style="font-size: 0.8em; color: #666; margin-top: 0.5rem;">
-                  Paths will be grouped: <span id="bin-preview" style="font-family: monospace;">0-25%, 25-50%, 50-75%, 75-100%</span>
+
+                <div class="controls-grid">
+                  <label>
+                    Test Shape
+                    <select id="sample-shape">
+                      <option value="circle">Circle</option>
+                      <option value="square">Square</option>
+                      <option value="triangle">Triangle</option>
+                      <option value="star">Star</option>
+                      <option value="grid">Grid (3x3)</option>
+                      <option value="mixed">Mixed Shapes</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Shape Size (mm)
+                    <input type="number" id="sample-size" step="10" min="10" max="200" value="50" />
+                  </label>
+
+                  <label>
+                    Complexity
+                    <select id="sample-complexity">
+                      <option value="simple">Simple (5-10 paths)</option>
+                      <option value="medium">Medium (10-20 paths)</option>
+                      <option value="complex">Complex (20-40 paths)</option>
+                    </select>
+                  </label>
                 </div>
-              </label>
-            </div>
-          </div>
 
-          <div class="action-buttons">
-            <button id="btn-copy-cli">Copy CLI Command</button>
-            <button id="btn-export">Export (Quick)</button>
-            <button id="btn-export-server">Export (Server)</button>
-          </div>
+                <div class="action-buttons">
+                  <button id="btn-load-sample">Load Sample Shape</button>
+                  <button id="btn-back-to-svg" style="display: none;">Back to My SVG</button>
+                </div>
 
-          <!-- Progress Panel for Backend Processing -->
-          <div id="progress-panel" class="progress-panel hidden">
-            <h3>Processing on Server</h3>
-            <div class="progress-bar-container">
-              <div id="progress-bar" class="progress-bar"></div>
-            </div>
-            <div id="progress-text" class="progress-text">Initializing...</div>
-            <button id="btn-progress-action" class="progress-action-btn">Cancel</button>
-          </div>
+                <div id="sample-info" class="info-box" style="display: none; margin-top: 1rem;">
+                  <strong>Sample loaded:</strong> <span id="sample-info-text"></span>
+                </div>
+              </div>
             </section>
+
+            <!-- Fill Mode Section -->
+            <section class="accordion-section expanded" data-section="fills">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▼</span>
+                Fill Mode
+              </h2>
+              <div class="accordion-content">
+                <div class="controls-grid">
+                  <label>
+                    Fill Mode
+                    <select id="fill-mode">
+                      <option value="offset">Offset</option>
+                      <option value="crosshatch">Crosshatch</option>
+                      <option value="striped">Striped</option>
+                      <option value="spiral">Spiral</option>
+                      <option value="focus-blur">Focus Blur</option>
+                      <option value="hatch-gradient">Hatch Gradient</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Base Offset (mm)
+                    <input type="number" id="base-offset" step="0.05" min="0" max="2" value="0.25" />
+                  </label>
+
+                  <label>
+                    Min Passes
+                    <input type="number" id="min-passes" step="1" min="1" max="20" value="1" />
+                  </label>
+
+                  <label>
+                    Max Passes
+                    <input type="number" id="max-passes" step="1" min="1" max="20" value="10" />
+                  </label>
+                </div>
+
+                <!-- Mode-specific controls -->
+                <div id="mode-striped-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Striped Mode Options</h3>
+                  <div class="controls-grid">
+                    <label>
+                      Filled Stripes
+                      <input type="number" id="stripe-filled" step="1" min="1" max="10" value="1" />
+                    </label>
+                    <label>
+                      Empty Stripes
+                      <input type="number" id="stripe-empty" step="1" min="0" max="10" value="1" />
+                    </label>
+                  </div>
+                </div>
+
+                <div id="mode-spiral-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Spiral Mode Options</h3>
+                  <div class="controls-grid">
+                    <label>
+                      Twist Rate
+                      <input type="number" id="twist-rate" step="0.005" min="0" max="0.1" value="0.01" />
+                    </label>
+                    <label>
+                      Twist Offset (rad)
+                      <input type="number" id="twist-offset" step="0.1" min="0" max="6.28" value="0" />
+                    </label>
+                    <label>
+                      Filled Stripes
+                      <input type="number" id="spiral-stripe-filled" step="1" min="1" max="10" value="1" />
+                    </label>
+                    <label>
+                      Empty Stripes
+                      <input type="number" id="spiral-stripe-empty" step="1" min="0" max="10" value="1" />
+                    </label>
+                  </div>
+                </div>
+
+                <div id="mode-crosshatch-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Crosshatch Mode Options</h3>
+                  <div class="controls-grid">
+                    <label>
+                      Hatch Angles (comma-separated)
+                      <input type="text" id="crosshatch-angles" value="45,135" placeholder="e.g., 0,90 or 45,135" />
+                    </label>
+                    <label>
+                      Hatch Spacing (mm)
+                      <input type="number" id="crosshatch-spacing" step="0.1" min="0.1" max="5" value="1.0" />
+                    </label>
+                  </div>
+                  <div class="info-box" style="display: block; margin-top: 10px;">
+                    <strong>Tip:</strong> Use 0,90 for orthogonal crosshatch, 45,135 for diagonal, or 0,60,120 for triangular pattern.
+                  </div>
+                </div>
+
+                <div id="mode-focus-blur-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Focus Blur Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates depth-of-field effect: tight, crisp lines in focused areas, loose sketchy lines in blurred areas.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Light Mode
+                      <select id="focus-blur-light-mode">
+                        <option value="directional">Directional Light</option>
+                        <option value="point">Point Source</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <!-- Directional Light Controls -->
+                  <div id="focus-blur-directional-controls">
+                    <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Directional Light</h4>
+                    <div class="controls-grid">
+                      <label>
+                        Light Angle (degrees)
+                        <input type="number" id="focus-blur-light-angle" step="5" min="0" max="360" value="45" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">0°=right, 90°=down, 180°=left, 270°=up</div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Point Light Controls -->
+                  <div id="focus-blur-point-controls" style="display: none;">
+                    <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Point Light Source</h4>
+                    <div class="controls-grid">
+                      <label>
+                        Light Position X (%)
+                        <input type="number" id="focus-blur-light-pos-x" step="5" min="0" max="100" value="50" />
+                      </label>
+                      <label>
+                        Light Position Y (%)
+                        <input type="number" id="focus-blur-light-pos-y" step="5" min="0" max="100" value="50" />
+                      </label>
+                      <label>
+                        Falloff Radius (mm)
+                        <input type="number" id="focus-blur-falloff-radius" step="10" min="10" max="500" value="150" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance where light intensity drops to 50%</div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Noise Amplitude -->
+                  <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Noise Amplitude</h4>
+                  <div class="controls-grid">
+                    <label>
+                      Min - Focus (mm)
+                      <input type="number" id="focus-noise-min" step="0.01" min="0" max="2" value="0.05" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Calm, precise strokes in lit areas</div>
+                    </label>
+                    <label>
+                      Max - Blur (mm)
+                      <input type="number" id="focus-noise-max" step="0.01" min="0" max="2" value="0.6" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Wild, loose strokes in shadows</div>
+                    </label>
+                  </div>
+
+                  <!-- Noise Frequency -->
+                  <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Noise Frequency</h4>
+                  <div class="controls-grid">
+                    <label>
+                      Min - Focus
+                      <input type="number" id="focus-freq-min" step="10" min="1" max="200" value="100" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Tight detail in focused areas</div>
+                    </label>
+                    <label>
+                      Max - Blur
+                      <input type="number" id="focus-freq-max" step="5" min="1" max="200" value="10" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Loose waves in blurred areas</div>
+                    </label>
+                  </div>
+
+                  <!-- Pass Count Modulation -->
+                  <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">Pass Count Modulation (Optional)</h4>
+                  <div class="controls-grid">
+                    <label>
+                      <input type="checkbox" id="focus-blur-modulate-passes" />
+                      Modulate Pass Count (thicker/darker in shadows)
+                    </label>
+                  </div>
+
+                  <div id="focus-blur-passes-controls" style="display: none; margin-top: 0.5rem;">
+                    <div class="controls-grid">
+                      <label>
+                        Pass Multiplier Min (focus)
+                        <input type="number" id="focus-passes-min" step="0.1" min="0.5" max="2" value="1.0" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Lighter in focused areas</div>
+                      </label>
+                      <label>
+                        Pass Multiplier Max (blur)
+                        <input type="number" id="focus-passes-max" step="0.1" min="0.5" max="2" value="1.5" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Darker in blurred areas</div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Hatch Gradient Mode Controls -->
+                <div id="mode-hatch-gradient-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Hatch Gradient Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates crosshatch fills with density based on simulated lighting. Lighter areas get sparser hatching, darker areas get denser fills.
+                  </div>
+
+                  <label>
+                    Light Mode
+                    <select id="hatch-light-mode">
+                      <option value="directional">Directional Light</option>
+                      <option value="point">Point Source</option>
+                    </select>
+                  </label>
+
+                  <!-- Directional Light Controls -->
+                  <div id="hatch-directional-controls">
+                    <label>
+                      Light Direction (degrees)
+                      <input type="number" id="hatch-light-angle" step="5" min="0" max="360" value="45" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">0°=right, 90°=down, 180°=left, 270°=up</div>
+                    </label>
+                  </div>
+
+                  <!-- Point Light Controls -->
+                  <div id="hatch-point-controls" style="display: none;">
+                    <label>
+                      Light Position X (%)
+                      <input type="number" id="hatch-light-pos-x" step="1" min="0" max="100" value="25" />
+                    </label>
+                    <label>
+                      Light Position Y (%)
+                      <input type="number" id="hatch-light-pos-y" step="1" min="0" max="100" value="25" />
+                    </label>
+                    <label>
+                      Falloff Radius (mm)
+                      <input type="number" id="hatch-falloff-radius" step="10" min="10" max="500" value="100" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance where light intensity drops to 50%</div>
+                    </label>
+                  </div>
+
+                  <label>
+                    Light Strength (0-1)
+                    <input type="number" id="hatch-light-strength" step="0.05" min="0" max="1" value="0.8" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much light affects density (0=uniform, 1=max contrast)</div>
+                  </label>
+
+                  <label>
+                    Base Density (0-0.5)
+                    <input type="number" id="hatch-base-weight" step="0.05" min="0" max="0.5" value="0.2" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum hatch density in lightest areas</div>
+                  </label>
+
+                  <label>
+                    Shadow Softness (0-1)
+                    <input type="number" id="hatch-shadow-softness" step="0.05" min="0" max="1" value="0.5" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Smoothness of light-to-shadow transitions</div>
+                  </label>
+                </div>
+
+                <div class="controls-grid">
+                  <label>
+                    <input type="checkbox" id="live-preview" />
+                    Live Preview (auto-update)
+                  </label>
+
+                  <label>
+                    <input type="checkbox" id="fast-preview" />
+                    Fast Preview Mode
+                  </label>
+                </div>
+
+                <div class="info-box" id="fast-preview-info" style="display: none; margin-top: 0.5rem;">
+                  <strong>Fast Preview:</strong> Shows color-coded stroke widths (green=min, red=max) that approximate the final result. Much faster than full processing.
+                </div>
+
+                <div class="action-buttons">
+                  <button id="btn-process">Process Paths</button>
+                  <button id="btn-reset-preview">Reset to Original</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- Effects Section (NEW) -->
+            <section class="accordion-section" data-section="effects">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▶</span>
+                Effects
+              </h2>
+              <div class="accordion-content">
+                <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.1rem;">Envelope / Taper Mode</h3>
+                <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                  Control how offset width varies along each path. Use tapers for organic, natural-looking fills.
+                </div>
+
+                <div class="controls-grid">
+                  <label>
+                    Envelope Preset
+                    <select id="envelope">
+                      <option value="flat">Flat (no taper)</option>
+                      <option value="sinTaperBoth">Sine Taper (both ends)</option>
+                      <option value="sinTaper">Sine Taper (start)</option>
+                      <option value="linearTaper">Linear Taper (start to end)</option>
+                      <option value="linearTaperBoth">Linear Taper (both ends)</option>
+                      <option value="easeInOut">Ease In-Out</option>
+                      <option value="exponential">Exponential</option>
+                    </select>
+                  </label>
+                </div>
+
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Length → Weight Mapping</h3>
+                <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                  How path length maps to line weight. Linear gives uniform distribution, easing curves emphasize short or long paths.
+                </div>
+
+                <div class="controls-grid">
+                  <label>
+                    Weight Curve
+                    <select id="curve">
+                      <option value="linear">Linear</option>
+                      <option value="easeIn">Ease In (emphasize long paths)</option>
+                      <option value="easeOut">Ease Out (emphasize short paths)</option>
+                      <option value="easeInOut">Ease In-Out</option>
+                    </select>
+                  </label>
+                </div>
+
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Length Thresholding</h3>
+                <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                  Override auto-detected min/max path lengths for normalization. Useful for handling outliers or focusing effects on specific length ranges.
+                </div>
+
+                <div class="controls-grid">
+                  <label>
+                    Min Length (mm)
+                    <input type="number" id="min-length" step="10" min="0" value="0" placeholder="Auto" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
+                    <div id="detected-min-length" style="font-size: 0.8em; color: #4a90e2; margin-top: 2px;"></div>
+                  </label>
+
+                  <label>
+                    Max Length (mm)
+                    <input type="number" id="max-length" step="10" min="0" value="0" placeholder="Auto" />
+                    <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Leave 0 for auto-detect</div>
+                    <div id="detected-max-length" style="font-size: 0.8em; color: #4a90e2; margin-top: 2px;"></div>
+                  </label>
+                </div>
+
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Noise & Variation</h3>
+
+                <div class="controls-grid">
+                  <label>
+                    Noise (mm)
+                    <input type="number" id="noise" step="0.05" min="0" max="2" value="0" />
+                  </label>
+
+                  <label>
+                    Noise Frequency (mm)
+                    <input type="number" id="noise-frequency" step="5" min="5" max="200" value="50" />
+                  </label>
+
+                  <label>
+                    Sample Rate (mm)
+                    <input type="number" id="sample-rate" step="0.5" min="0.5" max="10" value="2" />
+                  </label>
+                </div>
+              </div>
+            </section>
+            <!-- Attractors Section -->
+            <section class="accordion-section" data-section="attractors">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▶</span>
+                Attractors <span style="font-size: 0.8em; color: #666;" id="attractor-count">(0/10)</span>
+              </h2>
+              <div class="accordion-content">
+                <div class="controls-grid">
+                  <label>
+                    <input type="checkbox" id="use-attractors" />
+                    Enable Attractors
+                  </label>
+                </div>
+
+                <div class="info-box" id="attractor-info">
+                  <strong>Ctrl/Cmd+Click:</strong> Add attractor<br>
+                  <strong>Shift+Click:</strong> Remove nearest<br>
+                  <strong>Click &amp; Drag:</strong> Move attractor
+                </div>
+
+                <!-- Manual entry form -->
+                <details style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 4px;">
+                  <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em; color: #4a9eff;">➕ Add Attractor Manually</summary>
+                  <div style="margin-top: 0.75rem;">
+                    <div class="controls-grid">
+                      <label style="font-size: 0.9em;">
+                        X Position (mm)
+                        <input type="number" id="manual-x" placeholder="X" step="1" style="width: 100%;">
+                      </label>
+                      <label style="font-size: 0.9em;">
+                        Y Position (mm)
+                        <input type="number" id="manual-y" placeholder="Y" step="1" style="width: 100%;">
+                      </label>
+                      <label style="font-size: 0.9em;">
+                        Strength (optional)
+                        <input type="number" id="manual-strength" placeholder="Use global" step="0.1" min="0" max="5" style="width: 100%;">
+                      </label>
+                      <label style="font-size: 0.9em;">
+                        Radius (optional, mm)
+                        <input type="number" id="manual-radius" placeholder="Use global" step="5" min="5" max="300" style="width: 100%;">
+                      </label>
+                    </div>
+                    <button id="add-manual-attractor" style="margin-top: 0.5rem; width: 100%;">Add Attractor</button>
+                  </div>
+                </details>
+
+                <div class="action-buttons">
+                  <button id="btn-clear-attractors">Clear All Attractors</button>
+                </div>
+
+                <div id="attractor-list" class="attractor-list"></div>
+
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Global Attractor Settings</h3>
+
+                <div class="controls-grid">
+                  <label>
+                    Mode
+                    <select id="attractor-mode">
+                      <option value="attract">Attract (more passes)</option>
+                      <option value="repel">Repel (fewer passes)</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Default Strength
+                    <input type="number" id="attractor-strength" step="0.1" min="0" max="5" value="1.0" />
+                  </label>
+
+                  <label>
+                    Default Falloff Radius (mm)
+                    <input type="number" id="attractor-radius" step="5" min="10" max="300" value="50" />
+                  </label>
+
+                  <label>
+                    Falloff Curve
+                    <select id="attractor-curve">
+                      <option value="linear">Linear</option>
+                      <option value="exponential">Exponential (x²)</option>
+                      <option value="power">Power (configurable)</option>
+                      <option value="gaussian">Gaussian (smooth)</option>
+                      <option value="inverse-square">Inverse Square</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div id="falloff-exponent-control" class="mode-specific-controls" style="display: none;">
+                  <label>
+                    Falloff Exponent
+                    <input type="range" id="falloff-exponent" min="1" max="10" step="0.5" value="2" />
+                    <span id="falloff-exponent-value">2.0</span>
+                  </label>
+                  <div style="font-size: 0.85em; color: #888; margin-top: 4px;">
+                    Higher = sharper center, steeper falloff
+                  </div>
+                </div>
+
+                <div class="controls-grid">
+                  <label>
+                    Multiple Attractor Mode
+                    <select id="multi-mode">
+                      <option value="additive">Additive (sum influences)</option>
+                      <option value="strongest">Strongest Only</option>
+                      <option value="average">Average</option>
+                      <option value="soft">Soft (averaged by count)</option>
+                      <option value="weighted-average">Weighted Average (by distance)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <!-- Advanced options -->
+                <details style="margin-top: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+                  <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em;">⚙️ Advanced Filtering</summary>
+                  <div style="margin-top: 0.75rem;">
+                    <div class="controls-grid">
+                      <label style="font-size: 0.9em;">
+                        Min Influence Threshold (0-1)
+                        <input type="number" id="min-influence-threshold" step="0.05" min="0" max="1" value="0" style="width: 100%;" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect paths with max influence above this</div>
+                      </label>
+
+                      <label style="font-size: 0.9em;">
+                        Min Coverage % (0-100)
+                        <input type="number" id="min-coverage-percent" step="5" min="0" max="100" value="0" style="width: 100%;" />
+                        <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Only affect if this % of path is in radius</div>
+                      </label>
+
+                      <label style="font-size: 0.9em;">
+                        Influence Calculation
+                        <select id="influence-calc-mode" style="width: 100%;">
+                          <option value="average">Average (whole path)</option>
+                          <option value="maximum">Maximum (closest point)</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            <!-- Advanced Options Section -->
+            <section class="accordion-section" data-section="advanced">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▶</span>
+                Advanced Options
+              </h2>
+              <div class="accordion-content">
+                <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.1rem;">Output Options</h3>
+
+                <!-- Outline Extraction -->
+                <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="add-outline" style="margin-right: 0.5rem;" />
+                    <span>Add Outline Strokes</span>
+                  </label>
+                  <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
+                    Adds the furthermost boundary paths as separate strokes. Useful for creating defined edges around fills, especially with striped/spiral patterns.
+                  </div>
+                </div>
+
+                <!-- Length Binning -->
+                <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="enable-binning" style="margin-right: 0.5rem;" />
+                    <span>Enable Length Binning</span>
+                  </label>
+                  <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
+                    Groups output paths by length into bins for easier management in vector editors. Organizes paths into separate groups by length ranges.
+                  </div>
+
+                  <div id="binning-controls" style="display: none; margin-top: 0.75rem;">
+                    <label style="display: block;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span>Number of Bins:</span>
+                        <span id="bin-count-value" style="font-weight: bold;">4</span>
+                      </div>
+                      <input type="range" id="bin-count" min="2" max="10" step="1" value="4" style="width: 100%;" />
+                      <div style="font-size: 0.8em; color: #666; margin-top: 0.5rem;">
+                        Paths will be grouped: <span id="bin-preview" style="font-family: monospace;">0-25%, 25-50%, 50-75%, 75-100%</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Export Section -->
+            <section class="accordion-section expanded" data-section="export">
+              <h2 class="accordion-header">
+                <span class="accordion-indicator">▼</span>
+                Export
+              </h2>
+              <div class="accordion-content">
+                <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.1rem;">CLI Command</h3>
+                <div class="info-box" style="display: block; margin-bottom: 0.5rem;">
+                  Equivalent command-line invocation for batch processing.
+                </div>
+                <input type="text" id="cli-command" readonly style="width: 100%; padding: 0.5rem; font-family: monospace; font-size: 0.85em; background: #f5f5f5; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.75rem;" />
+
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Output Size</h3>
+                <div class="controls-grid" style="margin-bottom: 1rem;">
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="output-size" value="original" id="output-size-original" checked style="margin-right: 0.5rem;" />
+                    <span>Keep original dimensions</span>
+                  </label>
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="output-size" value="a3-landscape" id="output-size-a3-landscape" style="margin-right: 0.5rem;" />
+                    <span>A3 Landscape (420 × 297 mm)</span>
+                  </label>
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="radio" name="output-size" value="a3-portrait" id="output-size-a3-portrait" style="margin-right: 0.5rem;" />
+                    <span>A3 Portrait (297 × 420 mm)</span>
+                  </label>
+                </div>
+
+                <div class="action-buttons">
+                  <button id="btn-copy-cli">Copy CLI Command</button>
+                  <button id="btn-export">Export (Quick)</button>
+                  <button id="btn-export-server">Export (Server)</button>
+                </div>
+
+                <!-- Progress Panel for Backend Processing -->
+                <div id="progress-panel" class="progress-panel hidden">
+                  <h3>Processing on Server</h3>
+                  <div class="progress-bar-container">
+                    <div id="progress-bar" class="progress-bar"></div>
+                  </div>
+                  <div id="progress-text" class="progress-text">Initializing...</div>
+                  <button id="btn-progress-action" class="progress-action-btn">Cancel</button>
+                </div>
+              </div>
+            </section>
+
           </div>
         </div>
 

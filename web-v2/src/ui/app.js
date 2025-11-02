@@ -39,6 +39,84 @@ function throttle(func, delay) {
   };
 }
 
+/**
+ * Build CLI command from current config
+ */
+function buildCLICommand(config) {
+  const parts = ['node process-svg.js input.svg output.svg'];
+
+  parts.push(`--offset ${config.baseOffset}`);
+  parts.push(`--min-passes ${config.minPasses}`);
+  parts.push(`--max-passes ${config.maxPasses}`);
+
+  if (config.fillMode !== 'offset') {
+    parts.push(`--fill-mode ${config.fillMode}`);
+  }
+
+  if (config.envelope && config.envelope !== 'flat') {
+    parts.push(`--envelope ${config.envelope}`);
+  }
+
+  if (config.curve && config.curve !== 'linear') {
+    parts.push(`--curve ${config.curve}`);
+  }
+
+  if (config.noise > 0) {
+    parts.push(`--noise ${config.noise}`);
+    parts.push(`--noise-frequency ${config.noiseFrequency}`);
+  }
+
+  // Add mode-specific parameters
+  if (config.fillMode === 'striped') {
+    if (config.stripeFilled !== 1) parts.push(`--stripe-filled ${config.stripeFilled}`);
+    if (config.stripeEmpty !== 1) parts.push(`--stripe-empty ${config.stripeEmpty}`);
+  } else if (config.fillMode === 'spiral') {
+    if (config.twistRate !== 0.01) parts.push(`--twist-rate ${config.twistRate}`);
+    if (config.twistOffset !== 0) parts.push(`--twist-offset ${config.twistOffset}`);
+    if (config.stripeFilled !== 1) parts.push(`--stripe-filled ${config.stripeFilled}`);
+    if (config.stripeEmpty !== 1) parts.push(`--stripe-empty ${config.stripeEmpty}`);
+  } else if (config.fillMode === 'crosshatch') {
+    if (config.crosshatchAngles && config.crosshatchAngles.length > 0) {
+      parts.push(`--crosshatch-angles ${config.crosshatchAngles.join(',')}`);
+    }
+    if (config.crosshatchSpacing !== 1.0) {
+      parts.push(`--crosshatch-spacing ${config.crosshatchSpacing}`);
+    }
+  }
+
+  parts.push(`--sample-rate ${config.sampleRate}`);
+
+  // Length thresholding
+  if (config.minLength && config.minLength > 0) {
+    parts.push(`--min-length ${config.minLength}`);
+  }
+  if (config.maxLength && config.maxLength > 0) {
+    parts.push(`--max-length ${config.maxLength}`);
+  }
+
+  // Outline extraction
+  if (config.addOutline) {
+    parts.push(`--add-outline`);
+  }
+
+  // Output size
+  if (config.outputSize && config.outputSize !== 'original') {
+    parts.push(`--output-size ${config.outputSize}`);
+  }
+
+  return parts.join(' \\\n  ');
+}
+
+/**
+ * Update the CLI command display
+ */
+function updateCLICommandDisplay(config) {
+  const cliCommandInput = document.getElementById('cli-command');
+  if (cliCommandInput) {
+    cliCommandInput.value = buildCLICommand(config);
+  }
+}
+
 export function initUI(store, renderer) {
   // Shared path processing function
   const processPathsInternal = async () => {
@@ -69,7 +147,7 @@ export function initUI(store, renderer) {
       const viewBox = store.getState('svgBounds');
 
       // Process with or without attractors
-      const processed = await processPaths(
+      const result = await processPaths(
         originalPaths,
         config,
         useAttractors ? attractors : [],
@@ -78,7 +156,9 @@ export function initUI(store, renderer) {
       );
 
       store.setState({
-        processedPaths: processed,
+        processedPaths: result.paths,
+        detectedMinLength: result.detectedMinLength,
+        detectedMaxLength: result.detectedMaxLength,
         processing: false
       });
 
@@ -93,12 +173,12 @@ export function initUI(store, renderer) {
         renderer.renderFastPreview(originalPaths, bounds);
       } else {
         // Normal mode: show fully processed paths
-        renderer.render(processed, bounds);
+        renderer.render(result.paths, bounds);
       }
 
-      console.log(`Rendered ${processed.length} processed paths`);
+      console.log(`Rendered ${result.paths.length} processed paths`);
 
-      showComplete(`Generated ${processed.length} paths from ${originalPaths.length} originals`);
+      showComplete(`Generated ${result.paths.length} paths from ${originalPaths.length} originals`);
 
       // Remove visual feedback
       processBtn.classList.remove('processing');
@@ -119,22 +199,33 @@ export function initUI(store, renderer) {
   // Throttled version for live preview (500ms delay)
   const throttledProcess = throttle(processPathsInternal, 500);
 
-  // Tab switching
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  const tabPanels = document.querySelectorAll('.tab-panel');
+  // Accordion toggle functionality
+  const accordionHeaders = document.querySelectorAll('.accordion-header');
+  accordionHeaders.forEach(header => {
+    header.addEventListener('click', () => {
+      const section = header.closest('.accordion-section');
+      const isExpanded = section.classList.contains('expanded');
+      const indicator = header.querySelector('.accordion-indicator');
 
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetTab = btn.dataset.tab;
+      // Toggle expanded state
+      section.classList.toggle('expanded');
 
-      // Update active states
-      tabButtons.forEach(b => b.classList.remove('active'));
-      tabPanels.forEach(p => p.classList.remove('active'));
+      // Update indicator
+      if (indicator) {
+        indicator.textContent = section.classList.contains('expanded') ? '▼' : '▶';
+      }
 
-      btn.classList.add('active');
-      document.getElementById(`tab-${targetTab}`).classList.add('active');
+      // Update store
+      const expandedSections = store.getState('expandedSections') || new Set();
+      const sectionId = section.id;
 
-      store.setState({ activeTab: targetTab });
+      if (section.classList.contains('expanded')) {
+        expandedSections.add(sectionId);
+      } else {
+        expandedSections.delete(sectionId);
+      }
+
+      store.setState({ expandedSections });
     });
   });
 
@@ -171,7 +262,8 @@ export function initUI(store, renderer) {
         svg: svgData.raw,
         svgBounds: svgData.bounds,
         originalPaths: svgData.paths,
-        originalFilename: file.name
+        originalFilename: file.name,
+        originalSvgMetadata: svgData.metadata
       });
 
       updateProgress('Rendering preview...', 75);
@@ -314,10 +406,14 @@ export function initUI(store, renderer) {
     noiseFrequency: document.getElementById('noise-frequency'),
     sampleRate: document.getElementById('sample-rate'),
     minLength: document.getElementById('min-length'),
-    maxLength: document.getElementById('max-length')
+    maxLength: document.getElementById('max-length'),
+    envelope: document.getElementById('envelope'),
+    curve: document.getElementById('curve')
   };
 
   Object.entries(fillInputs).forEach(([key, input]) => {
+    if (!input) return; // Skip if element doesn't exist
+
     input.addEventListener('change', () => {
       const config = store.getState('config');
       const value = input.type === 'number' ? parseFloat(input.value) : input.value;
@@ -330,6 +426,9 @@ export function initUI(store, renderer) {
       if (key === 'fillMode') {
         updateFillModeControls(value);
       }
+
+      // Update CLI command display
+      updateCLICommandDisplay(store.getState('config'));
 
       // Auto-process if live preview is enabled
       const livePreview = store.getState('livePreview');
@@ -350,6 +449,8 @@ export function initUI(store, renderer) {
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
+    if (!input) return; // Skip if element doesn't exist
+
     input.addEventListener('change', () => {
       const config = store.getState('config');
       const value = parseFloat(input.value);
@@ -373,6 +474,9 @@ export function initUI(store, renderer) {
           config: { ...config, [configKey]: value }
         });
       }
+
+      // Update CLI command display
+      updateCLICommandDisplay(store.getState('config'));
 
       // Auto-process if live preview is enabled
       const livePreview = store.getState('livePreview');
@@ -403,6 +507,9 @@ export function initUI(store, renderer) {
       config: { ...config, crosshatchAngles: angles }
     });
 
+    // Update CLI command display
+    updateCLICommandDisplay(store.getState('config'));
+
     // Auto-process if live preview is enabled
     if (store.getState('livePreview')) {
       throttledProcess();
@@ -416,6 +523,9 @@ export function initUI(store, renderer) {
     store.setState({
       config: { ...config, crosshatchSpacing: value }
     });
+
+    // Update CLI command display
+    updateCLICommandDisplay(store.getState('config'));
 
     // Auto-process if live preview is enabled
     if (store.getState('livePreview')) {
@@ -590,10 +700,29 @@ export function initUI(store, renderer) {
       config: { ...config, addOutline: e.target.checked }
     });
 
+    // Update CLI command display
+    updateCLICommandDisplay(store.getState('config'));
+
     // Auto-process if live preview is enabled
     if (store.getState('livePreview')) {
       throttledProcess();
     }
+  });
+
+  // Output size controls
+  const outputSizeRadios = document.querySelectorAll('input[name="output-size"]');
+  outputSizeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        const config = store.getState('config');
+        store.setState({
+          config: { ...config, outputSize: radio.value }
+        });
+
+        // Update CLI command display
+        updateCLICommandDisplay(store.getState('config'));
+      }
+    });
   });
 
   // Length binning controls
@@ -739,10 +868,16 @@ export function initUI(store, renderer) {
 
   // CLI command generation
   document.getElementById('btn-copy-cli').addEventListener('click', () => {
-    const config = store.getState('config');
-    const cmd = generateCLICommand(config);
-    navigator.clipboard.writeText(cmd);
-    alert('CLI command copied to clipboard!');
+    const cliCommandInput = document.getElementById('cli-command');
+    if (cliCommandInput) {
+      const cmd = cliCommandInput.value;
+      navigator.clipboard.writeText(cmd).then(() => {
+        alert('CLI command copied to clipboard!');
+      }).catch(err => {
+        console.error('Failed to copy CLI command:', err);
+        alert('Failed to copy to clipboard. Please copy manually.');
+      });
+    }
   });
 
   // Export SVG
@@ -776,13 +911,18 @@ export function initUI(store, renderer) {
       };
 
       // Build SVG with optional binning
+      const originalSvgMetadata = store.getState('originalSvgMetadata') || {};
+      const outputSize = config.outputSize || 'original';
+
       const svgContent = buildSVG(
         pathsToExport,
         bounds,
         metadata,
         config.enableBinning || false,
         config.binCount || 4,
-        originalPaths
+        originalPaths,
+        originalSvgMetadata,
+        outputSize
       );
 
       // Generate filename
@@ -1167,6 +1307,26 @@ export function initUI(store, renderer) {
     renderer.updateAttractors(state.attractors);
   });
 
+  // Subscribe to detected length changes
+  store.subscribe('detectedMinLength', (state) => {
+    const minLengthDisplay = document.getElementById('detected-min-length');
+    if (minLengthDisplay && state.detectedMinLength !== undefined) {
+      minLengthDisplay.textContent = state.detectedMinLength.toFixed(2);
+    }
+  });
+
+  store.subscribe('detectedMaxLength', (state) => {
+    const maxLengthDisplay = document.getElementById('detected-max-length');
+    if (maxLengthDisplay && state.detectedMaxLength !== undefined) {
+      maxLengthDisplay.textContent = state.detectedMaxLength.toFixed(2);
+    }
+  });
+
+  // Subscribe to config changes to update CLI command
+  store.subscribe('config', (state) => {
+    updateCLICommandDisplay(state.config);
+  });
+
   // Initialize attractor list
   updateAttractorList();
 
@@ -1176,147 +1336,8 @@ export function initUI(store, renderer) {
   // Initialize progress panel for backend export
   initProgressPanel();
 
+  // Initialize CLI command display
+  updateCLICommandDisplay(store.getState('config'));
+
   console.log('✓ UI initialized');
-}
-
-function generateCLICommand(config) {
-  const parts = ['node process-svg.js input.svg output.svg'];
-
-  parts.push(`--offset ${config.baseOffset}`);
-  parts.push(`--min-passes ${config.minPasses}`);
-  parts.push(`--max-passes ${config.maxPasses}`);
-
-  if (config.noise > 0) {
-    parts.push(`--noise ${config.noise}`);
-    parts.push(`--noise-frequency ${config.noiseFrequency}`);
-  }
-
-  if (config.fillMode !== 'offset') {
-    parts.push(`--fill-mode ${config.fillMode}`);
-
-    // Add mode-specific parameters
-    if (config.fillMode === 'striped') {
-      if (config.stripeFilled !== 1) parts.push(`--stripe-filled ${config.stripeFilled}`);
-      if (config.stripeEmpty !== 1) parts.push(`--stripe-empty ${config.stripeEmpty}`);
-    } else if (config.fillMode === 'spiral') {
-      if (config.twistRate !== 0.01) parts.push(`--twist-rate ${config.twistRate}`);
-      if (config.twistOffset !== 0) parts.push(`--twist-offset ${config.twistOffset}`);
-      if (config.stripeFilled !== 1) parts.push(`--stripe-filled ${config.stripeFilled}`);
-      if (config.stripeEmpty !== 1) parts.push(`--stripe-empty ${config.stripeEmpty}`);
-    } else if (config.fillMode === 'crosshatch') {
-      if (config.crosshatchAngles && config.crosshatchAngles.length > 0) {
-        parts.push(`--crosshatch-angles ${config.crosshatchAngles.join(',')}`);
-      }
-      if (config.crosshatchSpacing !== 1.0) {
-        parts.push(`--crosshatch-spacing ${config.crosshatchSpacing}`);
-      }
-    } else if (config.fillMode === 'focus-blur') {
-      const fb = config.focusBlur || {};
-
-      // Light mode parameters
-      if (fb.lightMode) {
-        parts.push(`--focus-blur-light-mode ${fb.lightMode}`);
-      }
-
-      if (fb.lightMode === 'directional') {
-        if (fb.lightAngle !== undefined && fb.lightAngle !== 45) {
-          parts.push(`--focus-blur-light-angle ${fb.lightAngle}`);
-        }
-      } else if (fb.lightMode === 'point') {
-        if (fb.lightPosX !== undefined && fb.lightPosX !== 50) {
-          parts.push(`--focus-blur-light-pos-x ${fb.lightPosX}`);
-        }
-        if (fb.lightPosY !== undefined && fb.lightPosY !== 50) {
-          parts.push(`--focus-blur-light-pos-y ${fb.lightPosY}`);
-        }
-        if (fb.falloffRadius !== undefined && fb.falloffRadius !== 150) {
-          parts.push(`--focus-blur-falloff-radius ${fb.falloffRadius}`);
-        }
-      }
-
-      // Noise parameters
-      if (fb.noiseMin !== undefined && fb.noiseMin !== 0.05) {
-        parts.push(`--focus-blur-noise-min ${fb.noiseMin}`);
-      }
-      if (fb.noiseMax !== undefined && fb.noiseMax !== 0.6) {
-        parts.push(`--focus-blur-noise-max ${fb.noiseMax}`);
-      }
-      if (fb.freqMin !== undefined && fb.freqMin !== 100) {
-        parts.push(`--focus-blur-freq-min ${fb.freqMin}`);
-      }
-      if (fb.freqMax !== undefined && fb.freqMax !== 10) {
-        parts.push(`--focus-blur-freq-max ${fb.freqMax}`);
-      }
-
-      // Pass modulation
-      if (fb.modulatePasses) {
-        parts.push(`--focus-blur-modulate-passes`);
-        if (fb.passesMin !== undefined && fb.passesMin !== 1.0) {
-          parts.push(`--focus-blur-passes-min ${fb.passesMin}`);
-        }
-        if (fb.passesMax !== undefined && fb.passesMax !== 1.5) {
-          parts.push(`--focus-blur-passes-max ${fb.passesMax}`);
-        }
-      }
-    } else if (config.fillMode === 'hatch-gradient') {
-      const hg = config.hatchGradient || {};
-
-      // Hatch angles and spacing
-      if (hg.angles && hg.angles.length > 0 && JSON.stringify(hg.angles) !== JSON.stringify([0, 45, 90])) {
-        parts.push(`--hatch-angles ${hg.angles.join(',')}`);
-      }
-      if (hg.spacing !== undefined && hg.spacing !== 1.0) {
-        parts.push(`--hatch-spacing ${hg.spacing}`);
-      }
-
-      // Light mode parameters
-      if (hg.lightMode) {
-        parts.push(`--hatch-light-mode ${hg.lightMode}`);
-      }
-
-      if (hg.lightMode === 'directional') {
-        if (hg.lightAngle !== undefined && hg.lightAngle !== 45) {
-          parts.push(`--hatch-light-angle ${hg.lightAngle}`);
-        }
-      } else if (hg.lightMode === 'point') {
-        if (hg.lightPosX !== undefined && hg.lightPosX !== 25) {
-          parts.push(`--hatch-light-pos-x ${hg.lightPosX}`);
-        }
-        if (hg.lightPosY !== undefined && hg.lightPosY !== 25) {
-          parts.push(`--hatch-light-pos-y ${hg.lightPosY}`);
-        }
-        if (hg.falloffRadius !== undefined && hg.falloffRadius !== 100) {
-          parts.push(`--hatch-falloff-radius ${hg.falloffRadius}`);
-        }
-      }
-
-      // Density modulation parameters
-      if (hg.lightStrength !== undefined && hg.lightStrength !== 0.8) {
-        parts.push(`--hatch-light-strength ${hg.lightStrength}`);
-      }
-      if (hg.baseWeight !== undefined && hg.baseWeight !== 0.2) {
-        parts.push(`--hatch-base-weight ${hg.baseWeight}`);
-      }
-      if (hg.shadowSoftness !== undefined && hg.shadowSoftness !== 0.5) {
-        parts.push(`--hatch-shadow-softness ${hg.shadowSoftness}`);
-      }
-    }
-  }
-
-  parts.push(`--sample-rate ${config.sampleRate}`);
-
-  // Length thresholding
-  if (config.minLength && config.minLength > 0) {
-    parts.push(`--min-length ${config.minLength}`);
-  }
-  if (config.maxLength && config.maxLength > 0) {
-    parts.push(`--max-length ${config.maxLength}`);
-  }
-
-  // Outline extraction
-  if (config.addOutline) {
-    parts.push(`--add-outline`);
-  }
-
-  return parts.join(' \\\n  ');
 }

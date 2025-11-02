@@ -19,6 +19,13 @@ export function parseSVG(svgText) {
   // Extract viewBox or compute from width/height
   const bounds = extractBounds(svgEl);
 
+  // Store original SVG metadata (for preserving dimensions on export)
+  const metadata = {
+    width: svgEl.getAttribute('width'),
+    height: svgEl.getAttribute('height'),
+    viewBox: svgEl.getAttribute('viewBox')
+  };
+
   // Extract all path elements
   const pathElements = svgEl.querySelectorAll('path');
   const paths = Array.from(pathElements).map((pathEl, index) => ({
@@ -33,7 +40,8 @@ export function parseSVG(svgText) {
   return {
     raw: svgText,
     bounds,
-    paths
+    paths,
+    metadata
   };
 }
 
