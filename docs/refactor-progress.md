@@ -526,6 +526,126 @@ All critical Phase 3 tasks completed:
 
 ---
 
+## Session 5 - 2025-11-01
+
+### Phase 4: Backend Export with Progress Tracking ✓
+
+**Work Completed:**
+- [x] Created Express server with REST API ([web-v2/server.js](../web-v2/server.js))
+  - POST `/api/process` - Submit processing job
+  - GET `/api/status/:jobId` - Poll progress
+  - GET `/api/download/:jobId` - Download result
+  - DELETE `/api/job/:jobId` - Cancel job
+  - Runs on port 3003
+
+- [x] Created job queue manager ([web-v2/server/job-queue.js](../web-v2/server/job-queue.js))
+  - In-memory job storage with automatic cleanup (1 hour)
+  - Progress tracking per job
+  - Status management (queued, processing, complete, error, cancelled)
+
+- [x] Created processor wrapper with progress hooks ([web-v2/server/processor.js](../web-v2/server/processor.js))
+  - Wraps shared engine with progress callbacks
+  - Emits progress every 100 paths
+  - Full parity with client-side processor
+  - Supports all fill modes, attractors, and configurations
+
+- [x] Created API client utility ([web-v2/src/utils/api-client.js](../web-v2/src/utils/api-client.js))
+  - `submitJob()` - Submit SVG + config to backend
+  - `pollStatus()` - Check job progress
+  - `downloadResult()` - Trigger browser download
+  - `cancelJob()` - Cancel running job
+  - `startPolling()` - Automatic polling with callbacks
+
+- [x] Created progress panel UI component ([web-v2/src/ui/progress-panel.js](../web-v2/src/ui/progress-panel.js))
+  - Real-time progress display
+  - Cancel button → Download button swap on completion
+  - Automatic polling (500ms interval)
+  - Error handling and visual feedback
+
+- [x] Updated UI ([web-v2/index.html](../web-v2/index.html), [web-v2/src/styles/main.css](../web-v2/src/styles/main.css))
+  - Two export buttons: "Export (Quick)" and "Export (Server)"
+  - Collapsible progress panel with animated progress bar
+  - Status text with path count and percentage
+  - Smooth animations and visual feedback
+
+**Key Features:**
+- **Dual Export Options:**
+  - Quick: Client-side processing + immediate download (existing)
+  - Server: Backend processing with progress tracking (new)
+
+- **Progress Granularity:**
+  - Updates every 100 paths processed
+  - Well-suited for 3,000-15,000+ path files
+  - Displays: "Processing 1,234 / 5,678 paths (21.7%)"
+
+- **User Experience:**
+  - Progress bar shows 0-100% completion
+  - Cancel button during processing
+  - Swaps to Download button on completion
+  - No auto-download (manual click required)
+
+- **Architecture:**
+  - Polling-based (500ms interval, simpler than WebSocket)
+  - In-memory job queue (no database needed)
+  - Automatic cleanup of completed jobs
+  - Full error handling and recovery
+
+**Technical Details:**
+- Frontend: http://localhost:3002 (Vite dev server)
+- Backend: http://localhost:3003 (Express API server)
+- Job lifecycle: Submit → Poll → Download → Auto-cleanup (1 hour)
+- Progress updates: Every 100 paths
+- Max request size: 50MB (large SVG support)
+- CORS enabled for local development
+
+**File Structure:**
+```
+web-v2/
+├── server.js                    # Express server
+├── server/
+│   ├── job-queue.js             # Job management
+│   └── processor.js             # Processing with progress hooks
+├── src/
+│   ├── ui/
+│   │   ├── app.js               # Added initProgressPanel()
+│   │   └── progress-panel.js    # Progress UI component
+│   └── utils/
+│       └── api-client.js        # API wrapper
+├── index.html                   # Added progress panel HTML
+└── src/styles/main.css          # Added progress panel styles
+```
+
+**Testing:**
+- Both servers running successfully
+- Frontend on port 3002, backend on port 3003
+- Ready for testing with sample shapes and real SVGs
+- Supports all existing fill modes and features
+
+**Status**: Backend export with progress tracking complete! ✅
+
+### Decisions Made
+
+1. **Port Configuration**: Backend on 3003, frontend on 3002 (3001 already in use)
+2. **Polling vs WebSocket**: Polling (simpler, no persistent connections needed)
+3. **Progress Granularity**: Every 100 paths (balance between overhead and UX)
+4. **Job Storage**: In-memory (sufficient for single-user local dev)
+5. **Cleanup Strategy**: Automatic 1-hour retention for completed jobs
+6. **Export UX**: Manual download button (no auto-download)
+
+### Next Steps
+
+**Ready for:**
+- User testing with complex SVGs (3,000-15,000+ paths)
+- Performance validation on large files
+- Phase 5: Polish & cleanup
+
+**Optional enhancements:**
+- Web worker for client-side processing (offload from main thread)
+- Job persistence (if needed for multi-user deployment)
+- Streaming partial results (currently processes fully before download)
+
+---
+
 ## Session Template
 
 Copy this for future sessions:

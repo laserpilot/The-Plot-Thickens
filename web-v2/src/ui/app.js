@@ -6,6 +6,8 @@ import { loadSVGFile } from '../utils/svg-loader.js';
 import { processPaths } from '../utils/processor.js';
 import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.js';
 import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
+import { initProgressPanel } from './progress-panel.js';
+import { initGlobalProgress, showProgress, updateProgress, hideProgress, showComplete } from '../utils/global-progress.js';
 
 /**
  * Throttle function to limit how often a function can be called
@@ -55,6 +57,7 @@ export function initUI(store, renderer) {
       processBtn.classList.add('processing');
       processBtn.disabled = true;
 
+      showProgress(`Processing ${originalPaths.length} paths...`, 0);
       console.log('Processing paths with config:', config);
 
       // Get attractor state
@@ -79,6 +82,8 @@ export function initUI(store, renderer) {
         processing: false
       });
 
+      updateProgress('Rendering processed paths...', 75);
+
       // Render processed paths (unless fast preview is enabled)
       const bounds = store.getState('svgBounds');
       const fastPreview = store.getState('fastPreview');
@@ -93,6 +98,8 @@ export function initUI(store, renderer) {
 
       console.log(`Rendered ${processed.length} processed paths`);
 
+      showComplete(`Generated ${processed.length} paths from ${originalPaths.length} originals`);
+
       // Remove visual feedback
       processBtn.classList.remove('processing');
       processBtn.disabled = false;
@@ -100,6 +107,7 @@ export function initUI(store, renderer) {
     } catch (err) {
       console.error('Processing error:', err);
       store.setState({ processing: false });
+      hideProgress();
 
       // Remove visual feedback on error
       const processBtn = document.getElementById('btn-process');
@@ -140,7 +148,9 @@ export function initUI(store, renderer) {
 
     try {
       fileInfo.textContent = 'Loading...';
+      showProgress('Loading SVG file...', 0);
       console.log('Loading SVG file:', file.name);
+
       const svgData = await loadSVGFile(file);
 
       console.log('SVG loaded:', {
@@ -148,6 +158,8 @@ export function initUI(store, renderer) {
         bounds: svgData.bounds,
         firstPath: svgData.paths[0]
       });
+
+      updateProgress(`Loaded ${svgData.paths.length} paths`, 50);
 
       fileInfo.innerHTML = `
         <strong>Loaded:</strong> ${file.name}<br>
@@ -162,13 +174,18 @@ export function initUI(store, renderer) {
         originalFilename: file.name
       });
 
+      updateProgress('Rendering preview...', 75);
+
       // Render static preview (preview is always visible in split-panel layout)
       console.log('Calling renderer.render()...');
       renderer.render(svgData.paths, svgData.bounds);
 
+      showComplete(`Loaded ${svgData.paths.length} paths from ${file.name}`);
+
     } catch (err) {
       fileInfo.innerHTML = `<span style="color: #ff4444">Error: ${err.message}</span>`;
       console.error('SVG load error:', err);
+      hideProgress();
     }
   });
 
@@ -1152,6 +1169,12 @@ export function initUI(store, renderer) {
 
   // Initialize attractor list
   updateAttractorList();
+
+  // Initialize global progress indicator
+  initGlobalProgress();
+
+  // Initialize progress panel for backend export
+  initProgressPanel();
 
   console.log('✓ UI initialized');
 }

@@ -9,8 +9,19 @@
 <body>
   <div id="app">
     <header>
-      <h1>Plotter Line Thickener v2</h1>
-      <p class="subtitle">SVG path offset utility for pen plotters</p>
+      <div class="header-content">
+        <div>
+          <h1>Plotter Line Thickener v2</h1>
+          <p class="subtitle">SVG path offset utility for pen plotters</p>
+        </div>
+        <!-- Global Progress Indicator -->
+        <div id="global-progress" class="global-progress hidden">
+          <div class="progress-text" id="global-progress-text">Processing...</div>
+          <div class="progress-bar-container">
+            <div id="global-progress-bar" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
     </header>
 
     <main>
@@ -560,7 +571,18 @@
 
           <div class="action-buttons">
             <button id="btn-copy-cli">Copy CLI Command</button>
-            <button id="btn-export">Export SVG</button>
+            <button id="btn-export">Export (Quick)</button>
+            <button id="btn-export-server">Export (Server)</button>
+          </div>
+
+          <!-- Progress Panel for Backend Processing -->
+          <div id="progress-panel" class="progress-panel hidden">
+            <h3>Processing on Server</h3>
+            <div class="progress-bar-container">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="progress-text" class="progress-text">Initializing...</div>
+            <button id="btn-progress-action" class="progress-action-btn">Cancel</button>
           </div>
             </section>
           </div>

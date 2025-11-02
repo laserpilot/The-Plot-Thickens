@@ -95,6 +95,9 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [x] Set up persistent progress log (`docs/refactor-progress.md`) to capture completed steps, deviations, and open questions for easy handoff between sessions.
 
 ### Phase 4 – Advanced Fills & Tooling
+- [ ] Add text field that shows the CLI command, not just offer copy/paste on advanced
+- [ ] Add the fill envelopes from the original version for controls of things like sinTaper, EaseInOut, exponential, etc - currently missing in UI and CLI
+- [ ] make sure UI tabs are arranged in a way that doesn't hide them - the width is getting too wide and Advanced is getting cut off
 - [ ] Port focus blur controls + preview canvas (consider worker).
 - [ ] Reintroduce crosshatch/striped/gradient modes via shared modules.
 - [ ] Restore calibration / diagnostic panels selectively.
