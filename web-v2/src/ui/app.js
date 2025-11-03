@@ -952,19 +952,28 @@ export function initUI(store, renderer) {
   });
 
   // Export SVG
-  document.getElementById('btn-export').addEventListener('click', () => {
+  document.getElementById('btn-export').addEventListener('click', async () => {
     const processedPaths = store.getState('processedPaths');
     const originalPaths = store.getState('originalPaths');
     const bounds = store.getState('svgBounds');
     const config = store.getState('config');
 
-    // Use processed paths if available, otherwise original paths
-    const pathsToExport = processedPaths && processedPaths.length > 0
-      ? processedPaths
-      : originalPaths;
+    if (!originalPaths || originalPaths.length === 0) {
+      alert('No paths to export! Load an SVG file first.');
+      return;
+    }
+
+    // Auto-process if no processed paths exist
+    if (!processedPaths || processedPaths.length === 0) {
+      console.log('No processed paths found - auto-processing before export...');
+      await processPathsInternal();
+    }
+
+    // Get the processed paths after processing
+    const pathsToExport = store.getState('processedPaths');
 
     if (!pathsToExport || pathsToExport.length === 0) {
-      alert('No paths to export! Load an SVG file first.');
+      alert('Processing failed! Check console for errors.');
       return;
     }
 

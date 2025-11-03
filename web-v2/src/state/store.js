@@ -99,7 +99,7 @@ const initialState = {
     minPasses: 1,
     maxPasses: 10,
     curve: 'linear',
-    envelope: 'flat',
+    envelope: 'sinTaperBoth',
     fillMode: 'offset',
     sampleRate: 2,
     outputSize: 'original',
