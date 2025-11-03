@@ -531,13 +531,16 @@ function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, nois
   let amplitude, frequency;
 
   // Map to noise range based on gradient direction
+  // Note: passIndex 0 = centerline, higher passIndex = outer passes
   if (gradientMode === 'fuzzy-crisp') {
-    // Outer passes (high index) = fuzzy (high amp, low freq), inner = crisp (low amp, high freq)
+    // Outer passes (high index/t) = fuzzy (high amp, low freq)
+    // Inner passes (low index/t) = crisp (low amp, high freq)
     amplitude = noiseMin + curvedT * (noiseMax - noiseMin);
     frequency = freqMax - curvedT * (freqMax - freqMin);
   } else if (gradientMode === 'crisp-fuzzy') {
-    // Outer passes = crisp (low amp, high freq), inner = fuzzy (high amp, low freq)
-    amplitude = noiseMax - curvedT * (noiseMax - noiseMin);
+    // Outer passes (high index/t) = crisp (low amp, high freq)
+    // Inner passes (low index/t) = fuzzy (high amp, low freq)
+    amplitude = noiseMin + (1 - curvedT) * (noiseMax - noiseMin);
     frequency = freqMin + curvedT * (freqMax - freqMin);
   } else {
     amplitude = baseNoise;
