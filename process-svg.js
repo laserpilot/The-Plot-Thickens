@@ -15,6 +15,13 @@ const DEFAULT_CONFIG = {
   baseOffset: 0.25, // mm
   noise: 0.0, // mm
   noiseFrequency: 50, // mm (wavelength for smooth variation)
+  // Noise gradient configuration
+  noiseGradientMode: 'flat', // 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
+  noiseMin: 0.05, // mm - crisp end amplitude
+  noiseMax: 0.4, // mm - fuzzy end amplitude
+  freqMin: 50, // mm - crisp end frequency (higher = tighter)
+  freqMax: 10, // mm - fuzzy end frequency (lower = smoother)
+  gradientCurve: 'linear', // 'linear', 'exponential', 'inverse', 'smoothstep'
   minPasses: 1,
   maxPasses: 10,
   curve: 'linear', // 'linear', 'exponential', 'logarithmic'
@@ -85,6 +92,12 @@ program
   .option('-o, --offset <number>', 'Base offset distance in mm', parseFloat)
   .option('-n, --noise <number>', 'Noise amount in mm', parseFloat)
   .option('--noise-frequency <number>', 'Noise wavelength in mm (lower=smoother, default: 50)', parseFloat)
+  .option('--noise-gradient <mode>', 'Noise gradient mode: flat, fuzzy-crisp, or crisp-fuzzy (default: flat)')
+  .option('--noise-min <number>', 'Minimum noise amplitude for gradient (crisp end, mm, default: 0.05)', parseFloat)
+  .option('--noise-max <number>', 'Maximum noise amplitude for gradient (fuzzy end, mm, default: 0.4)', parseFloat)
+  .option('--freq-min <number>', 'Minimum noise frequency for gradient (crisp end, higher=tighter, default: 50)', parseFloat)
+  .option('--freq-max <number>', 'Maximum noise frequency for gradient (fuzzy end, lower=smoother, default: 10)', parseFloat)
+  .option('--gradient-curve <type>', 'Gradient curve: linear, exponential, inverse, or smoothstep (default: linear)')
   .option('--min-passes <number>', 'Minimum number of passes', parseInt)
   .option('--max-passes <number>', 'Maximum number of passes', parseInt)
   .option('--curve <type>', 'Length-to-weight curve (linear|exponential|logarithmic)')
@@ -152,6 +165,12 @@ program
     if (options.offset !== undefined) config.baseOffset = options.offset;
     if (options.noise !== undefined) config.noise = options.noise;
     if (options.noiseFrequency !== undefined) config.noiseFrequency = options.noiseFrequency;
+    if (options.noiseGradient !== undefined) config.noiseGradientMode = options.noiseGradient;
+    if (options.noiseMin !== undefined) config.noiseMin = options.noiseMin;
+    if (options.noiseMax !== undefined) config.noiseMax = options.noiseMax;
+    if (options.freqMin !== undefined) config.freqMin = options.freqMin;
+    if (options.freqMax !== undefined) config.freqMax = options.freqMax;
+    if (options.gradientCurve !== undefined) config.gradientCurve = options.gradientCurve;
     if (options.minPasses !== undefined) config.minPasses = options.minPasses;
     if (options.maxPasses !== undefined) config.maxPasses = options.maxPasses;
     if (options.curve !== undefined) config.curve = options.curve;
