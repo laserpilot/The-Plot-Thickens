@@ -38,6 +38,8 @@ const DEFAULT_CONFIG = {
   spiralTwistRate: 0.01, // Spiral twist rate in radians per mm
   spiralTwistOffset: 0, // Spiral starting angle in degrees
   addOutline: false, // Add outline strokes (furthermost boundaries)
+  outlineOffset: 0.25, // Base offset for outline thickness in mm
+  outlinePasses: 1, // Number of passes for outline thickness
   crosshatch: {
     angles: [90], // hatch angles in degrees
     spacing: 1, // spacing between hatch lines in mm
@@ -115,6 +117,8 @@ program
   .option('--spiral-twist-rate <number>', 'Spiral twist rate in radians per mm (default: 0.01, range: 0.001-0.1)', parseFloat)
   .option('--spiral-twist-offset <number>', 'Spiral starting angle in degrees (default: 0)', parseFloat)
   .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
+  .option('--outline-offset <number>', 'Offset distance for outline thickness passes in mm (default: 0.25)', parseFloat)
+  .option('--outline-passes <number>', 'Number of passes for outline thickness (default: 1)', parseInt)
   .option('--hatch-angles <angles>', 'Hatch angles in degrees, comma-separated (e.g., "45,-45" or "90")')
   .option('--hatch-spacing <number>', 'Spacing between hatch lines in mm (default: 1)', parseFloat)
   .option('--organic-hatch', 'Enable organic/hand-drawn crosshatch mode')
@@ -187,6 +191,8 @@ program
     if (options.spiralTwistRate !== undefined) config.spiralTwistRate = options.spiralTwistRate;
     if (options.spiralTwistOffset !== undefined) config.spiralTwistOffset = options.spiralTwistOffset;
     if (options.addOutline) config.addOutline = true;
+    if (options.outlineOffset !== undefined) config.outlineOffset = options.outlineOffset;
+    if (options.outlinePasses !== undefined) config.outlinePasses = options.outlinePasses;
 
     // Handle crosshatch options
     if (options.hatchAngles !== undefined) {

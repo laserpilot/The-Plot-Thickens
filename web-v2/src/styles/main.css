@@ -39,6 +39,72 @@ header {
   gap: 2rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Header Process Button */
+.header-process-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--panel);
+  color: var(--fg);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.header-process-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+
+.header-process-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.header-process-btn.dirty {
+  border-color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.header-process-btn.dirty:hover:not(:disabled) {
+  background: rgba(255, 152, 0, 0.2);
+  border-color: #ffb74d;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.process-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+  transition: background 0.3s ease;
+}
+
+.header-process-btn.dirty .process-status-indicator {
+  background: #ff9800;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.6);
+}
+
+.header-process-btn:not(.dirty) .process-status-indicator {
+  background: #4caf50;
+}
+
 h1 {
   font-size: 2rem;
   color: var(--accent);

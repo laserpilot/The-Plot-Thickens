@@ -144,6 +144,8 @@ const initialState = {
     },
     // Outline extraction
     addOutline: false,
+    outlineOffset: 0.25,    // Base offset for outline thickness (mm)
+    outlinePasses: 1,       // Number of passes for outline thickness
     // Length binning for SVG organization
     enableBinning: false,
     binCount: 4
@@ -155,6 +157,7 @@ const initialState = {
   livePreview: false,
   fastPreview: false,
   processing: false,
+  configDirty: false, // True when config has changed since last process
 
   // Original SVG metadata (for preserving dimensions)
   originalSvgMetadata: {

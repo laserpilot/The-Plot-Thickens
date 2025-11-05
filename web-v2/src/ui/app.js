@@ -140,12 +140,18 @@ export function initUI(store, renderer) {
     }
 
     try {
-      store.setState({ processing: true });
+      store.setState({ processing: true, configDirty: false });
 
-      // Add visual feedback
+      // Add visual feedback to both buttons
       const processBtn = document.getElementById('btn-process');
+      const processHeaderBtn = document.getElementById('btn-process-header');
       processBtn.classList.add('processing');
       processBtn.disabled = true;
+      if (processHeaderBtn) {
+        processHeaderBtn.classList.add('processing');
+        processHeaderBtn.classList.remove('dirty');
+        processHeaderBtn.disabled = true;
+      }
 
       showProgress(`Processing ${originalPaths.length} paths...`, 0);
       console.log('Processing paths with config:', config);
@@ -192,24 +198,64 @@ export function initUI(store, renderer) {
 
       showComplete(`Generated ${result.paths.length} paths from ${originalPaths.length} originals`);
 
-      // Remove visual feedback
+      // Remove visual feedback from both buttons
       processBtn.classList.remove('processing');
       processBtn.disabled = false;
+      if (processHeaderBtn) {
+        processHeaderBtn.classList.remove('processing');
+        processHeaderBtn.disabled = false;
+      }
 
     } catch (err) {
       console.error('Processing error:', err);
       store.setState({ processing: false });
       hideProgress();
 
-      // Remove visual feedback on error
+      // Remove visual feedback on error from both buttons
       const processBtn = document.getElementById('btn-process');
+      const processHeaderBtn = document.getElementById('btn-process-header');
       processBtn.classList.remove('processing');
       processBtn.disabled = false;
+      if (processHeaderBtn) {
+        processHeaderBtn.classList.remove('processing');
+        processHeaderBtn.disabled = false;
+      }
     }
   };
 
   // Throttled version for live preview (500ms delay)
   const throttledProcess = throttle(processPathsInternal, 500);
+
+  // Update header process button state based on dirty flag and content
+  const updateHeaderProcessButton = () => {
+    const processHeaderBtn = document.getElementById('btn-process-header');
+    if (!processHeaderBtn) return;
+
+    const configDirty = store.getState('configDirty');
+    const originalPaths = store.getState('originalPaths');
+    const hasContent = originalPaths && originalPaths.length > 0;
+
+    // Update dirty state visual indicator
+    if (configDirty) {
+      processHeaderBtn.classList.add('dirty');
+    } else {
+      processHeaderBtn.classList.remove('dirty');
+    }
+
+    // Enable/disable based on content
+    processHeaderBtn.disabled = !hasContent;
+  };
+
+  // Subscribe to state changes to update button
+  store.subscribe(['configDirty', 'originalPaths'], updateHeaderProcessButton);
+
+  // Track config changes to set dirty flag (unless live preview is on)
+  store.subscribe('config', () => {
+    const livePreview = store.getState('livePreview');
+    if (!livePreview) {
+      store.setState({ configDirty: true });
+    }
+  });
 
   // Accordion toggle functionality
   const accordionHeaders = document.querySelectorAll('.accordion-header');
@@ -914,7 +960,8 @@ export function initUI(store, renderer) {
   });
 
   // Process paths (manual button)
-  document.getElementById('btn-process').addEventListener('click', async () => {
+  // Process button click handler (shared by both buttons)
+  const handleProcessClick = async () => {
     const originalPaths = store.getState('originalPaths');
 
     if (!originalPaths || originalPaths.length === 0) {
@@ -923,7 +970,14 @@ export function initUI(store, renderer) {
     }
 
     await processPathsInternal();
-  });
+  };
+
+  document.getElementById('btn-process').addEventListener('click', handleProcessClick);
+
+  const processHeaderBtn = document.getElementById('btn-process-header');
+  if (processHeaderBtn) {
+    processHeaderBtn.addEventListener('click', handleProcessClick);
+  }
 
   // Reset to original
   document.getElementById('btn-reset-preview').addEventListener('click', () => {
@@ -963,9 +1017,14 @@ export function initUI(store, renderer) {
       return;
     }
 
-    // Auto-process if no processed paths exist
-    if (!processedPaths || processedPaths.length === 0) {
-      console.log('No processed paths found - auto-processing before export...');
+    // Auto-process if no processed paths exist OR if config has changed
+    const configDirty = store.getState('configDirty');
+    if (!processedPaths || processedPaths.length === 0 || configDirty) {
+      if (configDirty) {
+        console.log('Config has changed since last process - reprocessing before export...');
+      } else {
+        console.log('No processed paths found - auto-processing before export...');
+      }
       await processPathsInternal();
     }
 

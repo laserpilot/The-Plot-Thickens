@@ -178,7 +178,9 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
       modeOptions,            // crosshatchOptions (or mode-specific options)
       config.addOutline || false,  // extractOutline
       config.stripeFilled || 1,  // stripeFilled
-      config.stripeEmpty || 1    // stripeEmpty
+      config.stripeEmpty || 1,   // stripeEmpty
+      config.outlineOffset || 0.25,  // outlineOffset
+      config.outlinePasses || 1      // outlinePasses
     );
 
     // Handle result - could be array of paths or {fills, outlines} object
