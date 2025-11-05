@@ -36,6 +36,15 @@ let panStartY = 0;
 let baseOffset = 0.2;
 let noise = 0.1;
 
+// Shape fill settings
+let fillMode = 'offset'; // 'offset' or 'shape-fill'
+let shapeType = 'circle';
+let shapeFillMode = 'filled'; // 'hollow' or 'filled'
+let shapeSpacing = 1.0;
+let envelope = 'flat';
+let maxWidth = 3.0;
+let minWidth = 0.0;
+
 // Render control
 let needsRedraw = true;
 

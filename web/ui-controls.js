@@ -44,6 +44,60 @@ function initializeControls() {
     });
   });
 
+  // Fill mode toggle
+  document.querySelectorAll('input[name="fill-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      fillMode = e.target.value;
+
+      // Show/hide shape fill controls
+      const shapeFillControls = document.querySelectorAll('.shape-fill-controls');
+      shapeFillControls.forEach(control => {
+        control.style.display = fillMode === 'shape-fill' ? 'block' : 'none';
+      });
+
+      updateStatus(fillMode === 'shape-fill' ? 'Shape fill mode' : 'Offset mode');
+      needsRedraw = true;
+      redraw();
+    });
+  });
+
+  // Shape fill controls
+  document.getElementById('shape-type').addEventListener('change', (e) => {
+    shapeType = e.target.value;
+    needsRedraw = true;
+    redraw();
+  });
+
+  document.getElementById('shape-fill-mode').addEventListener('change', (e) => {
+    shapeFillMode = e.target.value;
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('shape-spacing', (value) => {
+    shapeSpacing = value;
+    needsRedraw = true;
+    redraw();
+  });
+
+  document.getElementById('envelope-type').addEventListener('change', (e) => {
+    envelope = e.target.value;
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('max-width', (value) => {
+    maxWidth = value;
+    needsRedraw = true;
+    redraw();
+  });
+
+  setupSlider('min-width', (value) => {
+    minWidth = value;
+    needsRedraw = true;
+    redraw();
+  });
+
   // Attractor controls
   document.getElementById('clear-attractors').addEventListener('click', () => {
     attractorSystem.clearAll();
@@ -246,60 +300,94 @@ async function prepareExport() {
   console.log('Re-processing paths with high resolution for export...');
 
   svgData.paths.forEach((path, index) => {
-    // Re-sample path with high quality for export
-    const highQualityPoints = svgParser.pathToPoints(path.d, true);
+    // Check fill mode
+    if (fillMode === 'shape-fill') {
+      // Shape fill mode: generate sequential shapes along path
+      const shapePaths = generateShapeFill(path.d, {
+        shapeType: shapeType,
+        shapeFillMode: shapeFillMode,
+        shapeSpacing: shapeSpacing,
+        baseOffset: baseOffset,
+        envelope: envelope,
+        maxWidth: maxWidth,
+        minWidth: minWidth,
+      });
 
-    let passes;
-
-    if (useAttractors) {
-      passes = attractorSystem.calculatePathWeight(highQualityPoints);
-    } else {
-      // Length-based weight calculation (inline to avoid scope issues)
-      const pathLength = path.length || 0;
-
-      if (pathLength === 0 || maxLength === minLength) {
-        passes = attractorSystem.config.minPasses;
-      } else {
-        const normalized = (pathLength - minLength) / (maxLength - minLength);
-        passes = Math.round(
-          attractorSystem.config.minPasses +
-          normalized * (attractorSystem.config.maxPasses - attractorSystem.config.minPasses)
-        );
-        passes = Math.max(attractorSystem.config.minPasses, Math.min(attractorSystem.config.maxPasses, passes));
-      }
-    }
-
-    // Only log first 5 and last 5 paths to avoid console spam
-    const totalPaths = svgData.paths.length;
-    if (index < 5 || index >= totalPaths - 5) {
-      console.log(`Path ${path.id}: ${highQualityPoints.length} HQ points, length=${path.length}, passes=${passes}`);
-    } else if (index === 5) {
-      console.log(`... (logging only first 5 and last 5 of ${totalPaths} paths)`);
-    }
-
-    // Generate deterministic seed from path data
-    const seed = hashString(path.d);
-
-    // Generate offset duplicates with centered distribution
-    for (let i = 0; i < passes; i++) {
-      const passIndex = Math.floor(i / 2); // Distance from center
-      const isRight = i % 2 === 0; // Alternate sides
-      const direction = isRight ? 1 : -1;
-
-      const offsetDistance = direction * passIndex * baseOffset;
-      const passSeed = seed + i;
-
-      // Generate offset using high-quality points
-      const offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed);
-
-      if (offsetPoints) {
-        const offsetPathData = pointsToPathString(offsetPoints);
+      // Add all generated shape paths
+      shapePaths.forEach(shapePath => {
         processedPaths.push({
-          d: offsetPathData,
+          d: shapePath,
           stroke: path.stroke,
           fill: path.fill,
           strokeWidth: path.strokeWidth,
         });
+      });
+
+      // Only log first 5 and last 5 paths
+      const totalPaths = svgData.paths.length;
+      if (index < 5 || index >= totalPaths - 5) {
+        console.log(`Path ${path.id}: generated ${shapePaths.length} shapes`);
+      } else if (index === 5) {
+        console.log(`... (logging only first 5 and last 5 of ${totalPaths} paths)`);
+      }
+
+    } else {
+      // Traditional offset mode
+      // Re-sample path with high quality for export
+      const highQualityPoints = svgParser.pathToPoints(path.d, true);
+
+      let passes;
+
+      if (useAttractors) {
+        passes = attractorSystem.calculatePathWeight(highQualityPoints);
+      } else {
+        // Length-based weight calculation (inline to avoid scope issues)
+        const pathLength = path.length || 0;
+
+        if (pathLength === 0 || maxLength === minLength) {
+          passes = attractorSystem.config.minPasses;
+        } else {
+          const normalized = (pathLength - minLength) / (maxLength - minLength);
+          passes = Math.round(
+            attractorSystem.config.minPasses +
+            normalized * (attractorSystem.config.maxPasses - attractorSystem.config.minPasses)
+          );
+          passes = Math.max(attractorSystem.config.minPasses, Math.min(attractorSystem.config.maxPasses, passes));
+        }
+      }
+
+      // Only log first 5 and last 5 paths to avoid console spam
+      const totalPaths = svgData.paths.length;
+      if (index < 5 || index >= totalPaths - 5) {
+        console.log(`Path ${path.id}: ${highQualityPoints.length} HQ points, length=${path.length}, passes=${passes}`);
+      } else if (index === 5) {
+        console.log(`... (logging only first 5 and last 5 of ${totalPaths} paths)`);
+      }
+
+      // Generate deterministic seed from path data
+      const seed = hashString(path.d);
+
+      // Generate offset duplicates with centered distribution
+      for (let i = 0; i < passes; i++) {
+        const passIndex = Math.floor(i / 2); // Distance from center
+        const isRight = i % 2 === 0; // Alternate sides
+        const direction = isRight ? 1 : -1;
+
+        const offsetDistance = direction * passIndex * baseOffset;
+        const passSeed = seed + i;
+
+        // Generate offset using high-quality points
+        const offsetPoints = generateOffsetPath(highQualityPoints, offsetDistance, noise, passSeed);
+
+        if (offsetPoints) {
+          const offsetPathData = pointsToPathString(offsetPoints);
+          processedPaths.push({
+            d: offsetPathData,
+            stroke: path.stroke,
+            fill: path.fill,
+            strokeWidth: path.strokeWidth,
+          });
+        }
       }
     }
   });

@@ -94,6 +94,75 @@
         </section>
 
         <section class="control-group">
+          <h3>Fill Mode</h3>
+
+          <label>
+            <input type="radio" name="fill-mode" value="offset" checked>
+            Offset (traditional parallel lines)
+          </label>
+
+          <label>
+            <input type="radio" name="fill-mode" value="shape-fill">
+            Shape Fill (peas in pod effect)
+          </label>
+        </section>
+
+        <section class="control-group shape-fill-controls" style="display: none;">
+          <h3>Shape Fill Settings</h3>
+
+          <label>
+            Shape Type:
+            <select id="shape-type">
+              <option value="circle">Circle</option>
+            </select>
+          </label>
+
+          <label>
+            Fill Mode:
+            <select id="shape-fill-mode">
+              <option value="filled">Filled (concentric passes)</option>
+              <option value="hollow">Hollow (outline only)</option>
+            </select>
+          </label>
+
+          <label title="Gap between shapes relative to envelope width. 1.0 = shapes touch, 0.5 = tight spacing, 2.0 = loose spacing">
+            Shape Spacing:
+            <input type="range" id="shape-spacing" min="0" max="2" step="0.1" value="1.0">
+            <span id="shape-spacing-value">1.0</span>
+            <span class="hint-icon" title="Gap relative to envelope width">?</span>
+          </label>
+
+          <label>
+            Envelope Type:
+            <select id="envelope-type">
+              <option value="flat">Flat (constant width)</option>
+              <option value="sinTaper">Sin Taper (0 to 1)</option>
+              <option value="sinTaperBoth">Sin Taper Both (0-1-0)</option>
+              <option value="linearTaper">Linear Taper (0 to 1)</option>
+              <option value="linearTaperBoth">Linear Taper Both (0-1-0)</option>
+              <option value="easeInOut">Ease In/Out</option>
+              <option value="easeInOutBoth">Ease In/Out Both</option>
+            </select>
+          </label>
+
+          <label title="Maximum width of the envelope in mm">
+            Max Width (mm):
+            <input type="range" id="max-width" min="0.5" max="10" step="0.1" value="3.0">
+            <span id="max-width-value">3.0</span>
+          </label>
+
+          <label title="Minimum width of the envelope in mm">
+            Min Width (mm):
+            <input type="range" id="min-width" min="0" max="5" step="0.1" value="0.0">
+            <span id="min-width-value">0.0</span>
+          </label>
+
+          <p class="hint" style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">
+            Note: Base Offset below controls spacing between concentric circles in filled mode.
+          </p>
+        </section>
+
+        <section class="control-group">
           <h3>Line Weight Settings</h3>
 
           <!-- Live Parameter Preview -->

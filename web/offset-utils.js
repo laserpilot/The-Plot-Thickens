@@ -115,3 +115,148 @@ function pointsToPathString(points) {
 
   return pathStr.trim();
 }
+
+/**
+ * Envelope functions - control width variation along path length
+ * All functions take normalized position t (0.0 to 1.0) and return width multiplier (0.0 to 1.0)
+ */
+const envelopeFunctions = {
+  flat: (t) => 1.0,
+
+  sinTaper: (t) => Math.sin(t * Math.PI / 2),
+
+  sinTaperBoth: (t) => Math.sin(t * Math.PI),
+
+  linearTaper: (t) => t,
+
+  linearTaperBoth: (t) => (t < 0.5 ? t * 2 : (1 - t) * 2),
+
+  easeInOut: (t) => {
+    return 0.5 - Math.cos(t * Math.PI) / 2;
+  },
+
+  easeInOutBoth: (t) => {
+    if (t < 0.5) {
+      return 0.5 - Math.cos(t * 2 * Math.PI) / 2;
+    } else {
+      return 0.5 - Math.cos((1 - t) * 2 * Math.PI) / 2;
+    }
+  }
+};
+
+/**
+ * Get envelope function by name
+ */
+function getEnvelope(name) {
+  return envelopeFunctions[name] || envelopeFunctions.flat;
+}
+
+/**
+ * Generate a circle path centered at (cx, cy) with given radius
+ */
+function generateCirclePath(cx, cy, radius) {
+  if (radius <= 0) return '';
+
+  return `M ${cx.toFixed(3)},${(cy - radius).toFixed(3)} ` +
+         `A ${radius.toFixed(3)},${radius.toFixed(3)} 0 1,0 ${cx.toFixed(3)},${(cy + radius).toFixed(3)} ` +
+         `A ${radius.toFixed(3)},${radius.toFixed(3)} 0 1,0 ${cx.toFixed(3)},${(cy - radius).toFixed(3)} Z`;
+}
+
+/**
+ * Generate filled circle with concentric passes
+ */
+function generateFilledCircle(cx, cy, radius, baseOffset) {
+  const circles = [];
+  const numPasses = Math.max(1, Math.round(radius / baseOffset));
+
+  for (let i = 0; i < numPasses; i++) {
+    const currentRadius = radius - (i * baseOffset);
+    if (currentRadius > 0) {
+      circles.push(generateCirclePath(cx, cy, currentRadius));
+    }
+  }
+
+  return circles;
+}
+
+/**
+ * Generate shape fill for a path using sequential circle placement
+ * Uses the SVGPathCommander library for path operations
+ */
+function generateShapeFill(pathData, options = {}) {
+  const {
+    shapeType = 'circle',
+    shapeFillMode = 'filled',
+    shapeSpacing = 1.0,
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+  } = options;
+
+  const shapes = [];
+
+  try {
+    // Use SVGPathCommander library (loaded from CDN)
+    const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+    const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return shapes;
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelope(envelope);
+
+    // Walk along path and place shapes
+    let currentDistance = 0;
+
+    while (currentDistance <= totalLength) {
+      const t = currentDistance / totalLength;
+
+      // Calculate envelope width at this position
+      const envelopeMultiplier = envelopeFn(t);
+      const envelopeWidth = minWidth + envelopeMultiplier * (maxWidth - minWidth);
+
+      const diameter = envelopeWidth;
+      const radius = diameter / 2;
+
+      // Skip if too small
+      const minRadius = shapeFillMode === 'filled' ? baseOffset * 2 : baseOffset * 0.5;
+      if (radius < minRadius) {
+        const gap = shapeSpacing * envelopeWidth;
+        currentDistance += diameter + gap;
+        continue;
+      }
+
+      // Get position on path
+      const point = SVGPathCommander.getPointAtLength(absolutePath, currentDistance);
+
+      if (!point || isNaN(point.x) || isNaN(point.y)) {
+        break;
+      }
+
+      // Generate circle(s) at this position
+      if (shapeType === 'circle') {
+        if (shapeFillMode === 'filled') {
+          const filledCircles = generateFilledCircle(point.x, point.y, radius, baseOffset);
+          shapes.push(...filledCircles);
+        } else {
+          const circle = generateCirclePath(point.x, point.y, radius);
+          if (circle) {
+            shapes.push(circle);
+          }
+        }
+      }
+
+      // Advance by diameter + spacing
+      const gap = shapeSpacing * envelopeWidth;
+      currentDistance += diameter + gap;
+    }
+
+  } catch (error) {
+    console.warn('Failed to generate shape fill:', error.message);
+  }
+
+  return shapes;
+}
