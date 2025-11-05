@@ -119,6 +119,7 @@
                       <option value="spiral">Spiral</option>
                       <option value="focus-blur">Focus Blur</option>
                       <option value="hatch-gradient">Hatch Gradient</option>
+                      <option value="shape-fill">Shape Fill</option>
                     </select>
                   </label>
 
@@ -353,6 +354,52 @@
                     <input type="number" id="hatch-shadow-softness" step="0.05" min="0" max="1" value="0.5" />
                     <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Smoothness of light-to-shadow transitions</div>
                   </label>
+                </div>
+
+                <div id="mode-shape-fill-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Shape Fill Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates sequential filled or hollow circles along paths like "peas in a pod". Circle sizes follow the envelope taper for organic, flowing patterns.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Shape Type
+                      <select id="shape-type">
+                        <option value="circle">Circle</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      Fill Mode
+                      <select id="shape-fill-mode">
+                        <option value="filled">Filled (concentric passes)</option>
+                        <option value="hollow">Hollow (outline only)</option>
+                      </select>
+                    </label>
+
+                    <label>
+                      Shape Spacing
+                      <input type="number" id="shape-spacing" step="0.1" min="0" max="2" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Gap relative to envelope width (1.0 = shapes touch)</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="shape-max-width" step="0.1" min="0.5" max="10" value="3.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum circle diameter at widest envelope point</div>
+                    </label>
+
+                    <label>
+                      Min Width (mm)
+                      <input type="number" id="shape-min-width" step="0.1" min="0" max="5" value="0.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum circle diameter at narrowest envelope point</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Base Offset above controls spacing between concentric circles in filled mode. Use envelope presets (Effects section) to create tapered "bead" effects.
+                  </div>
                 </div>
 
                 <div class="controls-grid">

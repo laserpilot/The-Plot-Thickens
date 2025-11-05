@@ -114,6 +114,12 @@ const initialState = {
     crosshatchAngles: [45, 135],
     crosshatchSpacing: 1.0,
     fillModeOptions: null,
+    // Shape fill options
+    shapeType: 'circle',
+    shapeFillMode: 'filled',
+    shapeSpacing: 1.0,
+    shapeMaxWidth: 3.0,
+    shapeMinWidth: 0.0,
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',

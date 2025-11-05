@@ -94,6 +94,12 @@ function buildCLICommand(config) {
     if (config.crosshatchSpacing !== 1.0) {
       parts.push(`--crosshatch-spacing ${config.crosshatchSpacing}`);
     }
+  } else if (config.fillMode === 'shape-fill') {
+    if (config.shapeType && config.shapeType !== 'circle') parts.push(`--shape-type ${config.shapeType}`);
+    if (config.shapeFillMode && config.shapeFillMode !== 'filled') parts.push(`--shape-fill-mode ${config.shapeFillMode}`);
+    if (config.shapeSpacing !== undefined && config.shapeSpacing !== 1.0) parts.push(`--shape-spacing ${config.shapeSpacing}`);
+    if (config.shapeMaxWidth !== undefined && config.shapeMaxWidth !== 3.0) parts.push(`--shape-max-width ${config.shapeMaxWidth}`);
+    if (config.shapeMinWidth !== undefined && config.shapeMinWidth !== 0.0) parts.push(`--shape-min-width ${config.shapeMinWidth}`);
   }
 
   parts.push(`--sample-rate ${config.sampleRate}`);
@@ -503,7 +509,13 @@ export function initUI(store, renderer) {
     twistRate: document.getElementById('twist-rate'),
     twistOffset: document.getElementById('twist-offset'),
     spiralStripeFilled: document.getElementById('spiral-stripe-filled'),
-    spiralStripeEmpty: document.getElementById('spiral-stripe-empty')
+    spiralStripeEmpty: document.getElementById('spiral-stripe-empty'),
+    // Shape fill controls
+    shapeType: document.getElementById('shape-type'),
+    shapeFillMode: document.getElementById('shape-fill-mode'),
+    shapeSpacing: document.getElementById('shape-spacing'),
+    shapeMaxWidth: document.getElementById('shape-max-width'),
+    shapeMinWidth: document.getElementById('shape-min-width')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -511,7 +523,8 @@ export function initUI(store, renderer) {
 
     input.addEventListener('change', () => {
       const config = store.getState('config');
-      const value = parseFloat(input.value);
+      // Handle both numeric and string values
+      const value = input.type === 'number' ? parseFloat(input.value) : input.value;
 
       // Map spiral stripe controls to config keys
       const configKey = key === 'spiralStripeFilled' ? 'stripeFilled' :
@@ -887,6 +900,7 @@ export function initUI(store, renderer) {
     const crosshatchControls = document.getElementById('mode-crosshatch-controls');
     const focusBlurControls = document.getElementById('mode-focus-blur-controls');
     const hatchGradientControls = document.getElementById('mode-hatch-gradient-controls');
+    const shapeFillControls = document.getElementById('mode-shape-fill-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
@@ -894,6 +908,7 @@ export function initUI(store, renderer) {
     crosshatchControls.style.display = 'none';
     focusBlurControls.style.display = 'none';
     hatchGradientControls.style.display = 'none';
+    shapeFillControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -906,6 +921,8 @@ export function initUI(store, renderer) {
       focusBlurControls.style.display = 'block';
     } else if (mode === 'hatch-gradient') {
       hatchGradientControls.style.display = 'block';
+    } else if (mode === 'shape-fill') {
+      shapeFillControls.style.display = 'block';
     }
   }
 

@@ -6,7 +6,8 @@ import {
   generatePasses,
   measurePathLength,
   lengthToWeight,
-  getEnvelopePreset
+  getEnvelopePreset,
+  generateShapeFill
 } from '../../../shared/geometry/path-utils.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
@@ -159,6 +160,36 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
         shadowSoftness: hatchGradient.shadowSoftness || 0.5,
         viewBox: viewBox || { x: 0, y: 0, width: 100, height: 100 }
       };
+    }
+
+    // Handle shape-fill mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'shape-fill') {
+      const shapePaths = generateShapeFill(path.d, {
+        shapeType: config.shapeType || 'circle',
+        shapeFillMode: config.shapeFillMode || 'filled',
+        shapeSpacing: config.shapeSpacing !== undefined ? config.shapeSpacing : 1.0,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.shapeMaxWidth !== undefined ? config.shapeMaxWidth : 3.0,
+        minWidth: config.shapeMinWidth !== undefined ? config.shapeMinWidth : 0.0,
+        pathId: `path-${i}`
+      });
+
+      // Add each generated shape as a separate path
+      shapePaths.forEach((shapeData, shapeIndex) => {
+        processed.push({
+          id: `${path.id || i}-shape-${shapeIndex}`,
+          d: shapeData,
+          originalIndex: i,
+          shapeIndex,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
     }
 
     // Generate offset passes for this path
