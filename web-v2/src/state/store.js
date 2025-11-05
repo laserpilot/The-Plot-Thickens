@@ -102,7 +102,7 @@ const initialState = {
     envelope: 'sinTaperBoth',
     fillMode: 'offset',
     sampleRate: 2,
-    outputSize: 'original',
+    outputSize: 'a3-landscape',
     // Length thresholding
     minLength: 0,  // 0 = auto-detect
     maxLength: 0,  // 0 = auto-detect

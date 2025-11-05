@@ -115,6 +115,12 @@ function buildCLICommand(config) {
   // Outline extraction
   if (config.addOutline) {
     parts.push(`--add-outline`);
+    if (config.outlineOffset !== undefined && config.outlineOffset !== 0.25) {
+      parts.push(`--outline-offset ${config.outlineOffset}`);
+    }
+    if (config.outlinePasses !== undefined && config.outlinePasses !== 1) {
+      parts.push(`--outline-passes ${config.outlinePasses}`);
+    }
   }
 
   // Output size
@@ -829,16 +835,81 @@ export function initUI(store, renderer) {
   });
 
   // Outline extraction control
+  const outlineThicknessControls = document.getElementById('outline-thickness-controls');
+
   document.getElementById('add-outline').addEventListener('change', (e) => {
     const config = store.getState('config');
     store.setState({
       config: { ...config, addOutline: e.target.checked }
     });
 
+    // Show/hide outline thickness controls
+    outlineThicknessControls.style.display = e.target.checked ? 'block' : 'none';
+
     // Update CLI command display
     updateCLICommandDisplay(store.getState('config'));
 
     // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  });
+
+  // Outline offset controls (number input and slider syncing)
+  const outlineOffsetInput = document.getElementById('outline-offset');
+  const outlineOffsetSlider = document.getElementById('outline-offset-slider');
+
+  outlineOffsetInput.addEventListener('input', (e) => {
+    const value = parseFloat(e.target.value);
+    outlineOffsetSlider.value = value;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlineOffset: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  });
+
+  outlineOffsetSlider.addEventListener('input', (e) => {
+    const value = parseFloat(e.target.value);
+    outlineOffsetInput.value = value;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlineOffset: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  });
+
+  // Outline passes controls (number input and slider syncing)
+  const outlinePassesInput = document.getElementById('outline-passes');
+  const outlinePassesSlider = document.getElementById('outline-passes-slider');
+
+  outlinePassesInput.addEventListener('input', (e) => {
+    const value = parseInt(e.target.value);
+    outlinePassesSlider.value = value;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlinePasses: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
+    if (store.getState('livePreview')) {
+      throttledProcess();
+    }
+  });
+
+  outlinePassesSlider.addEventListener('input', (e) => {
+    const value = parseInt(e.target.value);
+    outlinePassesInput.value = value;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlinePasses: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
     if (store.getState('livePreview')) {
       throttledProcess();
     }
