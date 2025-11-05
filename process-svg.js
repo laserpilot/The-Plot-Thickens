@@ -79,6 +79,12 @@ const DEFAULT_CONFIG = {
     passesMin: 1.0, // pass multiplier in lit areas
     passesMax: 1.5 // pass multiplier in shadows
   },
+  // Shape fill options
+  shapeType: 'circle', // 'circle' (more shapes in future)
+  shapeFillMode: 'filled', // 'hollow' or 'filled'
+  shapeSpacing: 1.0, // Spacing multiplier relative to envelope width
+  shapeMaxWidth: 3.0, // Maximum envelope width in mm
+  shapeMinWidth: 0.0, // Minimum envelope width in mm
 };
 
 // CLI setup
@@ -111,11 +117,16 @@ program
   .option('--bins <number>', 'Group paths into N length quantile bins (e.g. 4 for quartiles)', parseInt)
   .option('--sample-rate <number>', 'Sample interval in mm for curve conversion (default: 2, lower=smoother/slower)', parseFloat)
   .option('--attractors <file>', 'JSON file with attractor preset (overrides length-based weighting)')
-  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, hatch-gradient, striped, or spiral (default: offset)')
+  .option('--fill-mode <mode>', 'Fill mode: offset, crosshatch, stippling, hatch-gradient, striped, spiral, or shape-fill (default: offset)')
   .option('--stripe-filled <number>', 'Number of consecutive filled paths in striped/spiral pattern (default: 1)', parseInt)
   .option('--stripe-empty <number>', 'Number of consecutive empty paths in striped/spiral pattern (default: 1)', parseInt)
   .option('--spiral-twist-rate <number>', 'Spiral twist rate in radians per mm (default: 0.01, range: 0.001-0.1)', parseFloat)
   .option('--spiral-twist-offset <number>', 'Spiral starting angle in degrees (default: 0)', parseFloat)
+  .option('--shape-type <type>', 'Shape type for shape-fill mode: circle (default: circle)')
+  .option('--shape-fill-mode <mode>', 'Shape fill mode: filled or hollow (default: filled)')
+  .option('--shape-spacing <number>', 'Shape spacing multiplier relative to envelope width (default: 1.0, range: 0.0-2.0)', parseFloat)
+  .option('--shape-max-width <number>', 'Maximum envelope width for shapes in mm (default: 3.0)', parseFloat)
+  .option('--shape-min-width <number>', 'Minimum envelope width for shapes in mm (default: 0.0)', parseFloat)
   .option('--add-outline', 'Add outline strokes (furthermost boundaries) as separate paths')
   .option('--outline-offset <number>', 'Offset distance for outline thickness passes in mm (default: 0.25)', parseFloat)
   .option('--outline-passes <number>', 'Number of passes for outline thickness (default: 1)', parseInt)
@@ -190,6 +201,14 @@ program
     if (options.stripeEmpty !== undefined) config.stripeEmpty = options.stripeEmpty;
     if (options.spiralTwistRate !== undefined) config.spiralTwistRate = options.spiralTwistRate;
     if (options.spiralTwistOffset !== undefined) config.spiralTwistOffset = options.spiralTwistOffset;
+
+    // Shape fill options
+    if (options.shapeType !== undefined) config.shapeType = options.shapeType;
+    if (options.shapeFillMode !== undefined) config.shapeFillMode = options.shapeFillMode;
+    if (options.shapeSpacing !== undefined) config.shapeSpacing = options.shapeSpacing;
+    if (options.shapeMaxWidth !== undefined) config.shapeMaxWidth = options.shapeMaxWidth;
+    if (options.shapeMinWidth !== undefined) config.shapeMinWidth = options.shapeMinWidth;
+
     if (options.addOutline) config.addOutline = true;
     if (options.outlineOffset !== undefined) config.outlineOffset = options.outlineOffset;
     if (options.outlinePasses !== undefined) config.outlinePasses = options.outlinePasses;
