@@ -170,13 +170,18 @@ export function initUI(store, renderer) {
       // Get viewBox for focus blur mode
       const viewBox = store.getState('svgBounds');
 
-      // Process with or without attractors
+      // Process with or without attractors, with progress callback
       const result = await processPaths(
         originalPaths,
         config,
         useAttractors ? attractors : [],
         useAttractors ? attractorConfig : null,
-        viewBox
+        viewBox,
+        (current, total) => {
+          // Update progress bar during processing
+          const percent = Math.floor((current / total) * 100);
+          updateProgress(`Processing ${current} / ${total} paths (${percent}%)...`, percent);
+        }
       );
 
       store.setState({
@@ -186,7 +191,7 @@ export function initUI(store, renderer) {
         processing: false
       });
 
-      updateProgress('Rendering processed paths...', 75);
+      updateProgress('Rendering processed paths...', 100);
 
       // Render processed paths (unless fast preview is enabled)
       const bounds = store.getState('svgBounds');

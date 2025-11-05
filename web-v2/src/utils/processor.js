@@ -13,15 +13,16 @@ import {
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
 
 /**
- * Process SVG paths with offset fills
+ * Process SVG paths with offset fills (chunked for UI responsiveness)
  * @param {Array} paths - Array of path objects with {d, ...}
  * @param {Object} config - Processing configuration
  * @param {Array} attractors - Optional array of attractors
  * @param {Object} attractorConfig - Optional attractor configuration
  * @param {Object} viewBox - Optional viewBox for focus blur (required for focus-blur mode)
- * @returns {Array} Processed paths
+ * @param {Function} progressCallback - Optional callback(current, total) for progress updates
+ * @returns {Object} {paths: processed paths, detectedMinLength, detectedMaxLength}
  */
-export function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null) {
+export async function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null, progressCallback = null) {
   const processed = [];
 
   // Set up attractor system if attractors provided
@@ -66,9 +67,17 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
 
   console.log(`Length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)} mm ${config.minLength || config.maxLength ? '(manual override)' : '(auto-detected)'}`);
 
-  for (let i = 0; i < paths.length; i++) {
-    const path = paths[i];
-    const length = lengths[i];
+  // Process in chunks to avoid blocking UI thread
+  const chunkSize = 50; // Process 50 paths at a time
+  const totalPaths = paths.length;
+
+  for (let chunkStart = 0; chunkStart < totalPaths; chunkStart += chunkSize) {
+    const chunkEnd = Math.min(chunkStart + chunkSize, totalPaths);
+
+    // Process this chunk
+    for (let i = chunkStart; i < chunkEnd; i++) {
+      const path = paths[i];
+      const length = lengths[i];
 
     // Calculate number of passes
     let passCount;
@@ -245,6 +254,16 @@ export function processPaths(paths, config, attractors = [], attractorConfig = n
         strokeWidth: 0.1
       });
     });
+    }
+
+    // Update progress after each chunk
+    if (progressCallback) {
+      progressCallback(chunkEnd, totalPaths);
+    }
+
+    // Yield to browser to keep UI responsive
+    // Use setTimeout with 0 delay to allow browser to update UI
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   console.log(`Processed ${paths.length} source paths into ${processed.length} offset paths`);
