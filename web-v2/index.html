@@ -808,6 +808,28 @@
                     </label>
                   </div>
                 </div>
+
+                <!-- Config Presets -->
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.1rem;">Configuration Presets</h3>
+                <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(74, 144, 226, 0.05); border: 1px solid rgba(74, 144, 226, 0.2); border-radius: 4px;">
+                  <div class="info-box" style="display: block; margin-bottom: 0.75rem; font-size: 0.85em;">
+                    Save and load complete configurations. Exported SVGs automatically include config metadata for easy round-tripping.
+                  </div>
+
+                  <div class="action-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <button id="btn-export-config" style="font-size: 0.9em;">💾 Export Config</button>
+                    <button id="btn-import-config" style="font-size: 0.9em;">📂 Import Config</button>
+                    <button id="btn-load-from-svg" style="font-size: 0.9em; grid-column: span 2;">📋 Load from SVG</button>
+                  </div>
+
+                  <!-- Hidden file inputs -->
+                  <input type="file" id="config-file-input" accept=".json" style="display: none;" />
+                  <input type="file" id="svg-config-input" accept=".svg" style="display: none;" />
+
+                  <div id="preset-status" class="info-box" style="display: none; margin-top: 0.75rem; font-size: 0.85em;">
+                    <!-- Status messages will appear here -->
+                  </div>
+                </div>
               </div>
             </section>
 
