@@ -1354,6 +1354,45 @@ export function initUI(store, renderer) {
     e.target.value = '';
   });
 
+  // Built-in presets dropdown
+  document.getElementById('builtin-presets').addEventListener('change', async (e) => {
+    const presetName = e.target.value;
+    if (!presetName) return;
+
+    try {
+      // Fetch the preset JSON from the shared/config/presets directory
+      const response = await fetch(`/shared/config/presets/${presetName}.json`);
+      if (!response.ok) {
+        throw new Error(`Failed to load preset: ${response.statusText}`);
+      }
+
+      const presetConfig = await response.json();
+
+      // Merge with current config
+      const currentConfig = store.getState('config');
+      const mergedConfig = { ...currentConfig, ...presetConfig };
+
+      store.setState({ config: mergedConfig });
+
+      // Update all UI inputs
+      syncUIFromConfig(mergedConfig);
+
+      showPresetStatus(`✓ Loaded preset: ${e.target.options[e.target.selectedIndex].text}`, 'success');
+      console.log('Built-in preset loaded:', presetName, mergedConfig);
+
+      // Auto-process if live preview is enabled
+      if (store.getState('livePreview')) {
+        throttledProcess();
+      }
+    } catch (error) {
+      showPresetStatus(`✗ Failed to load preset: ${error.message}`, 'error');
+      console.error('Preset load error:', error);
+    }
+
+    // Reset dropdown
+    e.target.value = '';
+  });
+
   // ============================================================================
   // END CONFIG PRESET HANDLERS
   // ============================================================================

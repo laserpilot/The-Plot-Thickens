@@ -816,6 +816,22 @@
                     Save and load complete configurations. Exported SVGs automatically include config metadata for easy round-tripping.
                   </div>
 
+                  <!-- Built-in Presets -->
+                  <div style="margin-bottom: 0.75rem;">
+                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.9em;">
+                      Built-in Presets
+                    </label>
+                    <select id="builtin-presets" style="width: 100%; padding: 0.5rem; font-size: 0.9em;">
+                      <option value="">Select a preset...</option>
+                      <option value="organic-fill">Organic Fill - Smooth tapered offsets</option>
+                      <option value="technical-crosshatch">Technical Crosshatch - Clean mechanical hatches</option>
+                      <option value="sketchy-focus-blur">Sketchy Focus/Blur - Depth of field effect</option>
+                      <option value="peas-in-pod">Peas in Pod - Shape fill circles</option>
+                      <option value="striped-texture">Striped Texture - Alternating pattern with outline</option>
+                      <option value="hatch-gradient-shading">Hatch Gradient Shading - Light-based density</option>
+                    </select>
+                  </div>
+
                   <div class="action-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                     <button id="btn-export-config" style="font-size: 0.9em;">💾 Export Config</button>
                     <button id="btn-import-config" style="font-size: 0.9em;">📂 Import Config</button>

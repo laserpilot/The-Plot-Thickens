@@ -905,12 +905,293 @@ The web UI includes:
 
 ---
 
+## Shape Fill Mode ("Peas in Pod")
+
+Create **sequential filled or hollow shapes** along paths for unique organic textures. Perfect for creating decorative fills with circles that follow envelope tapers.
+
+### What It Does
+
+Shape fill mode places shapes (currently circles) sequentially along the path centerline. Shapes auto-size based on the envelope width, creating a "peas in a pod" effect where circles naturally taper with the path.
+
+**Key Features:**
+- **Auto-sizing**: Circle diameters follow envelope taper (sinTaperBoth, linearTaper, etc.)
+- **Sequential placement**: Shapes placed along centerline with proportional spacing
+- **Fill modes**: Hollow (outline only) or Filled (concentric passes)
+- **Configurable spacing**: Control gap between shapes (1.0 = touching)
+- **Width range**: Set min/max circle diameters for envelope modulation
+
+### CLI Usage
+
+```bash
+# Basic shape fill with circles
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-fill-mode filled \
+  --shape-spacing 1.0 \
+  --shape-max-width 3.0
+
+# Hollow circles with taper
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-fill-mode hollow \
+  --envelope sinTaperBoth \
+  --shape-max-width 2.5 \
+  --shape-min-width 0.5
+
+# Filled circles with tight spacing
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-fill-mode filled \
+  --shape-spacing 0.8 \
+  --shape-max-width 3.0 \
+  --offset 0.38
+```
+
+### Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--fill-mode shape-fill` | Enable shape fill mode | - |
+| `--shape-type` | Shape type (currently only `circle`) | `circle` |
+| `--shape-fill-mode` | `filled` (concentric passes) or `hollow` (outline) | `filled` |
+| `--shape-spacing` | Gap multiplier (0-2, where 1.0 = shapes touch) | `1.0` |
+| `--shape-max-width` | Maximum diameter at widest envelope point (mm) | `3.0` |
+| `--shape-min-width` | Minimum diameter at narrowest envelope point (mm) | `0.0` |
+| `--offset` | Base offset for concentric passes (filled mode) | `0.25` |
+
+### Web Interface
+
+The web UI includes comprehensive shape fill controls:
+1. **Fill Mode**: Select "Shape Fill" from dropdown
+2. **Fill Mode**: Toggle between Filled (concentric) and Hollow (outline only)
+3. **Shape Spacing** slider (0-2.0)
+4. **Max/Min Width** controls for envelope range
+5. **Envelope Preset**: Choose taper (sinTaperBoth recommended)
+6. **Base Offset**: Controls spacing between concentric circles in filled mode
+
+### Use Cases
+
+- **Decorative borders**: Create pearl-like borders along path edges
+- **Organic textures**: Natural-looking dotted patterns that respond to path width
+- **Beaded effects**: Simulated bead strings with realistic tapering
+- **Dotted fills**: Alternative to solid offset fills with unique character
+- **Expressive strokes**: Calligraphic effects where dots follow stroke variation
+
+### Technical Details
+
+- Circles placed sequentially along path using arc-length sampling
+- Envelope determines circle radius at each position (radius = envelope × (maxWidth - minWidth) + minWidth)
+- Spacing calculated proportionally to current envelope width
+- Filled mode generates concentric circles with baseOffset spacing
+- Compatible with all envelope presets (sinTaperBoth, linearTaper, etc.)
+
+---
+
+## Configuration & Presets System
+
+The tool now includes a comprehensive **configuration management system** for saving, loading, and sharing settings across projects.
+
+### Config Embedding in SVG Exports
+
+**Every SVG exported from the web interface** automatically includes the complete configuration in its metadata. This enables perfect reproducibility and easy round-tripping.
+
+**SVG Structure:**
+```xml
+<svg width="420mm" height="297mm" viewBox="0 0 420 297" xmlns="http://www.w3.org/2000/svg">
+  <metadata id="plotter-config">
+    <config xmlns="https://github.com/laserpilot/The-Plot-Thickens">
+      {
+        "baseOffset": 0.25,
+        "fillMode": "shape-fill",
+        "envelope": "sinTaperBoth",
+        ...entire config...
+      }
+    </config>
+  </metadata>
+  <!-- Human-readable comments -->
+  <g id="fill-paths">...</g>
+</svg>
+```
+
+**Benefits:**
+- **Perfect reproducibility**: Know exactly what settings created any output
+- **Version tracking**: Compare configs between different versions
+- **Debugging**: Easily identify what parameters were used
+- **Round-tripping**: Load config back from previously exported SVGs
+
+### Preset Management (Web Interface)
+
+The **Advanced Options** section includes a complete preset management system:
+
+**Built-in Presets:**
+- **Organic Fill**: Smooth tapered offsets with sinTaperBoth envelope
+- **Technical Crosshatch**: Clean mechanical hatches with outlines
+- **Sketchy Focus/Blur**: Depth of field effect with noise variation
+- **Peas in Pod**: Shape fill circles with tapered sizing
+- **Striped Texture**: Alternating pattern with outline strokes
+- **Hatch Gradient Shading**: Light-based density modulation
+
+**User Presets:**
+- **Export Config** (💾): Save current settings as timestamped JSON file
+- **Import Config** (📂): Load settings from a JSON file
+- **Load from SVG** (📋): Extract config from previously exported SVG
+
+**LocalStorage Autosave:**
+- Configuration automatically saved on every change
+- Last session restored when page reloads
+- Survives browser restarts and tab closures
+
+### Typical Workflows
+
+**Save Favorite Settings:**
+```
+1. Dial in your perfect settings (shape-fill, sinTaperBoth, etc.)
+2. Click "Export Config" → saves plotter-config-2025-11-06.json
+3. Later: Click "Import Config" → load that JSON → all settings restored
+```
+
+**Reproduce Past Work:**
+```
+1. You have an SVG you love: my-artwork-shape-fill-2025-10-31.svg
+2. Click "Load from SVG" → select that SVG
+3. All settings that created it are now loaded
+4. Load a different source SVG and process with those settings
+```
+
+**Quick Style Switching:**
+```
+1. Select "Peas in Pod" from Built-in Presets dropdown
+2. Process your artwork with shape-fill circles
+3. Select "Technical Crosshatch" preset
+4. Instantly switch to mechanical hatch style
+```
+
+### Creating Custom Presets
+
+You can create your own preset library by:
+
+1. **Export configs** as you work: Click "Export Config" after dialing in settings
+2. **Organize presets** in a folder: `my-presets/vintage-crosshatch.json`
+3. **Share with team**: Send JSON files to collaborators
+4. **Add to built-ins** (optional): Place in `shared/config/presets/` to appear in dropdown
+
+**Preset JSON Structure:**
+```json
+{
+  "baseOffset": 0.25,
+  "fillMode": "crosshatch",
+  "envelope": "sinTaperBoth",
+  "crosshatchAngles": [45, -45],
+  "crosshatchSpacing": 1.5,
+  "minPasses": 2,
+  "maxPasses": 10,
+  ...all configuration parameters...
+}
+```
+
+### Adding Custom Built-in Presets
+
+To add your own presets to the dropdown:
+
+1. Create a JSON file in `shared/config/presets/my-preset.json`
+2. Add an option to the dropdown in `web-v2/index.html`:
+```html
+<option value="my-preset">My Custom Preset - Description here</option>
+```
+3. Preset will automatically load when selected
+
+---
+
+## Web Interface v2
+
+The modern web interface (`web-v2/`) provides a streamlined experience with improved performance and organization.
+
+### Quick Start
+
+```bash
+# Serve locally (recommended)
+python3 -m http.server 8000
+# Visit: http://localhost:8000/web-v2/
+
+# Or use Node.js
+npx http-server -p 8000
+# Visit: http://localhost:8000/web-v2/
+```
+
+### Key Features
+
+**Accordion Layout:**
+- Collapsible sections keep interface clean
+- Focus on the controls you need
+- Default expanded: File Upload, Fill Mode, Export
+
+**Fill Modes:**
+- Offset (traditional parallel offsets)
+- Crosshatch (angled hatch fills)
+- Striped (alternating filled/empty pattern)
+- Spiral (twisted offset with rotation)
+- Focus Blur (depth of field effects)
+- Hatch Gradient (light-responsive shading)
+- **Shape Fill** (sequential circles "peas in pod")
+
+**Effects:**
+- Envelope/Taper: Control width variation along paths
+- Noise & Variation: Organic texture and smoothness
+- Noise Gradient: Per-pass texture transitions
+- Length Thresholding: Override auto-detected ranges
+
+**Advanced Options:**
+- Outline Extraction: Add boundary strokes with configurable thickness
+- Length Binning: Organize output by path length
+- **Configuration Presets**: Save/load/share complete settings
+- **Built-in Preset Library**: Quick access to curated styles
+
+**Performance:**
+- **Chunked Processing**: Handles 10,000+ path files without freezing
+- **Progress Meter**: Real-time updates during processing
+- **Fast Preview Mode**: Color-coded stroke width approximation
+- **Live Preview**: Auto-update on parameter changes (toggle)
+
+**Export Options:**
+- Quick Export: Direct download from browser
+- Server Export: Backend processing for large files
+- CLI Command: Copy equivalent command-line invocation
+- **Output Size**: Default to A3 Landscape (420×297mm) or keep original dimensions
+- **Config Embedding**: All exports include complete metadata
+
+### UI Improvements Over Legacy Version
+
+**Better Organization:**
+- Grouped controls by category (Fill Mode, Effects, Advanced)
+- Collapsible sections reduce visual clutter
+- Logical flow from input → settings → export
+
+**Enhanced Preview:**
+- Zoom in/out/reset view controls
+- Color-coded thickness visualization
+- Fast preview mode for instant feedback
+- Real-time attractor field overlay
+
+**Smarter Defaults:**
+- A3 Landscape output (prevents accidental huge canvases)
+- Sensible envelope (sinTaperBoth) for organic results
+- Reasonable pass counts (1-10) for typical 0.38mm pens
+
+**Professional Features:**
+- Outline thickness controls with dual sliders
+- Sample shape tester for quick parameter tuning
+- Comprehensive CLI command generator
+- Built-in preset library with curated examples
+
+---
+
 ## Phase 5: Coming Soon
 
 - Combined length + attractor weighting system
-- Batch processing with saved configurations
 - Additional attractor shapes (line, polygon)
 - Curvature-based width modulation
+- Additional shape types (squares, triangles, custom)
+- Community preset library sharing
 
 ---
 
