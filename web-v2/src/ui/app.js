@@ -674,6 +674,43 @@ export function initUI(store, renderer) {
     }
   });
 
+  // Crosshatch organic parameter controls
+  const organicCrosshatchInputs = {
+    wiggle: document.getElementById('crosshatch-wiggle'),
+    wiggleFreq: document.getElementById('crosshatch-wiggle-freq'),
+    angleJitter: document.getElementById('crosshatch-angle-jitter'),
+    lengthJitter: document.getElementById('crosshatch-length-jitter'),
+    positionJitter: document.getElementById('crosshatch-position-jitter'),
+    spacingJitter: document.getElementById('crosshatch-spacing-jitter')
+  };
+
+  Object.entries(organicCrosshatchInputs).forEach(([key, input]) => {
+    if (!input) return;
+
+    input.addEventListener('change', () => {
+      const config = store.getState('config');
+      const value = parseFloat(input.value);
+
+      store.setState({
+        config: {
+          ...config,
+          crosshatchOrganic: {
+            ...(config.crosshatchOrganic || {}),
+            [key]: value
+          }
+        }
+      });
+
+      // Update CLI command display
+      updateCLICommandDisplay(store.getState('config'));
+
+      // Auto-process if live preview is enabled
+      if (store.getState('livePreview')) {
+        throttledProcess();
+      }
+    });
+  });
+
   // Focus blur controls
   const focusBlurLightModeSelect = document.getElementById('focus-blur-light-mode');
   const focusBlurDirectionalControls = document.getElementById('focus-blur-directional-controls');

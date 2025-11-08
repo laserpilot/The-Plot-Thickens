@@ -113,6 +113,14 @@ const initialState = {
     twistOffset: 0,
     crosshatchAngles: [45, 135],
     crosshatchSpacing: 1.0,
+    crosshatchOrganic: {
+      wiggle: 0.5,
+      wiggleFreq: 5,
+      angleJitter: 5,
+      lengthJitter: 0.1,
+      positionJitter: 0.2,
+      spacingJitter: 0.2
+    },
     fillModeOptions: null,
     // Shape fill options
     shapeType: 'circle',

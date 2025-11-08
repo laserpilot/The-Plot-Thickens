@@ -105,6 +105,8 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [x] Port focus blur controls + preview canvas (consider worker).
 - [x] Reintroduce crosshatch/striped/gradient modes via shared modules.
 - [x] Add Noise Gradient fill effect (per-path fuzzy→crisp or crisp→fuzzy transitions).
+- [ ] Add Shape Fill mode (filled/hollow circles arranged like "peas in pod").
+- [ ] Add Custom Envelope Taper controls (beyond existing presets).
 - [ ] Restore calibration / diagnostic panels selectively.
 - [ ] Add config import/export for presets.
 
@@ -342,3 +344,237 @@ Noise Controls
 - **Variable emphasis**: Combine with length-based or attractor weighting for mixed modes per path
 - **Small-scale detail**: Creates perceptible dimensional texture at 2-3mm without overwhelming form
 - **Stylistic control**: Offers new aesthetic vocabulary beyond density/spacing variation
+
+---
+
+### Shape Fill Mode - "Peas in Pod" Effect
+
+**Purpose**: Fill paths with sequential filled or hollow circles arranged like beads on a string, creating organic textured fills with flowing, tapered rhythms. Alternative to stippling (point dots) or offset fills (parallel lines).
+
+**Design Goals**:
+- Auto-size circles to fit envelope width at each position
+- Sequential placement along path centerline (beads on string)
+- Proportional spacing that responds to envelope taper
+- Support both hollow (outline) and filled (concentric passes) circles
+- Work naturally at 2-3mm scale with 0.38mm pen
+
+#### Scope & Compatibility
+
+**Works with**:
+- All envelope types (flat, sinTaper, sinTaperBoth, linearTaper, etc.)
+- Length-based and attractor-based weighting
+- Standard offset/noise parameters for filled circles
+
+**Independent of**:
+- Other fill modes (replaces offset/crosshatch/stipple when active)
+- Focus-Blur and Light-Based effects (conceptually compatible but not initially integrated)
+
+**Future expansion**:
+- Additional shapes (triangles, squares, hexagons)
+- Hexagonal packing option (beyond sequential)
+- Shape rotation/orientation controls
+
+#### Parameters
+
+| Parameter | Type | Range | Default | Description |
+|-----------|------|-------|---------|-------------|
+| `fillMode` | enum | `shape-fill` | - | Enable shape fill mode |
+| `shapeType` | enum | `circle` | `circle` | Shape to use (circle only initially) |
+| `shapeFillMode` | enum | `hollow`, `filled` | `filled` | Outline only vs concentric fill passes |
+| `shapeSpacing` | float | 0.0-2.0 | 1.0 | Spacing multiplier relative to local envelope width |
+
+**Reuses existing parameters**:
+- `baseOffset` - Spacing between concentric passes in filled circles (e.g., 0.25mm)
+- `envelope` - All envelope presets work (determines circle size variation)
+- `minPasses` / `maxPasses` - Could influence circle placement density (optional)
+
+#### How It Works
+
+**1. Circle Sizing** (Auto-fit to envelope):
+- At each position along path, circle diameter = local envelope width
+- With flat envelope (constant width): all circles same size
+- With tapered envelope (sinTaperBoth, linearTaper): circles shrink/grow naturally
+- Example: 1.5mm envelope width → 1.5mm diameter circle (0.75mm radius)
+
+**2. Circle Placement** (Sequential "beads on string"):
+- Start at path beginning, walk along centerline
+- Place circle at current position
+- Advance by: `current_diameter + (shapeSpacing × local_envelope_width)`
+- Repeat until reaching path end
+- Spacing is **proportional to local envelope width** (breathes with taper)
+
+**Spacing Examples** (at position with 1.0mm envelope width):
+- `shapeSpacing = 1.0`: gap = 1.0mm (circles touch, diameter-width spacing)
+- `shapeSpacing = 0.5`: gap = 0.5mm (50% of local width)
+- `shapeSpacing = 1.2`: gap = 1.2mm (slight overlap, 20% extra)
+- `shapeSpacing = 0.0`: circles packed tight at same center (maximum overlap)
+
+**3. Circle Fill Density** (when `shapeFillMode = filled`):
+- Number of concentric passes = `circle_radius / baseOffset`
+- Maintains consistent visual density regardless of circle size
+- Examples with `baseOffset = 0.25mm`:
+  - 1.5mm radius → 1.5 / 0.25 = 6 concentric passes
+  - 0.75mm radius → 0.75 / 0.25 = 3 passes
+  - 0.4mm radius → 0.4 / 0.25 ≈ 2 passes (rounded)
+
+**4. Hollow Mode** (`shapeFillMode = hollow`):
+- Only draw outer circumference (1 pass per circle)
+- Creates outline/skeleton effect
+- Lighter, faster, more delicate appearance
+
+#### Visual Effect at 2-3mm Scale
+
+**Example: 3mm path length, sinTaperBoth envelope (0.5mm → 1.5mm → 0.5mm width)**
+
+With `shapeSpacing = 0.5`, `baseOffset = 0.25mm`, `shapeFillMode = filled`:
+
+Position | Envelope Width | Circle Diameter | Fill Passes | Gap After
+---------|----------------|-----------------|-------------|----------
+Start    | 0.5mm         | 0.5mm          | 2 passes    | 0.25mm
+Middle   | 1.5mm         | 1.5mm          | 6 passes    | 0.75mm
+End      | 0.5mm         | 0.5mm          | 2 passes    | -
+
+Result: 3-4 circles with flowing size variation and proportional rhythm
+
+#### Implementation Notes
+
+**Circle Generation**:
+- Use existing circle path generation (likely from stippling code)
+- For filled circles: generate N concentric circles at decreasing radii
+- Each concentric circle offset by `baseOffset` from previous
+- For hollow: single circle at full radius
+
+**Path Walking**:
+- Sample path at regular intervals to get centerline positions
+- At each position, query envelope function for width
+- Calculate circle placement based on accumulated distance traveled
+- Stop when remaining path length < next circle diameter
+
+**Envelope Integration**:
+- Reuse existing envelope functions (flat, sinTaper, easeInOut, etc.)
+- Query envelope at normalized position `t` (0.0 to 1.0 along path)
+- Circle radius = `envelope(t) × maxWidth / 2`
+- Spacing = `shapeSpacing × envelope(t) × maxWidth`
+
+**Edge Cases**:
+- Path too short for even one circle: skip or draw single centered circle?
+- Tapered ends too narrow (< 2 × baseOffset): skip tiny circles or allow minimum size?
+- Suggest: minimum circle radius = 2 × baseOffset (needs at least 2 passes to read as filled)
+
+#### CLI Examples
+
+```bash
+# Basic filled circles with touching spacing
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-type circle \
+  --shape-fill-mode filled \
+  --shape-spacing 1.0 \
+  --offset 0.25
+
+# Hollow circles with 50% gaps (outline beads effect)
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-type circle \
+  --shape-fill-mode hollow \
+  --shape-spacing 0.5
+
+# Tapered peas-in-pod with tight packing
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --envelope sinTaperBoth \
+  --shape-spacing 0.8 \
+  --offset 0.2
+
+# Dense filled beads (overlapping slightly)
+node process-svg.js input.svg output.svg \
+  --fill-mode shape-fill \
+  --shape-fill-mode filled \
+  --shape-spacing 0.9 \
+  --offset 0.15
+```
+
+#### Web UI Integration
+
+**Location**: Fills tab, new section when Shape Fill mode selected
+
+**UI Structure**:
+```
+Fill Mode: [Shape Fill ▼]
+
+Shape Fill Controls
+  Shape Type:     [Circle ▼]
+                  Options: Circle (more shapes later)
+
+  Fill Mode:      [Filled ▼]
+                  Options: Filled | Hollow
+
+  Shape Spacing:  [1.0] ────────────── 0.0-2.0
+                  (Gap relative to envelope width)
+
+  Fill Density:   [0.25mm] ──────────── 0.1-0.5mm
+                  (Spacing between concentric passes)
+                  (Only shown when Fill Mode = Filled)
+
+Envelope:         [sinTaperBoth ▼]
+                  (All existing envelope presets)
+```
+
+**Behavior**:
+- Fill Mode dropdown includes "Shape Fill" alongside Offset, Crosshatch, etc.
+- When selected, shows shape-specific controls
+- Shape Spacing slider with visual tooltip showing gap behavior
+- Fill Density reuses existing offset control
+- Preview updates in real-time with live preview enabled
+
+#### Testing & Validation
+
+**Unit Tests**:
+- [ ] Circle placement algorithm produces correct positions along path
+- [ ] Spacing calculation responds correctly to envelope taper
+- [ ] Fill density (concentric passes) calculates correctly for various radii
+- [ ] Edge cases: very short paths, very narrow tapers, spacing = 0
+
+**Visual Tests**:
+- [ ] Filled circles appear solid at 2-3mm scale (sufficient concentric passes)
+- [ ] Hollow circles create clean outline beads
+- [ ] Spacing flows naturally with tapered envelopes (no sudden jumps)
+- [ ] Circle sizes transition smoothly in tapered sections
+- [ ] Works with all envelope presets (flat, sinTaper, easeInOut, etc.)
+
+**Regression Tests**:
+- [ ] Other fill modes (offset, crosshatch) unaffected
+- [ ] Existing stippling mode still works
+- [ ] CLI backward compatibility maintained
+
+**Performance Tests**:
+- [ ] Large files with many paths process efficiently
+- [ ] Preview renders smoothly (consider simplification for preview)
+
+#### Use Cases
+
+- **Organic texture**: Peas-in-pod feel creates natural, flowing patterns
+- **Dimensional flow**: Tapering creates sense of volume and movement
+- **Efficient fills**: Fewer total passes than full offset fills (faster plotting)
+- **Decorative elements**: Beaded, pearl-like, or cellular path treatments
+- **Scale variation**: Effective from 2mm to much larger paths
+- **Lighter alternative**: Hollow mode offers delicate outline effect vs heavy fills
+- **Rhythmic patterns**: Proportional spacing creates musical, breathing quality
+
+#### Future Enhancements
+
+**Additional shapes** (Phase 5+):
+- Triangles (orientation options)
+- Squares/diamonds
+- Hexagons
+- Organic blobs (varied, seed-based randomness)
+
+**Advanced packing**:
+- Hexagonal packing (offset rows for denser coverage)
+- Random jittered positions (organic variation)
+- Dual-size mixing (alternating large/small)
+
+**Integration**:
+- Combine with attractor weighting (filled vs hollow based on influence)
+- Vary shape type along path (circles → triangles transition)
+- Rotation/orientation controls (align with path or independent angle)

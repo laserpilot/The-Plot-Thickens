@@ -68,7 +68,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
   console.log(`Length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)} mm ${config.minLength || config.maxLength ? '(manual override)' : '(auto-detected)'}`);
 
   // Process in chunks to avoid blocking UI thread
-  const chunkSize = 50; // Process 50 paths at a time
+  const chunkSize = 10; // Process 10 paths at a time
   const totalPaths = paths.length;
 
   for (let chunkStart = 0; chunkStart < totalPaths; chunkStart += chunkSize) {
@@ -127,7 +127,17 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       modeOptions = {
         ...(modeOptions || {}),
         angles: config.crosshatchAngles || [45, 135],
-        spacing: config.crosshatchSpacing || 1.0
+        spacing: config.crosshatchSpacing || 1.0,
+        // Add organic parameters if configured
+        organic: config.crosshatchOrganic ? {
+          enabled: true,
+          wiggle: config.crosshatchOrganic.wiggle || 0,
+          wiggleFreq: config.crosshatchOrganic.wiggleFreq || 0,
+          angleJitter: config.crosshatchOrganic.angleJitter || 0,
+          lengthJitter: config.crosshatchOrganic.lengthJitter || 0,
+          positionJitter: config.crosshatchOrganic.positionJitter || 0,
+          spacingJitter: config.crosshatchOrganic.spacingJitter || 0
+        } : { enabled: false }
       };
     }
 
@@ -262,8 +272,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     }
 
     // Yield to browser to keep UI responsive
-    // Use setTimeout with 0 delay to allow browser to update UI
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // Use setTimeout with 10ms delay to ensure browser has time to paint UI updates
+    await new Promise(resolve => setTimeout(resolve, 10));
   }
 
   console.log(`Processed ${paths.length} source paths into ${processed.length} offset paths`);

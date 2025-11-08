@@ -188,6 +188,57 @@
                       <input type="number" id="crosshatch-spacing" step="0.1" min="0.1" max="5" value="1.0" />
                     </label>
                   </div>
+
+                  <!-- Organic/Hand-Drawn Options -->
+                  <details style="margin-top: 1rem; padding: 0.75rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 4px;">
+                    <summary style="cursor: pointer; font-weight: bold; font-size: 0.9em; color: #4a9eff;">
+                      ➕ Organic/Hand-Drawn Options
+                    </summary>
+                    <div style="margin-top: 0.75rem;">
+                      <div class="controls-grid">
+                        <label>
+                          Line Wiggle (mm)
+                          <input type="number" id="crosshatch-wiggle" step="0.05" min="0" max="2" value="0.5" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Amplitude of line waviness (0=straight)</div>
+                        </label>
+
+                        <label>
+                          Wiggle Frequency (mm)
+                          <input type="number" id="crosshatch-wiggle-freq" step="1" min="1" max="20" value="5" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Wavelength (lower=tighter curves)</div>
+                        </label>
+
+                        <label>
+                          Angle Variation (degrees)
+                          <input type="number" id="crosshatch-angle-jitter" step="1" min="0" max="20" value="5" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Random angle per line (0=uniform)</div>
+                        </label>
+
+                        <label>
+                          Length Randomization
+                          <input type="number" id="crosshatch-length-jitter" step="0.05" min="0" max="0.5" value="0.1" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Randomly shorten lines (0-0.5)</div>
+                        </label>
+
+                        <label>
+                          Position Jitter (mm)
+                          <input type="number" id="crosshatch-position-jitter" step="0.05" min="0" max="2" value="0.2" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Shift lines perpendicular to path</div>
+                        </label>
+
+                        <label>
+                          Spacing Randomization
+                          <input type="number" id="crosshatch-spacing-jitter" step="0.05" min="0" max="1" value="0.2" />
+                          <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Random gaps between hatches (0=uniform)</div>
+                        </label>
+                      </div>
+
+                      <div class="info-box" style="display: block; margin-top: 0.75rem; font-size: 0.85em;">
+                        <strong>Organic mode:</strong> Adds natural hand-drawn variation to crosshatch lines. Set all values to 0 for traditional mechanical crosshatching.
+                      </div>
+                    </div>
+                  </details>
+
                   <div class="info-box" style="display: block; margin-top: 10px;">
                     <strong>Tip:</strong> Use 0,90 for orthogonal crosshatch, 45,135 for diagonal, or 0,60,120 for triangular pattern.
                   </div>
