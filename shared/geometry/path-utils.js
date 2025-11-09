@@ -2184,38 +2184,82 @@ function calculateExtension(phase, occlusionMode, minOcclusion) {
 
 /**
  * Generate stripe boundaries for each lane
+ * Creates discrete S-shaped regions for each stripe
  * @private
  */
 function generateStripeBoundaries(centerlineWithPhase, stripeCount, occlusionMode, minOcclusion) {
   const stripeBoundaries = [];
+  const laneWidth = 1.0 / stripeCount; // Each lane is 1/N of total width
 
   for (let lane = 0; lane < stripeCount; lane++) {
     const laneOffset = lane / stripeCount;
-    const points = [];
+    const segments = []; // Array of discrete stripe segments
+    let currentSegment = null;
 
-    for (const sample of centerlineWithPhase) {
+    for (let i = 0; i < centerlineWithPhase.length; i++) {
+      const sample = centerlineWithPhase[i];
+
       // Calculate phase for this stripe
       const phase = sample.accumulatedTwist + laneOffset;
       const extension = calculateExtension(phase, occlusionMode, minOcclusion);
 
-      // Calculate how far this stripe extends from centerline
-      const maxExtension = sample.localWidth / 2;
-      const actualExtension = maxExtension * extension;
+      // Check if stripe is visible at this position
+      const isVisible = extension > 0.01;
 
-      // For now, create a simple ribbon that extends symmetrically
-      // Each stripe occupies the full width but with varying extension
-      // Store centerline position with extension metadata
-      points.push({
-        x: sample.x,
-        y: sample.y,
-        nx: sample.nx,
-        ny: sample.ny,
-        extension: actualExtension,
-        phase: phase
-      });
+      if (isVisible) {
+        // Calculate lane boundaries (discrete lanes, not overlapping)
+        // Lane occupies a fixed fraction of the total ribbon width
+        const laneStart = lane * laneWidth; // 0.0 to 1.0 (fraction of total width)
+        const laneEnd = (lane + 1) * laneWidth;
+
+        // Convert to actual distances from centerline
+        const halfWidth = sample.localWidth / 2;
+        const leftEdge = -halfWidth + (laneStart * sample.localWidth);
+        const rightEdge = -halfWidth + (laneEnd * sample.localWidth);
+
+        // Apply extension (occlusion) to shrink stripe within its lane
+        // When extension = 1.0, stripe fills entire lane
+        // When extension = 0.0, stripe pinches to nothing
+        const laneCenter = (leftEdge + rightEdge) / 2;
+        const laneHalfWidth = (rightEdge - leftEdge) / 2;
+        const shrunkLeftEdge = laneCenter - (laneHalfWidth * extension);
+        const shrunkRightEdge = laneCenter + (laneHalfWidth * extension);
+
+        // Calculate actual positions
+        const leftPoint = {
+          x: sample.x + sample.nx * shrunkLeftEdge,
+          y: sample.y + sample.ny * shrunkLeftEdge
+        };
+        const rightPoint = {
+          x: sample.x + sample.nx * shrunkRightEdge,
+          y: sample.y + sample.ny * shrunkRightEdge
+        };
+
+        // Start new segment if needed
+        if (!currentSegment) {
+          currentSegment = {
+            leftEdge: [],
+            rightEdge: []
+          };
+        }
+
+        currentSegment.leftEdge.push(leftPoint);
+        currentSegment.rightEdge.push(rightPoint);
+      } else {
+        // Stripe is not visible - end current segment if exists
+        if (currentSegment && currentSegment.leftEdge.length > 0) {
+          segments.push(currentSegment);
+          currentSegment = null;
+        }
+      }
     }
 
-    stripeBoundaries.push({ lane, points });
+    // Push final segment if exists
+    if (currentSegment && currentSegment.leftEdge.length > 0) {
+      segments.push(currentSegment);
+    }
+
+    stripeBoundaries.push({ lane, segments });
   }
 
   return stripeBoundaries;
@@ -2229,23 +2273,41 @@ function fillStripeBoundaries(stripeBoundaries, baseOffset, noise, seed) {
   const allPaths = [];
 
   for (const stripe of stripeBoundaries) {
-    // For each stripe, create fill lines by offsetting perpendicular to path
-    // at regular intervals along the stripe
+    // Process each discrete segment
+    for (const segment of stripe.segments) {
+      if (segment.leftEdge.length < 2) continue; // Need at least 2 points
 
-    // Simple approach: create offset lines at each sample point
-    for (let i = 0; i < stripe.points.length - 1; i++) {
-      const p1 = stripe.points[i];
-      const p2 = stripe.points[i + 1];
+      // Create a closed polygon from the segment boundaries
+      // Left edge forward, right edge backward
+      const polygonPoints = [
+        ...segment.leftEdge,
+        ...segment.rightEdge.slice().reverse()
+      ];
 
-      // Only draw if stripe is visible (extension > 0)
-      if (p1.extension > 0.01 && p2.extension > 0.01) {
-        // Create a line segment on one side of the centerline
-        const line = `M ${p1.x + p1.nx * p1.extension} ${p1.y + p1.ny * p1.extension} L ${p2.x + p2.nx * p2.extension} ${p2.y + p2.ny * p2.extension}`;
-        allPaths.push(line);
+      // Convert to path string (closed polygon)
+      if (polygonPoints.length > 0) {
+        let pathData = `M ${polygonPoints[0].x} ${polygonPoints[0].y}`;
+        for (let i = 1; i < polygonPoints.length; i++) {
+          pathData += ` L ${polygonPoints[i].x} ${polygonPoints[i].y}`;
+        }
+        pathData += ' Z'; // Close the path
 
-        // Also draw the other side
-        const line2 = `M ${p1.x - p1.nx * p1.extension} ${p1.y - p1.ny * p1.extension} L ${p2.x - p2.nx * p2.extension} ${p2.y - p2.ny * p2.extension}`;
-        allPaths.push(line2);
+        // For now, just add the outline of the stripe region
+        // TODO: Fill with parallel lines at baseOffset spacing
+        allPaths.push(pathData);
+
+        // Also fill the interior with simple cross-strokes
+        // Draw lines connecting left edge to right edge at regular intervals
+        const numFillLines = Math.max(2, Math.floor(segment.leftEdge.length / 3));
+        for (let i = 0; i < numFillLines; i++) {
+          const t = i / (numFillLines - 1);
+          const idx = Math.floor(t * (segment.leftEdge.length - 1));
+          const leftPt = segment.leftEdge[idx];
+          const rightPt = segment.rightEdge[idx];
+
+          const fillLine = `M ${leftPt.x} ${leftPt.y} L ${rightPt.x} ${rightPt.y}`;
+          allPaths.push(fillLine);
+        }
       }
     }
   }
