@@ -1967,6 +1967,292 @@ function generateShapeFill(pathData, options = {}) {
   return shapes;
 }
 
+/**
+ * Generate barber pole spiral fill with dynamic twist and occlusion
+ * @param {string} pathData - Original SVG path
+ * @param {Object} options - Barber pole options
+ * @param {number} options.stripeCount - Number of spiral lanes (2-8)
+ * @param {number} options.twistFrequency - Rotations per mm (0.05-1.0)
+ * @param {string} options.twistRateMode - 'constant', 'inverse', or 'proportional'
+ * @param {string} options.occlusionMode - 'none', 'smooth', or 'hard'
+ * @param {number} options.minOcclusion - Minimum extension at back (0.0-0.5)
+ * @param {number} options.baseOffset - Fill line spacing within stripes
+ * @param {string} options.envelope - Envelope type name
+ * @param {number} options.maxWidth - Maximum envelope width in mm
+ * @param {number} options.minWidth - Minimum envelope width in mm (default: 0)
+ * @param {number} options.noise - Noise amount for stripe fills
+ * @param {number} options.seed - Random seed
+ * @param {number} options.sampleRate - Sample interval in mm
+ * @param {string} options.pathId - Optional path identifier
+ * @returns {Array<string>} Array of path data for all stripe fills
+ */
+function generateBarberPoleFill(pathData, options = {}) {
+  const {
+    stripeCount = 3,
+    twistFrequency = 0.2,
+    twistRateMode = 'inverse',
+    occlusionMode = 'smooth',
+    minOcclusion = 0.0,
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    noise = 0,
+    seed = 0,
+    sampleRate = 0.5,
+    pathId = '',
+  } = options;
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return [];
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+
+    // Step 1: Sample path with twist phase accumulation
+    const centerlineWithPhase = samplePathWithTwist(
+      absolutePath,
+      totalLength,
+      envelopeFn,
+      pathId,
+      maxWidth,
+      minWidth,
+      twistFrequency,
+      twistRateMode,
+      sampleRate
+    );
+
+    if (centerlineWithPhase.length === 0) {
+      return [];
+    }
+
+    // Step 2: Generate stripe boundaries
+    const stripeBoundaries = generateStripeBoundaries(
+      centerlineWithPhase,
+      stripeCount,
+      occlusionMode,
+      minOcclusion
+    );
+
+    // Step 3: Fill each stripe
+    const paths = fillStripeBoundaries(
+      stripeBoundaries,
+      baseOffset,
+      noise,
+      seed
+    );
+
+    return paths;
+
+  } catch (error) {
+    console.warn('Failed to generate barber pole fill:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Sample path and accumulate twist phase
+ * @private
+ */
+function samplePathWithTwist(
+  absolutePath,
+  totalLength,
+  envelopeFn,
+  pathId,
+  maxWidth,
+  minWidth,
+  twistFrequency,
+  twistRateMode,
+  sampleRate
+) {
+  const sampleInterval = Math.min(sampleRate, totalLength / 100);
+  const numSamples = Math.min(500, Math.ceil(totalLength / sampleInterval));
+  const centerlineWithPhase = [];
+  let accumulatedTwist = 0;
+
+  for (let i = 0; i <= numSamples; i++) {
+    const t = i / numSamples;
+    const arcLength = t * totalLength;
+
+    const point = getPointAtLength(absolutePath, arcLength);
+    if (!point || isNaN(point.x) || isNaN(point.y)) continue;
+
+    // Calculate tangent
+    const delta = Math.min(0.1, totalLength * 0.01);
+    const t1 = Math.max(0, arcLength - delta);
+    const t2 = Math.min(totalLength, arcLength + delta);
+
+    const p1 = getPointAtLength(absolutePath, t1);
+    const p2 = getPointAtLength(absolutePath, t2);
+
+    if (!p1 || !p2) continue;
+
+    const tx = p2.x - p1.x;
+    const ty = p2.y - p1.y;
+    const tLen = Math.sqrt(tx * tx + ty * ty);
+
+    if (tLen === 0) continue;
+
+    // Unit normal (perpendicular to tangent)
+    const nx = -ty / tLen;
+    const ny = tx / tLen;
+
+    // Get envelope width at this position
+    const envelopeMultiplier = envelopeFn(pathId, t);
+    const localWidth = minWidth + envelopeMultiplier * (maxWidth - minWidth);
+
+    // Calculate local twist rate based on mode
+    let localTwistRate;
+    switch (twistRateMode) {
+      case 'constant':
+        localTwistRate = twistFrequency;
+        break;
+      case 'inverse':
+        // Faster twist when narrow, slower when wide
+        localTwistRate = twistFrequency * (maxWidth / Math.max(localWidth, 0.1));
+        break;
+      case 'proportional':
+        // Faster when wide, slower when narrow
+        localTwistRate = twistFrequency * (localWidth / maxWidth);
+        break;
+      default:
+        localTwistRate = twistFrequency;
+    }
+
+    // Integrate twist over step distance
+    if (i > 0) {
+      const prevArcLength = centerlineWithPhase[centerlineWithPhase.length - 1].arcLength;
+      const stepDistance = arcLength - prevArcLength;
+      accumulatedTwist += localTwistRate * stepDistance;
+    }
+
+    // Store sample with phase
+    centerlineWithPhase.push({
+      x: point.x,
+      y: point.y,
+      nx,
+      ny,
+      localWidth,
+      accumulatedTwist,
+      t,
+      arcLength
+    });
+  }
+
+  return centerlineWithPhase;
+}
+
+/**
+ * Calculate extension factor based on phase and occlusion mode
+ * @private
+ */
+function calculateExtension(phase, occlusionMode, minOcclusion) {
+  // Normalize phase to 0.0-1.0 range
+  const normalizedPhase = ((phase % 1.0) + 1.0) % 1.0;
+
+  switch (occlusionMode) {
+    case 'none':
+      return 1.0;
+
+    case 'smooth':
+      // Linear occlusion: full at front (0), minimum at back (0.5)
+      if (normalizedPhase < 0.5) {
+        // Front half: 1.0 -> minOcclusion
+        return 1.0 - (1.0 - minOcclusion) * (normalizedPhase * 2);
+      } else {
+        // Back half: minOcclusion -> 1.0
+        return minOcclusion + (1.0 - minOcclusion) * ((normalizedPhase - 0.5) * 2);
+      }
+
+    case 'hard':
+      // Sharp cutoff at quarter points
+      if (normalizedPhase < 0.25 || normalizedPhase > 0.75) {
+        return 1.0;
+      } else {
+        return minOcclusion;
+      }
+
+    default:
+      return 1.0;
+  }
+}
+
+/**
+ * Generate stripe boundaries for each lane
+ * @private
+ */
+function generateStripeBoundaries(centerlineWithPhase, stripeCount, occlusionMode, minOcclusion) {
+  const stripeBoundaries = [];
+
+  for (let lane = 0; lane < stripeCount; lane++) {
+    const laneOffset = lane / stripeCount;
+    const points = [];
+
+    for (const sample of centerlineWithPhase) {
+      // Calculate phase for this stripe
+      const phase = sample.accumulatedTwist + laneOffset;
+      const extension = calculateExtension(phase, occlusionMode, minOcclusion);
+
+      // Calculate how far this stripe extends from centerline
+      const maxExtension = sample.localWidth / 2;
+      const actualExtension = maxExtension * extension;
+
+      // For now, create a simple ribbon that extends symmetrically
+      // Each stripe occupies the full width but with varying extension
+      // Store centerline position with extension metadata
+      points.push({
+        x: sample.x,
+        y: sample.y,
+        nx: sample.nx,
+        ny: sample.ny,
+        extension: actualExtension,
+        phase: phase
+      });
+    }
+
+    stripeBoundaries.push({ lane, points });
+  }
+
+  return stripeBoundaries;
+}
+
+/**
+ * Fill stripe boundaries with parallel lines
+ * @private
+ */
+function fillStripeBoundaries(stripeBoundaries, baseOffset, noise, seed) {
+  const allPaths = [];
+
+  for (const stripe of stripeBoundaries) {
+    // For each stripe, create fill lines by offsetting perpendicular to path
+    // at regular intervals along the stripe
+
+    // Simple approach: create offset lines at each sample point
+    for (let i = 0; i < stripe.points.length - 1; i++) {
+      const p1 = stripe.points[i];
+      const p2 = stripe.points[i + 1];
+
+      // Only draw if stripe is visible (extension > 0)
+      if (p1.extension > 0.01 && p2.extension > 0.01) {
+        // Create a line segment on one side of the centerline
+        const line = `M ${p1.x + p1.nx * p1.extension} ${p1.y + p1.ny * p1.extension} L ${p2.x + p2.nx * p2.extension} ${p2.y + p2.ny * p2.extension}`;
+        allPaths.push(line);
+
+        // Also draw the other side
+        const line2 = `M ${p1.x - p1.nx * p1.extension} ${p1.y - p1.ny * p1.extension} L ${p2.x - p2.nx * p2.extension} ${p2.y - p2.ny * p2.extension}`;
+        allPaths.push(line2);
+      }
+    }
+  }
+
+  return allPaths;
+}
+
 export {
   measurePathLength,
   offsetPath,
@@ -1980,4 +2266,5 @@ export {
   generateCirclePath,
   generateFilledCircle,
   generateShapeFill,
+  generateBarberPoleFill,
 };

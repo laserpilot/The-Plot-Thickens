@@ -100,6 +100,14 @@ function buildCLICommand(config) {
     if (config.shapeSpacing !== undefined && config.shapeSpacing !== 1.0) parts.push(`--shape-spacing ${config.shapeSpacing}`);
     if (config.shapeMaxWidth !== undefined && config.shapeMaxWidth !== 3.0) parts.push(`--shape-max-width ${config.shapeMaxWidth}`);
     if (config.shapeMinWidth !== undefined && config.shapeMinWidth !== 0.0) parts.push(`--shape-min-width ${config.shapeMinWidth}`);
+  } else if (config.fillMode === 'barber-pole') {
+    if (config.stripeCount !== undefined && config.stripeCount !== 3) parts.push(`--stripe-count ${config.stripeCount}`);
+    if (config.twistFrequency !== undefined && config.twistFrequency !== 0.2) parts.push(`--twist-frequency ${config.twistFrequency}`);
+    if (config.twistRateMode && config.twistRateMode !== 'inverse') parts.push(`--twist-rate-mode ${config.twistRateMode}`);
+    if (config.occlusionMode && config.occlusionMode !== 'smooth') parts.push(`--occlusion-mode ${config.occlusionMode}`);
+    if (config.minOcclusion !== undefined && config.minOcclusion !== 0.0) parts.push(`--min-occlusion ${config.minOcclusion}`);
+    if (config.barberPoleMaxWidth !== undefined && config.barberPoleMaxWidth !== 3.0) parts.push(`--barber-pole-max-width ${config.barberPoleMaxWidth}`);
+    if (config.barberPoleMinWidth !== undefined && config.barberPoleMinWidth !== 0.0) parts.push(`--barber-pole-min-width ${config.barberPoleMinWidth}`);
   }
 
   parts.push(`--sample-rate ${config.sampleRate}`);
@@ -526,7 +534,15 @@ export function initUI(store, renderer) {
     shapeFillMode: document.getElementById('shape-fill-mode'),
     shapeSpacing: document.getElementById('shape-spacing'),
     shapeMaxWidth: document.getElementById('shape-max-width'),
-    shapeMinWidth: document.getElementById('shape-min-width')
+    shapeMinWidth: document.getElementById('shape-min-width'),
+    // Barber pole controls
+    stripeCount: document.getElementById('stripe-count'),
+    twistFrequency: document.getElementById('twist-frequency'),
+    twistRateMode: document.getElementById('twist-rate-mode'),
+    occlusionMode: document.getElementById('occlusion-mode'),
+    minOcclusion: document.getElementById('min-occlusion'),
+    barberPoleMaxWidth: document.getElementById('barber-pole-max-width'),
+    barberPoleMinWidth: document.getElementById('barber-pole-min-width')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -1019,6 +1035,7 @@ export function initUI(store, renderer) {
     const focusBlurControls = document.getElementById('mode-focus-blur-controls');
     const hatchGradientControls = document.getElementById('mode-hatch-gradient-controls');
     const shapeFillControls = document.getElementById('mode-shape-fill-controls');
+    const barberPoleControls = document.getElementById('mode-barber-pole-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
@@ -1027,6 +1044,7 @@ export function initUI(store, renderer) {
     focusBlurControls.style.display = 'none';
     hatchGradientControls.style.display = 'none';
     shapeFillControls.style.display = 'none';
+    barberPoleControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -1041,6 +1059,8 @@ export function initUI(store, renderer) {
       hatchGradientControls.style.display = 'block';
     } else if (mode === 'shape-fill') {
       shapeFillControls.style.display = 'block';
+    } else if (mode === 'barber-pole') {
+      barberPoleControls.style.display = 'block';
     }
   }
 

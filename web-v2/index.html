@@ -120,6 +120,7 @@
                       <option value="focus-blur">Focus Blur</option>
                       <option value="hatch-gradient">Hatch Gradient</option>
                       <option value="shape-fill">Shape Fill</option>
+                      <option value="barber-pole">Barber Pole</option>
                     </select>
                   </label>
 
@@ -450,6 +451,69 @@
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
                     <strong>Tip:</strong> Base Offset above controls spacing between concentric circles in filled mode. Use envelope presets (Effects section) to create tapered "bead" effects.
+                  </div>
+                </div>
+
+                <div id="mode-barber-pole-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Barber Pole Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates candy cane/barber pole spiral stripes with dynamic twist and occlusion effects for 3D cylindrical illusion. Stripe width and twist rate respond to envelope taper.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Stripe Count
+                      <input type="number" id="stripe-count" step="1" min="2" max="8" value="3" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Number of parallel spiral lanes (2-8)</div>
+                    </label>
+
+                    <label>
+                      Twist Frequency
+                      <input type="number" id="twist-frequency" step="0.05" min="0.05" max="1.0" value="0.2" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Rotations per mm (0.2 = 1 rotation per 5mm)</div>
+                    </label>
+
+                    <label>
+                      Twist Rate Mode
+                      <select id="twist-rate-mode">
+                        <option value="inverse">Inverse (tight when narrow, relaxed when wide)</option>
+                        <option value="constant">Constant (uniform spiral angle)</option>
+                        <option value="proportional">Proportional (relaxed when narrow, tight when wide)</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How twist responds to envelope width</div>
+                    </label>
+
+                    <label>
+                      Occlusion Mode
+                      <select id="occlusion-mode">
+                        <option value="smooth">Smooth (gradual stripe shortening)</option>
+                        <option value="hard">Hard (sharp visibility cutoff)</option>
+                        <option value="none">None (flat 2D spiral, no hiding)</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How stripes hide when "wrapping to back"</div>
+                    </label>
+
+                    <label id="min-occlusion-label">
+                      Min Extension
+                      <input type="number" id="min-occlusion" step="0.05" min="0" max="0.5" value="0.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum stripe length at back (0 = disappear, 0.5 = centerline only)</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="barber-pole-max-width" step="0.1" min="0.5" max="10" value="3.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum ribbon width at widest envelope point</div>
+                    </label>
+
+                    <label>
+                      Min Width (mm)
+                      <input type="number" id="barber-pole-min-width" step="0.1" min="0" max="5" value="0.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum ribbon width at narrowest envelope point</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Base Offset above controls spacing between fill lines within each stripe. Use envelope presets (Effects section) for dramatic breathing/flowing motion. Inverse twist mode with sinTaperBoth envelope creates the most dynamic effect.
                   </div>
                 </div>
 

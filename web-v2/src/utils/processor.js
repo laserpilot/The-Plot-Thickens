@@ -7,7 +7,8 @@ import {
   measurePathLength,
   lengthToWeight,
   getEnvelopePreset,
-  generateShapeFill
+  generateShapeFill,
+  generateBarberPoleFill
 } from '../../../shared/geometry/path-utils.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
@@ -201,6 +202,41 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           d: shapeData,
           originalIndex: i,
           shapeIndex,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
+    }
+
+    // Handle barber-pole mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'barber-pole') {
+      const barberPolePaths = generateBarberPoleFill(path.d, {
+        stripeCount: config.stripeCount !== undefined ? config.stripeCount : 3,
+        twistFrequency: config.twistFrequency !== undefined ? config.twistFrequency : 0.2,
+        twistRateMode: config.twistRateMode || 'inverse',
+        occlusionMode: config.occlusionMode || 'smooth',
+        minOcclusion: config.minOcclusion !== undefined ? config.minOcclusion : 0.0,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.barberPoleMaxWidth !== undefined ? config.barberPoleMaxWidth : 3.0,
+        minWidth: config.barberPoleMinWidth !== undefined ? config.barberPoleMinWidth : 0.0,
+        noise: config.noise || 0,
+        seed: null,
+        sampleRate: config.sampleRate || 0.5,
+        pathId: `path-${i}`
+      });
+
+      // Add each generated stripe path
+      barberPolePaths.forEach((stripeData, stripeIndex) => {
+        processed.push({
+          id: `${path.id || i}-stripe-${stripeIndex}`,
+          d: stripeData,
+          originalIndex: i,
+          stripeIndex,
           fill: 'none',
           stroke: 'black',
           strokeWidth: 0.1

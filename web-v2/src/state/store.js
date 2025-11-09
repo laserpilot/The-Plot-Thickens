@@ -128,6 +128,14 @@ const initialState = {
     shapeSpacing: 1.0,
     shapeMaxWidth: 3.0,
     shapeMinWidth: 0.0,
+    // Barber pole options
+    stripeCount: 3,
+    twistFrequency: 0.2,
+    twistRateMode: 'inverse',
+    occlusionMode: 'smooth',
+    minOcclusion: 0.0,
+    barberPoleMaxWidth: 3.0,
+    barberPoleMinWidth: 0.0,
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',
