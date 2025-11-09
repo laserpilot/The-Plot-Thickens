@@ -146,6 +146,7 @@ Feel free to annotate with owner initials or target dates.
 - Batch processing UI for multiple SVGs.
 - Plugin hooks for custom noise fields.
 - Batch "gallery" export mode: queue multiple fill configurations (optionally randomized) against a single SVG to explore unexpected outcomes.
+- **Directional/Orientation-Based Weighting**: Global directional field where path thickness responds to tangent direction (e.g., north-facing paths thin, south-facing thick). Similar to attractors but based on path orientation rather than position.
 
 Add or remove items as plans change.
 
@@ -907,3 +908,318 @@ Envelope:          [sinTaperBoth ▼]
 - User-defined twist rate function (not just constant/inverse/proportional)
 - Bezier curve editor for twist acceleration
 - Step functions for abrupt twist changes
+
+---
+
+### Parametric Envelope Taper System
+
+**Purpose**: Extend existing envelope presets with adjustable parameters to create custom taper shapes without needing a full curve editor. Enables asymmetric tapers (rocket-with-trail), plateaus, teardrops, and other variations beyond the fixed presets.
+
+**Design Goals**:
+- Start with familiar preset as foundation
+- Add intuitive adjustment parameters for common modifications
+- Support asymmetric tapers (different start vs end sharpness)
+- Enable "rocket with trail" effect and similar custom shapes
+- Maintain backward compatibility with existing presets
+- Keep UI simple - no curve editor complexity
+
+#### Scope & Compatibility
+
+**Works with**:
+- All existing envelope presets (flat, sinTaper, sinTaperBoth, linearTaper, etc.)
+- All fill modes (offset, crosshatch, barber-pole, shape-fill, etc.)
+- Length-based and attractor-based weighting
+
+**Behavior**:
+- When parameters are at default values: identical to base preset
+- Parameters provide incremental adjustments to preset shape
+- Backward compatible: existing configs without parameters work unchanged
+
+#### Parameters
+
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| `bulgePosition` | 0.0-1.0 | 0.5 | Where maximum width occurs (0=start, 0.5=center, 1=end) |
+| `startSharpness` | 0.1-3.0 | 1.0 | How aggressively start tapers (3.0=sharp point, 0.1=gentle, 1.0=preset default) |
+| `endSharpness` | 0.1-3.0 | 1.0 | How aggressively end tapers |
+| `minWidth` | 0.0-0.5 | 0.0 | Minimum width at tapered ends (0=point, 0.5=half width) |
+| `maxWidth` | 0.5-1.0 | 1.0 | Maximum width at bulge (caps the peak, 1.0=full width) |
+
+**Note**: All parameters default to "neutral" values that don't modify the base preset.
+
+#### Examples of Custom Shapes
+
+**Rocket with Trail** (sinTaperBoth base):
+```
+bulgePosition: 0.3      (bulge toward start - the rocket body)
+startSharpness: 0.8     (gentle start taper - nose cone)
+endSharpness: 2.5       (sharp end taper - exhaust trail)
+
+Visual:
+   ╱──●╲___
+  ╱     ╲___
+ ╱          ╲
+```
+
+**Teardrop** (sinTaper base):
+```
+bulgePosition: 0.8      (bulge near end)
+startSharpness: 3.0     (very sharp start - pointed tip)
+endSharpness: 0.3       (very gentle end - rounded base)
+
+Visual:
+    ╱──●
+   ╱╱   ╲
+  ╱      ╲
+ ╱        ╲
+```
+
+**Plateau** (any preset):
+```
+minWidth: 0.3           (don't taper to point, floor at 30%)
+maxWidth: 0.8           (don't reach full width, cap at 80%)
+
+Visual:
+  ___╱─●─╲___
+─────       ─────
+```
+
+**Asymmetric Bulge** (sinTaperBoth):
+```
+bulgePosition: 0.7      (bulge toward end)
+startSharpness: 1.5     (moderate start taper)
+endSharpness: 1.0       (normal end taper)
+
+Visual:
+     ╱───●╲
+    ╱      ╲
+   ╱        ╲
+  ╱          ╲
+```
+
+#### How It Works
+
+Transform base preset envelope function with adjustable parameters:
+
+```javascript
+function adjustedEnvelope(t, preset, params) {
+  // 1. Remap t to shift bulge position
+  // Maps input t (0-1) to shifted_t that moves the bulge
+  let shifted_t = remapForBulge(t, params.bulgePosition);
+
+  // 2. Get base preset value at shifted position
+  let base = presetFunctions[preset](shifted_t);
+
+  // 3. Apply sharpness curve (power function)
+  // Different curves for start vs end half
+  if (shifted_t < 0.5) {
+    // Start half: apply startSharpness
+    base = Math.pow(base, 1.0 / params.startSharpness);
+  } else {
+    // End half: apply endSharpness
+    base = Math.pow(base, 1.0 / params.endSharpness);
+  }
+
+  // 4. Remap to min/max range
+  // Scale output to stay within minWidth-maxWidth bounds
+  return lerp(params.minWidth, params.maxWidth, base);
+}
+
+// Bulge position remapping function
+function remapForBulge(t, bulgePos) {
+  // Shifts the curve so peak occurs at bulgePos instead of 0.5
+  if (bulgePos === 0.5) return t;  // no shift needed
+
+  if (t < bulgePos) {
+    // Before bulge: compress to first half
+    return (t / bulgePos) * 0.5;
+  } else {
+    // After bulge: compress to second half
+    return 0.5 + ((t - bulgePos) / (1.0 - bulgePos)) * 0.5;
+  }
+}
+```
+
+**Parameter Effects**:
+
+- **bulgePosition**: Shifts where the maximum width occurs along path
+- **startSharpness**:
+  - > 1.0: sharper taper (exponential falloff)
+  - = 1.0: preset default
+  - < 1.0: gentler taper (slower falloff)
+- **endSharpness**: Same as startSharpness but for end
+- **minWidth**: Prevents tapering below this fraction (creates plateau at narrow ends)
+- **maxWidth**: Prevents bulge exceeding this fraction (creates plateau at wide sections)
+
+#### CLI Examples
+
+```bash
+# Rocket with trail
+node process-svg.js input.svg output.svg \
+  --envelope sinTaperBoth \
+  --bulge-position 0.3 \
+  --start-sharpness 0.8 \
+  --end-sharpness 2.5
+
+# Teardrop shape
+node process-svg.js input.svg output.svg \
+  --envelope sinTaper \
+  --bulge-position 0.8 \
+  --start-sharpness 3.0 \
+  --end-sharpness 0.3
+
+# Plateau (limited range)
+node process-svg.js input.svg output.svg \
+  --envelope flat \
+  --min-width 0.3 \
+  --max-width 0.8
+
+# Asymmetric bulge with gentle start
+node process-svg.js input.svg output.svg \
+  --envelope sinTaperBoth \
+  --bulge-position 0.65 \
+  --start-sharpness 0.6 \
+  --end-sharpness 1.2
+
+# Sharp both ends, limited peak
+node process-svg.js input.svg output.svg \
+  --envelope sinTaperBoth \
+  --start-sharpness 2.0 \
+  --end-sharpness 2.0 \
+  --max-width 0.7
+```
+
+#### Web UI Integration
+
+**Location**: Fills tab, Envelope section (below preset selector)
+
+**UI Structure**:
+```
+Envelope Preset: [sinTaperBoth ▼]
+
+[ ] Customize Envelope
+
+(When checked, reveals parameter controls:)
+
+  Bulge Position:  [0.5] ────────────── 0.0-1.0
+                   (0=start, 0.5=center, 1=end)
+
+  Start Sharpness: [1.0] ────────────── 0.1-3.0
+                   (Taper curve at path start)
+
+  End Sharpness:   [1.0] ────────────── 0.1-3.0
+                   (Taper curve at path end)
+
+  Min Width:       [0.0] ────────────── 0.0-0.5
+                   (Floor at narrow ends)
+
+  Max Width:       [1.0] ────────────── 0.5-1.0
+                   (Cap at bulge)
+
+  [Live Envelope Preview]
+  (Small graph showing resulting envelope curve shape)
+```
+
+**Behavior**:
+- Checkbox defaults to unchecked
+- When unchecked: use preset as-is (current behavior, backward compatible)
+- When checked: reveal parameter sliders with defaults that don't modify preset
+- All sliders start at neutral values (bulge=0.5, sharpness=1.0, min=0, max=1)
+- Live preview graph updates in real-time showing the resulting envelope curve
+- Preview shows both base preset (faint) and adjusted curve (solid) for comparison
+
+**Preview Visualization**:
+- Small inline graph (100px × 30px)
+- X-axis: position along path (0 to 1)
+- Y-axis: width (min to max)
+- Shows curve shape visually
+- Updates immediately as sliders move
+
+#### Implementation Notes
+
+**Preset Compatibility**:
+- Works with all existing presets (flat, sinTaper, sinTaperBoth, linearTaper, easeInOut, etc.)
+- Some presets may not respond to all parameters (e.g., `flat` ignores sharpness)
+- Parameters always applied in same order: bulge shift → base preset → sharpness → min/max clamp
+
+**Bulge Remapping**:
+- Shifts the normalized position `t` so preset's natural bulge (usually at 0.5) moves to `bulgePosition`
+- Uses piecewise linear compression of t ranges
+- Maintains smooth transitions
+
+**Sharpness Calculation**:
+- Uses power curve: `output = input^(1/sharpness)`
+- Sharpness > 1.0: steeper curve (sharp taper)
+- Sharpness < 1.0: gentler curve (gradual taper)
+- Applied separately to start/end halves of curve
+
+**Edge Cases**:
+- `bulgePosition = 0.0` or `1.0`: extreme bulge at path ends (valid but unusual)
+- `minWidth = maxWidth`: completely flat envelope (valid edge case)
+- `startSharpness` or `endSharpness` very high (>10): numerical precision issues, clamp to 3.0 max
+- Very low sharpness (<0.1): nearly flat taper, clamp to minimum 0.1
+
+**Performance**:
+- Negligible overhead vs base preset evaluation
+- Four additional arithmetic operations per sample point
+- No need for optimization
+
+#### Testing & Validation
+
+**Unit Tests**:
+- [ ] Neutral parameters produce identical output to base preset
+- [ ] bulgePosition correctly shifts peak location
+- [ ] startSharpness/endSharpness produce expected power curves
+- [ ] minWidth/maxWidth clamp correctly
+- [ ] Edge cases: extreme parameter values don't crash
+- [ ] All presets work with parametric adjustments
+
+**Visual Tests**:
+- [ ] Rocket-with-trail shape reads clearly at 2-3mm scale
+- [ ] Teardrop shape produces expected asymmetry
+- [ ] Plateau creates visible flat sections
+- [ ] Preview graph accurately represents resulting curve
+- [ ] Parameters feel intuitive (slider movement = expected visual change)
+
+**Regression Tests**:
+- [ ] Existing configs without parameters work unchanged
+- [ ] Base presets unmodified when parameters at defaults
+- [ ] CLI backward compatibility maintained
+- [ ] Fill modes work correctly with custom envelopes
+
+**Integration Tests**:
+- [ ] Works with all fill modes (offset, barber-pole, shape-fill, crosshatch)
+- [ ] Combines correctly with attractor weighting
+- [ ] Combines correctly with length-based weighting
+- [ ] Preview updates smoothly when parameters change
+
+#### Use Cases
+
+- **Asymmetric emphasis**: Rocket-with-trail for directional flow or motion
+- **Organic variation**: Teardrops, bulges, custom organic shapes
+- **Controlled bounds**: Plateau effect keeps widths within specific range
+- **Subtle refinement**: Tweak existing presets slightly for perfect look
+- **Experimental shapes**: Explore parameter space to discover new aesthetics
+- **Artistic control**: Fine-tune envelope to match specific artistic vision
+
+#### Future Enhancements
+
+**Additional parameters** (Phase 5+):
+- `curvature`: Controls smoothness of transitions (linear vs curved)
+- `asymmetry`: Single param that adjusts start/end sharpness inversely
+- `wobble`: Add subtle noise/variation to envelope (organic irregularity)
+
+**Preset variations**:
+- Save custom parameter combinations as named variations
+- "Rocket", "Teardrop", "Plateau" as quick-select presets
+- Share/export custom envelope configs
+
+**Visual editor** (advanced):
+- Click-and-drag bulge position directly on preview graph
+- Visual sharpness handles (adjust curve by dragging)
+- Still backed by parameters (not freeform curve)
+
+**Per-path overrides**:
+- Different envelope parameters for different paths
+- Could integrate with attractor system (attractors influence parameters)
+- Path-specific artistic control
