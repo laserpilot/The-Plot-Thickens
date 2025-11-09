@@ -45,32 +45,62 @@ export function parseSVG(svgText) {
   };
 }
 
+/**
+ * Parse SVG unit value and convert to millimeters
+ */
+function parseUnit(value) {
+  if (!value) return null;
+
+  const match = String(value).match(/^([-+]?[0-9]*\.?[0-9]+)\s*(px|pt|pc|mm|cm|in)?$/);
+  if (!match) return parseFloat(value);
+
+  const num = parseFloat(match[1]);
+  const unit = match[2] || '';
+
+  // Convert all units to mm (per CSS3/SVG spec)
+  switch (unit) {
+    case 'mm': return num;
+    case 'cm': return num * 10;
+    case 'in': return num * 25.4;
+    case 'pt': return num * 25.4 / 72;
+    case 'pc': return num * 25.4 / 6;
+    case 'px': return num * 25.4 / 96;  // CSS px at 96 DPI
+    case '': return num;  // Unitless - assume user units
+    default: return num;
+  }
+}
+
 function extractBounds(svgEl) {
   const viewBox = svgEl.getAttribute('viewBox');
+  const widthAttr = svgEl.getAttribute('width');
+  const heightAttr = svgEl.getAttribute('height');
 
+  // Parse viewBox for coordinate system (if present)
+  let vb = null;
   if (viewBox) {
-    const [x, y, width, height] = viewBox.split(/\s+/).map(parseFloat);
-    return {
-      x,
-      y,
-      width,
-      height,
-      cx: x + width / 2,
-      cy: y + height / 2
-    };
+    const [x, y, w, h] = viewBox.split(/\s+/).map(parseFloat);
+    vb = { x, y, width: w, height: h };
   }
 
-  // Fallback to width/height attributes
-  const width = parseFloat(svgEl.getAttribute('width')) || 100;
-  const height = parseFloat(svgEl.getAttribute('height')) || 100;
+  // Parse physical dimensions from width/height attributes (prioritize these!)
+  let width = widthAttr ? parseUnit(widthAttr) : null;
+  let height = heightAttr ? parseUnit(heightAttr) : null;
+
+  // If width/height attributes are missing or unitless, fall back to viewBox dimensions
+  if (width === null && vb) width = vb.width;
+  if (height === null && vb) height = vb.height;
+
+  // Final fallback to defaults
+  width = width || 100;
+  height = height || 100;
 
   return {
-    x: 0,
-    y: 0,
+    x: vb ? vb.x : 0,
+    y: vb ? vb.y : 0,
     width,
     height,
-    cx: width / 2,
-    cy: height / 2
+    cx: (vb ? vb.x : 0) + width / 2,
+    cy: (vb ? vb.y : 0) + height / 2
   };
 }
 
