@@ -105,10 +105,11 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [x] Port focus blur controls + preview canvas (consider worker).
 - [x] Reintroduce crosshatch/striped/gradient modes via shared modules.
 - [x] Add Noise Gradient fill effect (per-path fuzzy→crisp or crisp→fuzzy transitions).
-- [ ] Add Shape Fill mode (filled/hollow circles arranged like "peas in pod").
+- [x] Add Shape Fill mode (filled/hollow circles arranged like "peas in pod").
+- [x] Add Dynamic Barber Pole effect (envelope-responsive twist with occlusion).
 - [ ] Add Custom Envelope Taper controls (beyond existing presets).
-- [ ] Restore calibration / diagnostic panels selectively.
-- [ ] Add config import/export for presets.
+- [x] Restore calibration / diagnostic panels selectively.
+- [x] Add config import/export for presets.
 
 ### Phase 5 – Polish & Cleanup
 - [ ] Remove redundant legacy files once parity verified.
@@ -578,3 +579,331 @@ Envelope:         [sinTaperBoth ▼]
 - Combine with attractor weighting (filled vs hollow based on influence)
 - Vary shape type along path (circles → triangles transition)
 - Rotation/orientation controls (align with path or independent angle)
+
+---
+
+### Dynamic Barber Pole Effect
+
+**Purpose**: Create candy cane/barber pole spiral stripes that respond organically to path envelope, with stripe width and twist rate varying dynamically. Includes occlusion effect (stripes shorten/disappear when "wrapping to back") to create convincing 3D helical appearance in 2D.
+
+**Design Goals**:
+- Stripe width scales with envelope width (wide stripes in wide sections, thin in narrow)
+- Twist rate inversely proportional to envelope width (tight spiral when narrow, relaxed when wide)
+- Stripe occlusion creates illusion of wrapping around cylindrical form
+- Natural flowing motion quality - not stiff/geometric
+- Works at 2-3mm scale with readable stripe definition
+
+#### Scope & Compatibility
+
+**Works with**:
+- All envelope types (flat, sinTaper, sinTaperBoth, etc.)
+- Length-based and attractor-based weighting
+- Existing offset/noise parameters
+
+**Replaces**:
+- Current spiral/twisted fill mode (which lacks proper occlusion)
+
+**Independent of**:
+- Other fill modes (offset, crosshatch, stipple, shape-fill)
+- Focus-Blur and Light-Based effects
+
+**Future expansion**:
+- Variable twist rate modes (constant, inverse, custom curve)
+- Irregular stripe spacing (breaks perfect geometric division)
+- Organic stripe edge variation (wiggle, undulate)
+- Multiple twist directions (clockwise/counterclockwise mixing)
+
+#### Parameters
+
+| Parameter | Type | Range | Default | Description |
+|-----------|------|-------|---------|-------------|
+| `fillMode` | enum | `barber-pole` | - | Enable barber pole spiral mode |
+| `twistFrequency` | float | 0.05-1.0 | 0.2 | Base rotations per mm (0.2 = 1 rotation per 5mm) |
+| `twistRateMode` | enum | `constant`, `inverse`, `proportional` | `inverse` | How twist rate responds to envelope width |
+| `stripeCount` | int | 2-8 | 3 | Number of parallel spiral stripe lanes |
+| `occlusionMode` | enum | `none`, `smooth`, `hard` | `smooth` | How aggressively stripes shorten at back |
+| `minOcclusion` | float | 0.0-0.5 | 0.0 | Minimum stripe extension at "back" (0 = disappear, 0.5 = centerline only) |
+
+**Reuses existing parameters**:
+- `baseOffset` - Spacing between stripe fill lines (within each stripe)
+- `envelope` - All envelope presets determine width variation
+- `noise` - Optional organic variation in stripe edges
+
+#### Twist Rate Modes
+
+**Constant** (`twistRateMode = constant`):
+- Twist rate stays constant regardless of envelope width
+- Consistent spiral angle everywhere
+- Less dynamic but predictable
+
+**Inverse** (`twistRateMode = inverse`) - **Recommended default**:
+- Twist rate inversely proportional to envelope width
+- Wide sections: slow, relaxed spiral
+- Narrow sections: fast, tight spiral
+- Creates natural breathing motion
+
+**Proportional** (`twistRateMode = proportional`):
+- Twist rate proportional to envelope width
+- Wide sections: fast spiral
+- Narrow sections: slow spiral
+- Opposite feel from inverse
+
+#### How It Works
+
+**1. Stripe Lane Definition**:
+- Divide ribbon width into N equal lanes (N = `stripeCount`)
+- Each lane gets a phase offset: `lane_offset = lane_index / stripeCount`
+- Example with 3 stripes: offsets = 0.0, 0.33, 0.67
+
+**2. Twist Rate Calculation** (at position `t` along path):
+- Get local envelope width: `w = envelope(t) × maxWidth`
+- Calculate local twist rate:
+  - `constant`: `rate = twistFrequency`
+  - `inverse`: `rate = twistFrequency × (maxWidth / w)` (faster when narrow)
+  - `proportional`: `rate = twistFrequency × (w / maxWidth)` (faster when wide)
+
+**3. Phase Accumulation** (walking along path):
+- Integrate twist rate to get accumulated rotation angle
+- At each sample point:
+  ```
+  accumulatedTwist += localTwistRate × stepDistance
+  phase[lane] = (accumulatedTwist + laneOffset) % 1.0
+  ```
+- Phase 0.0 = front-facing, 0.5 = back-facing, 1.0 = wraps to front again
+
+**4. Stripe Width**:
+- `stripeWidth = envelopeWidth / stripeCount`
+- Example: 1.5mm envelope, 3 stripes → 0.5mm per stripe
+- Example: 0.5mm envelope, 3 stripes → 0.17mm per stripe
+- Proportions stay consistent as envelope varies
+
+**5. Occlusion/Shortening** (for each stripe at each position):
+- Based on phase (0.0-1.0):
+  ```
+  if occlusionMode == 'none':
+    extension = 1.0  // always full width
+
+  else if occlusionMode == 'smooth':
+    if phase < 0.5:  // front half
+      extension = lerp(1.0, minOcclusion, phase * 2)
+    else:  // back half
+      extension = lerp(minOcclusion, 1.0, (phase - 0.5) * 2)
+
+  else if occlusionMode == 'hard':
+    extension = (phase < 0.25 || phase > 0.75) ? 1.0 : minOcclusion
+  ```
+- Stripe extends from centerline by: `extension × (envelopeWidth / 2)`
+- At extension = 0.0: stripe disappears (at back)
+- At extension = 0.5: stripe reaches centerline only
+- At extension = 1.0: stripe reaches full width (at front)
+
+**6. Stripe Fill Generation**:
+- For each stripe lane, at each position:
+  - Calculate stripe boundaries based on extension
+  - Fill stripe region with parallel lines at `baseOffset` spacing
+  - Lines run perpendicular to path direction (not spiraling)
+  - Only the stripe boundaries spiral, fills are straight across
+
+#### Visual Effect at 3mm sinTaperBoth Path
+
+**Configuration**: `twistFrequency = 0.3`, `stripeCount = 3`, `twistRateMode = inverse`, `occlusionMode = smooth`
+
+Position | Envelope | Stripe | Twist | Stripe A | Stripe B | Stripe C
+---------|----------|--------|-------|----------|----------|----------
+Start (narrow) | 0.5mm | 0.17mm | Fast (3x) | `\|---●---\|` full front | ` ● ` back (hidden) | `\|--●--\|` quarter
+Middle (wide) | 1.5mm | 0.5mm | Slow (1x) | `\|-------●-------\|` full | `\|----●----\|` 3/4 | ` ● ` back
+End (narrow) | 0.5mm | 0.17mm | Fast (3x) | ` ● ` back | `\|---●---\|` full front | `\|--●--\|` quarter
+
+**Result**: Stripes appear to spiral around the ribbon, widening and slowing in the middle, tightening and accelerating at the ends. Creates flowing, breathing barber pole with sense of 3D form.
+
+#### Implementation Notes
+
+**Path Sampling**:
+- Sample path at regular intervals (based on `baseOffset` or fixed 0.5mm)
+- At each sample: calculate position, tangent, normal, envelope width
+- Track accumulated twist angle as you walk
+
+**Twist Integration**:
+- Need to integrate twist rate along path (not just multiply by distance)
+- For tapered paths, twist rate changes at each step
+- Accumulate: `totalTwist += twistRate(t) × dt`
+
+**Stripe Boundary Calculation**:
+- For each lane at each sample point:
+  - Calculate phase from accumulated twist + lane offset
+  - Calculate extension from occlusion curve
+  - Calculate perpendicular offset from centerline
+  - Generate stripe boundaries as offset curves
+
+**Fill Strategy**:
+- Option A: Fill entire ribbon with offset passes, assign stripe identity per pass
+- Option B: Generate separate stripe geometries, fill each independently
+- Option B likely cleaner (separate path groups per stripe color in output)
+
+**Edge Cases**:
+- Very narrow sections (< stripeCount × baseOffset): stripes may overlap
+- Very fast twist (tight spiral): may need minimum sample density
+- Path shorter than one twist period: partial spiral only
+
+**Performance**:
+- More expensive than simple offset fills (phase calculation per sample)
+- Consider caching envelope evaluations
+- Preview mode could use coarser sampling
+
+#### CLI Examples
+
+```bash
+# Classic 3-stripe barber pole with inverse twist
+node process-svg.js input.svg output.svg \
+  --fill-mode barber-pole \
+  --stripe-count 3 \
+  --twist-frequency 0.2 \
+  --twist-rate-mode inverse \
+  --occlusion-mode smooth
+
+# Tight candy cane spiral (5 stripes, fast twist)
+node process-svg.js input.svg output.svg \
+  --fill-mode barber-pole \
+  --stripe-count 5 \
+  --twist-frequency 0.4 \
+  --offset 0.15
+
+# Gentle flowing spiral with tapered envelope
+node process-svg.js input.svg output.svg \
+  --fill-mode barber-pole \
+  --envelope sinTaperBoth \
+  --stripe-count 3 \
+  --twist-frequency 0.15 \
+  --twist-rate-mode inverse
+
+# Hard occlusion (stripes pop in/out sharply)
+node process-svg.js input.svg output.svg \
+  --fill-mode barber-pole \
+  --stripe-count 4 \
+  --occlusion-mode hard \
+  --min-occlusion 0.2
+
+# No occlusion (flat 2D spiral, no hiding)
+node process-svg.js input.svg output.svg \
+  --fill-mode barber-pole \
+  --stripe-count 3 \
+  --occlusion-mode none
+```
+
+#### Web UI Integration
+
+**Location**: Fills tab, new section when Barber Pole mode selected
+
+**UI Structure**:
+```
+Fill Mode: [Barber Pole ▼]
+
+Barber Pole Controls
+  Stripe Count:    [3] ────────────── 2-8
+                   (Number of spiral lanes)
+
+  Twist Frequency: [0.2] ──────────── 0.05-1.0
+                   (Rotations per mm)
+
+  Twist Rate Mode: [Inverse ▼]
+                   Options: Constant | Inverse | Proportional
+                   (How twist responds to taper)
+
+  Occlusion:       [Smooth ▼]
+                   Options: None | Smooth | Hard
+                   (Stripe hiding at back)
+
+  Min Extension:   [0.0] ──────────── 0.0-0.5
+                   (Minimum stripe length at back)
+                   (Only shown when Occlusion ≠ None)
+
+  Fill Density:    [0.25mm] ─────────── 0.1-0.5mm
+                   (Spacing within stripes)
+
+Envelope:          [sinTaperBoth ▼]
+                   (All existing envelope presets)
+```
+
+**Visual Aids**:
+- Mini preview showing stripe spiral pattern
+- Twist rate diagram (how fast/slow spiral changes with taper)
+- Occlusion curve visualization
+
+#### Testing & Validation
+
+**Unit Tests**:
+- [ ] Twist accumulation integrates correctly along path
+- [ ] Phase calculation produces correct 0.0-1.0 cycle
+- [ ] Inverse twist rate correctly speeds up when narrow
+- [ ] Occlusion curves produce expected extension values
+- [ ] Stripe width scales proportionally with envelope
+
+**Visual Tests**:
+- [ ] Stripes appear to spiral around ribbon convincingly
+- [ ] Occlusion creates 3D cylindrical illusion at 2-3mm scale
+- [ ] Inverse twist mode creates breathing/flowing motion
+- [ ] Stripe widths stay proportional to envelope width
+- [ ] Works with all envelope presets (flat, sinTaper, easeInOut, etc.)
+- [ ] Hard occlusion vs smooth shows distinct visual character
+
+**Regression Tests**:
+- [ ] Other fill modes unaffected
+- [ ] Existing spiral/twisted mode can be deprecated after validation
+- [ ] CLI backward compatibility maintained
+
+**Performance Tests**:
+- [ ] Large files with many paths process efficiently
+- [ ] Twist integration doesn't bottleneck on long paths
+- [ ] Preview renders smoothly (consider coarser sampling)
+
+#### Use Cases
+
+- **Dynamic motion**: Breathing, flowing spiral creates sense of energy
+- **3D illusion**: Occlusion effect suggests cylindrical form
+- **Decorative patterns**: Candy cane, barber pole, twisted rope aesthetics
+- **Organic variation**: Envelope-responsive behavior avoids mechanical stiffness
+- **Scale adaptation**: Tight spirals on thin paths, relaxed on thick paths
+- **Visual rhythm**: Twist rate variation creates musical, pulsing quality
+
+#### Comparison to Existing Spiral Mode
+
+**Current spiral/twisted mode** (broken):
+- Stripes don't hide/shorten when wrapping
+- Looks flat, lacks 3D illusion
+- No envelope responsiveness
+- Geometric, stiff appearance
+
+**New dynamic barber pole**:
+- Occlusion creates convincing wrap effect
+- Twist rate and stripe width respond to taper
+- Natural flowing motion quality
+- Works correctly at small plotter scale
+
+**Migration**: Mark old spiral mode as deprecated, suggest barber-pole with `occlusionMode = none` for similar flat effect.
+
+#### Future Enhancements
+
+**Variable stripe spacing** (Phase 5+):
+- Irregular lane widths (e.g., thin-thick-thin pattern)
+- Random jitter in stripe positions
+- Breaks perfect geometric division
+
+**Organic stripe edges**:
+- Wiggle/undulate stripe boundaries
+- Noise modulation along stripe edges
+- Hand-drawn, painterly quality
+
+**Multi-directional twists**:
+- Some stripes spiral clockwise, others counterclockwise
+- Creates chevron or herringbone patterns
+- Mix of twist frequencies per stripe
+
+**Attractor integration**:
+- Twist frequency influenced by attractors
+- Stripe visibility (filled vs outline) based on influence
+- Local twist direction changes
+
+**Custom twist curves**:
+- User-defined twist rate function (not just constant/inverse/proportional)
+- Bezier curve editor for twist acceleration
+- Step functions for abrupt twist changes
