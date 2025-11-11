@@ -2394,57 +2394,68 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Generate perpendicular stripe bands
-    // Concept: at each sample point, check if a stripe is "visible" (facing forward)
-    // If visible, create perpendicular segments crossing the path
-    // Group consecutive visible points into filled band regions
+    // Generate diagonal stripe bands with curved boundaries
+    // Concept: Stripe edges are at specific angular positions on the cylinder
+    // As the cylinder rotates, these edges create diagonal/helical curves
+    // We track both edges of each stripe and fill the region between them
 
-    const bandPaths = [];
-    let currentBand = [];
+    const stripePaths = [];
 
-    for (let i = 0; i < centerlineWithPhase.length; i++) {
-      const centerPoint = centerlineWithPhase[i];
+    // Generate stripes by tracking boundary curves
+    for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
+      // Each stripe has two edges (start and end)
+      const stripeStartPhase = (stripeIdx / stripeCount) * 2 * Math.PI;
+      const stripeEndPhase = ((stripeIdx + 0.5) / stripeCount) * 2 * Math.PI; // Half-width stripe, half-width gap
 
-      // Check if ANY stripe is visible at this phase
-      const visibility = getStripeVisibility(centerPoint.accumulatedTwist, stripeCount, edgeSoftness);
+      // Track points along both edges of this stripe
+      const startEdge = [];
+      const endEdge = [];
 
-      if (visibility > 0.01) {
-        // Stripe is visible - add perpendicular segment to current band
+      for (let i = 0; i < centerlineWithPhase.length; i++) {
+        const centerPoint = centerlineWithPhase[i];
+        const phase = centerPoint.accumulatedTwist % (2 * Math.PI);
         const halfWidth = centerPoint.localWidth / 2;
 
-        // Calculate perpendicular endpoints
-        const p1 = {
-          x: centerPoint.x - centerPoint.nx * halfWidth,
-          y: centerPoint.y - centerPoint.ny * halfWidth
-        };
+        // Calculate where this stripe's edges are relative to current phase
+        // The stripe rotates around the cylinder, we see it when it's facing forward
 
-        const p2 = {
-          x: centerPoint.x + centerPoint.nx * halfWidth,
-          y: centerPoint.y + centerPoint.ny * halfWidth
-        };
+        // Start edge of stripe
+        const startPhaseDiff = normalizeAngle(phase - stripeStartPhase);
+        if (startPhaseDiff < Math.PI) { // Visible on front half
+          const angleOffset = startPhaseDiff - Math.PI / 2; // -π/2 to π/2 when visible
+          const lateralOffset = Math.sin(angleOffset) * halfWidth;
 
-        currentBand.push({ p1, p2, visibility });
-      } else {
-        // Gap - emit current band if any
-        if (currentBand.length > 0) {
-          const bandPath = createStripeBand(currentBand);
-          if (bandPath) {
-            bandPaths.push(bandPath);
-          }
-          currentBand = [];
+          startEdge.push({
+            x: centerPoint.x + centerPoint.nx * lateralOffset,
+            y: centerPoint.y + centerPoint.ny * lateralOffset,
+            visible: Math.cos(angleOffset) // Fade based on viewing angle
+          });
+        }
+
+        // End edge of stripe
+        const endPhaseDiff = normalizeAngle(phase - stripeEndPhase);
+        if (endPhaseDiff < Math.PI) { // Visible on front half
+          const angleOffset = endPhaseDiff - Math.PI / 2;
+          const lateralOffset = Math.sin(angleOffset) * halfWidth;
+
+          endEdge.push({
+            x: centerPoint.x + centerPoint.nx * lateralOffset,
+            y: centerPoint.y + centerPoint.ny * lateralOffset,
+            visible: Math.cos(angleOffset)
+          });
+        }
+      }
+
+      // Create filled stripe region between the two edges
+      if (startEdge.length > 2 && endEdge.length > 2) {
+        const stripePath = createStripeBandFromEdges(startEdge, endEdge);
+        if (stripePath) {
+          stripePaths.push(stripePath);
         }
       }
     }
 
-    // Emit final band
-    if (currentBand.length > 0) {
-      const bandPath = createStripeBand(currentBand);
-      if (bandPath) {
-        bandPaths.push(bandPath);
-      }
-    }
-
-    return bandPaths;
+    return stripePaths;
 
   } catch (error) {
     console.warn('Failed to generate smooth barber pole fill:', error.message);
@@ -2453,68 +2464,42 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 }
 
 /**
- * Calculate stripe visibility at a given phase
- * Returns 0-1 visibility value based on stripe regions
+ * Normalize angle to 0-2π range
  * @private
  */
-function getStripeVisibility(phase, stripeCount, edgeSoftness) {
-  // Normalize phase to 0-2π
-  const normalizedPhase = phase % (2 * Math.PI);
-
-  // Divide full rotation into stripe regions
-  const regionSize = (2 * Math.PI) / stripeCount;
-  const regionIndex = Math.floor(normalizedPhase / regionSize);
-
-  // Only show every other stripe (alternating filled/empty)
-  if (regionIndex % 2 !== 0) {
-    return 0; // Gap region
-  }
-
-  // Position within this stripe region (0-1)
-  const regionPhase = (normalizedPhase % regionSize) / regionSize;
-
-  // Apply smooth edges with sigmoid
-  let visibility = 1.0;
-
-  if (edgeSoftness > 0) {
-    if (regionPhase < edgeSoftness) {
-      // Smooth fade-in at start of stripe
-      visibility = smoothstep(0, edgeSoftness, regionPhase);
-    } else if (regionPhase > 1 - edgeSoftness) {
-      // Smooth fade-out at end of stripe
-      visibility = smoothstep(1, 1 - edgeSoftness, regionPhase);
-    }
-  }
-
-  return visibility;
+function normalizeAngle(angle) {
+  const twoPi = 2 * Math.PI;
+  return ((angle % twoPi) + twoPi) % twoPi;
 }
 
 /**
- * Create a filled band path from perpendicular segments
+ * Create a filled stripe region from two edge curves
  * @private
  */
-function createStripeBand(band) {
-  if (band.length < 2) {
+function createStripeBandFromEdges(startEdge, endEdge) {
+  if (startEdge.length < 2 || endEdge.length < 2) {
     return null;
   }
 
   // Create a filled polygon by connecting:
-  // - Top edge: all p1 points from start to end
-  // - Bottom edge: all p2 points from end to start
+  // - Start edge: all points from first to last
+  // - End edge: all points from last to first (reversed)
 
-  let pathData = `M ${band[0].p1.x.toFixed(3)},${band[0].p1.y.toFixed(3)}`;
+  let pathData = `M ${startEdge[0].x.toFixed(3)},${startEdge[0].y.toFixed(3)}`;
 
-  // Top edge
-  for (let i = 1; i < band.length; i++) {
-    pathData += ` L ${band[i].p1.x.toFixed(3)},${band[i].p1.y.toFixed(3)}`;
+  // Start edge forward
+  for (let i = 1; i < startEdge.length; i++) {
+    pathData += ` L ${startEdge[i].x.toFixed(3)},${startEdge[i].y.toFixed(3)}`;
   }
 
-  // Connect to bottom edge at the end
-  pathData += ` L ${band[band.length - 1].p2.x.toFixed(3)},${band[band.length - 1].p2.y.toFixed(3)}`;
+  // Connect to end edge
+  if (endEdge.length > 0) {
+    pathData += ` L ${endEdge[endEdge.length - 1].x.toFixed(3)},${endEdge[endEdge.length - 1].y.toFixed(3)}`;
+  }
 
-  // Bottom edge in reverse
-  for (let i = band.length - 2; i >= 0; i--) {
-    pathData += ` L ${band[i].p2.x.toFixed(3)},${band[i].p2.y.toFixed(3)}`;
+  // End edge backward
+  for (let i = endEdge.length - 2; i >= 0; i--) {
+    pathData += ` L ${endEdge[i].x.toFixed(3)},${endEdge[i].y.toFixed(3)}`;
   }
 
   // Close path
