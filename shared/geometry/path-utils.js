@@ -2333,22 +2333,23 @@ function fillStripeBoundaries(stripeBoundaries, baseOffset, noise, seed) {
 }
 
 /**
- * Generate smooth sigmoid barber pole fill
- * Creates continuous flowing stripe curves that spiral around the path
+ * Generate smooth barber pole fill with perpendicular stripes
+ * Creates stripe bands that cross perpendicular to the path, like painted rings around a cylinder
+ * As you move along the path, the "cylinder" rotates, creating alternating stripe-gap-stripe pattern
  * @param {string} pathData - SVG path data string
  * @param {Object} options - Configuration options
- * @param {number} options.stripeCount - Number of stripes (default: 3)
- * @param {number} options.twistFrequency - Twist rate (default: 0.2)
+ * @param {number} options.stripeCount - Number of stripe regions around the virtual cylinder (default: 3)
+ * @param {number} options.twistFrequency - Rotation rate of the cylinder (default: 0.2)
  * @param {string} options.twistRateMode - 'constant', 'inverse', or 'proportional' (default: 'inverse')
- * @param {string} options.occlusionMode - 'none', 'hard', or 'smooth' (default: 'smooth')
+ * @param {string} options.occlusionMode - Not used in perpendicular mode (reserved for future)
  * @param {number} options.edgeSoftness - Stripe edge smoothness 0-1 (default: 0.15)
- * @param {number} options.baseOffset - Base offset distance in mm (default: 0.25)
- * @param {string} options.envelope - Envelope preset name (default: 'flat')
- * @param {number} options.maxWidth - Maximum envelope width in mm (default: 3.0)
- * @param {number} options.minWidth - Minimum envelope width in mm (default: 0.0)
+ * @param {number} options.baseOffset - Not used in perpendicular mode (reserved for future)
+ * @param {string} options.envelope - Envelope preset name to control path width (default: 'flat')
+ * @param {number} options.maxWidth - Maximum path width in mm (default: 3.0)
+ * @param {number} options.minWidth - Minimum path width in mm (default: 0.0)
  * @param {number} options.sampleRate - Sample interval in mm (default: 0.5)
  * @param {string} options.pathId - Optional path identifier
- * @returns {Array<string>} Array of path data strings for stripe curves
+ * @returns {Array<string>} Array of path data strings for perpendicular stripe bands
  */
 function generateBarberPoleSmooth(pathData, options = {}) {
   const {
@@ -2393,32 +2394,57 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Generate smooth stripe curves
-    const stripePaths = [];
+    // Generate perpendicular stripe bands
+    // Concept: at each sample point, check if a stripe is "visible" (facing forward)
+    // If visible, create perpendicular segments crossing the path
+    // Group consecutive visible points into filled band regions
 
-    for (let stripeIdx = 0; stripeIdx < stripeCount * 2; stripeIdx++) {
-      // Generate both sides of each stripe (positive and negative offset)
-      const side = stripeIdx % 2 === 0 ? 1 : -1;
-      const actualStripeIdx = Math.floor(stripeIdx / 2);
+    const bandPaths = [];
+    let currentBand = [];
 
-      const stripePath = generateSmoothStripeCurve(
-        centerlineWithPhase,
-        actualStripeIdx,
-        side,
-        {
-          stripeCount,
-          occlusionMode,
-          edgeSoftness,
-          baseOffset
+    for (let i = 0; i < centerlineWithPhase.length; i++) {
+      const centerPoint = centerlineWithPhase[i];
+
+      // Check if ANY stripe is visible at this phase
+      const visibility = getStripeVisibility(centerPoint.accumulatedTwist, stripeCount, edgeSoftness);
+
+      if (visibility > 0.01) {
+        // Stripe is visible - add perpendicular segment to current band
+        const halfWidth = centerPoint.localWidth / 2;
+
+        // Calculate perpendicular endpoints
+        const p1 = {
+          x: centerPoint.x - centerPoint.nx * halfWidth,
+          y: centerPoint.y - centerPoint.ny * halfWidth
+        };
+
+        const p2 = {
+          x: centerPoint.x + centerPoint.nx * halfWidth,
+          y: centerPoint.y + centerPoint.ny * halfWidth
+        };
+
+        currentBand.push({ p1, p2, visibility });
+      } else {
+        // Gap - emit current band if any
+        if (currentBand.length > 0) {
+          const bandPath = createStripeBand(currentBand);
+          if (bandPath) {
+            bandPaths.push(bandPath);
+          }
+          currentBand = [];
         }
-      );
-
-      if (stripePath) {
-        stripePaths.push(stripePath);
       }
     }
 
-    return stripePaths;
+    // Emit final band
+    if (currentBand.length > 0) {
+      const bandPath = createStripeBand(currentBand);
+      if (bandPath) {
+        bandPaths.push(bandPath);
+      }
+    }
+
+    return bandPaths;
 
   } catch (error) {
     console.warn('Failed to generate smooth barber pole fill:', error.message);
@@ -2427,130 +2453,74 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 }
 
 /**
- * Generate a single smooth stripe curve
+ * Calculate stripe visibility at a given phase
+ * Returns 0-1 visibility value based on stripe regions
  * @private
  */
-function generateSmoothStripeCurve(centerlinePoints, stripeIndex, side, options) {
-  const { stripeCount, occlusionMode, edgeSoftness, baseOffset } = options;
-  const points = [];
-  let hasVisibleSegments = false;
-
-  for (let i = 0; i < centerlinePoints.length; i++) {
-    const centerPoint = centerlinePoints[i];
-
-    // Calculate stripe offset distance at this point
-    const offsetDist = calculateStripeOffset(
-      centerPoint.phase,
-      stripeIndex,
-      side,
-      stripeCount,
-      centerPoint.width,
-      occlusionMode,
-      edgeSoftness,
-      baseOffset
-    );
-
-    if (offsetDist === null || Math.abs(offsetDist) < 0.01) {
-      // Stripe not visible here - continue to create gaps
-      if (points.length > 2) {
-        // We have a segment, but it's ending - could break into multiple paths
-        // For now, continue to allow gaps in stripes
-      }
-      continue;
-    }
-
-    hasVisibleSegments = true;
-
-    // Offset perpendicular to path
-    const offsetPoint = {
-      x: centerPoint.x + centerPoint.nx * offsetDist,
-      y: centerPoint.y + centerPoint.ny * offsetDist
-    };
-
-    points.push(offsetPoint);
-  }
-
-  if (!hasVisibleSegments || points.length < 2) {
-    return null;
-  }
-
-  // Convert points to SVG path
-  return pointsToSmoothPath(points);
-}
-
-/**
- * Calculate stripe offset distance using sigmoid modulation
- * @private
- */
-function calculateStripeOffset(phase, stripeIndex, side, stripeCount, envelopeWidth, occlusionMode, edgeSoftness, baseOffset) {
+function getStripeVisibility(phase, stripeCount, edgeSoftness) {
   // Normalize phase to 0-2π
   const normalizedPhase = phase % (2 * Math.PI);
 
-  // Calculate which stripe region we're in
-  // Each full rotation divided into stripeCount regions
-  const stripePhaseOffset = (stripeIndex / stripeCount) * 2 * Math.PI;
-  const localPhase = (normalizedPhase + stripePhaseOffset) % (2 * Math.PI);
-
-  // Determine stripe region (0 to stripeCount-1)
+  // Divide full rotation into stripe regions
   const regionSize = (2 * Math.PI) / stripeCount;
-  const regionIndex = Math.floor(localPhase / regionSize);
+  const regionIndex = Math.floor(normalizedPhase / regionSize);
 
-  // Only draw every other stripe (alternating filled/empty)
+  // Only show every other stripe (alternating filled/empty)
   if (regionIndex % 2 !== 0) {
-    return null; // Empty stripe region
+    return 0; // Gap region
   }
 
   // Position within this stripe region (0-1)
-  const regionPhase = (localPhase % regionSize) / regionSize;
+  const regionPhase = (normalizedPhase % regionSize) / regionSize;
 
-  // Apply sigmoid smoothing at edges
-  let alpha = 1.0;
+  // Apply smooth edges with sigmoid
+  let visibility = 1.0;
 
   if (edgeSoftness > 0) {
     if (regionPhase < edgeSoftness) {
       // Smooth fade-in at start of stripe
-      alpha = smoothstep(0, edgeSoftness, regionPhase);
+      visibility = smoothstep(0, edgeSoftness, regionPhase);
     } else if (regionPhase > 1 - edgeSoftness) {
       // Smooth fade-out at end of stripe
-      alpha = smoothstep(1, 1 - edgeSoftness, regionPhase);
+      visibility = smoothstep(1, 1 - edgeSoftness, regionPhase);
     }
   }
 
-  // Calculate occlusion factor
-  const occlusionFactor = calculateOcclusionFactor(normalizedPhase, occlusionMode);
-
-  // Calculate final offset distance
-  // Use envelope width to modulate the offset distance
-  // side determines if we offset positive or negative direction
-  const maxOffsetDist = envelopeWidth / 2;
-  const offsetDist = side * maxOffsetDist * alpha * occlusionFactor;
-
-  return offsetDist;
+  return visibility;
 }
 
 /**
- * Calculate occlusion factor based on phase
+ * Create a filled band path from perpendicular segments
  * @private
  */
-function calculateOcclusionFactor(phase, mode) {
-  // Normalize to 0-1
-  const normalizedPhase = (phase % (2 * Math.PI)) / (2 * Math.PI);
-
-  if (mode === 'none') {
-    return 1.0;
+function createStripeBand(band) {
+  if (band.length < 2) {
+    return null;
   }
 
-  if (mode === 'hard') {
-    // Back half (0.25-0.75) is fully occluded
-    return (normalizedPhase < 0.25 || normalizedPhase > 0.75) ? 1.0 : 0.0;
+  // Create a filled polygon by connecting:
+  // - Top edge: all p1 points from start to end
+  // - Bottom edge: all p2 points from end to start
+
+  let pathData = `M ${band[0].p1.x.toFixed(3)},${band[0].p1.y.toFixed(3)}`;
+
+  // Top edge
+  for (let i = 1; i < band.length; i++) {
+    pathData += ` L ${band[i].p1.x.toFixed(3)},${band[i].p1.y.toFixed(3)}`;
   }
 
-  if (mode === 'smooth') {
-    // Smooth cosine falloff - visible at 0/1, hidden at 0.5
-    return (Math.cos(2 * Math.PI * normalizedPhase) + 1) / 2;
+  // Connect to bottom edge at the end
+  pathData += ` L ${band[band.length - 1].p2.x.toFixed(3)},${band[band.length - 1].p2.y.toFixed(3)}`;
+
+  // Bottom edge in reverse
+  for (let i = band.length - 2; i >= 0; i--) {
+    pathData += ` L ${band[i].p2.x.toFixed(3)},${band[i].p2.y.toFixed(3)}`;
   }
 
-  return 1.0;
+  // Close path
+  pathData += ' Z';
+
+  return pathData;
 }
 
 /**

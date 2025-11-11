@@ -47,14 +47,24 @@
   <pre>
 Path:     ═══════════════════════════════════════════
 
-Stripe 1: ▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓
-Stripe 2:    ░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░
-Stripe 3: ░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░
+View along path (looking down the cylinder axis):
 
-▓ = filled stripe segment
-░ = empty gap
+        SSSS          SSSS          SSSS
+      SSSSSSSS      SSSSSSSS      SSSSSSSS
+    ════════════════════════════════════════
+      SSSSSSSS      SSSSSSSS      SSSSSSSS
+        SSSS          SSSS          SSSS
 
-Each stripe is a continuous S-shaped wave that appears and disappears
+S = stripe crossing perpendicular to path (like painted bands around a cylinder)
+Each S-shape is ONE stripe wrapping around
+Gap between stripes creates the barber pole pattern
+As you move along the path, the "cylinder" rotates, showing stripe-gap-stripe
+
+NOT like this (what I coded wrong):
+Path: ═══════════════════
+      ~~~~ stripe 1 ~~~~ (parallel to path)
+      ~~~~ stripe 2 ~~~~ (parallel to path)
+      ~~~~ stripe 3 ~~~~ (parallel to path)
   </pre>
 
   <script>
@@ -68,7 +78,7 @@ Each stripe is a continuous S-shaped wave that appears and disappears
       // Get parameters
       const stripeCount = parseInt(document.getElementById('stripeCount').value);
       const twistFreq = parseFloat(document.getElementById('twistFreq').value);
-      const stripeWidth = parseInt(document.getElementById('stripeWidth').value);
+      const ribbonWidth = parseInt(document.getElementById('stripeWidth').value);
       const gapWidth = parseInt(document.getElementById('gapWidth').value);
 
       // Draw centerline
@@ -87,7 +97,7 @@ Each stripe is a continuous S-shaped wave that appears and disappears
       // Label
       ctx.fillStyle = '#000';
       ctx.font = '12px monospace';
-      ctx.fillText('Path centerline', startX, centerY - 10);
+      ctx.fillText('Path centerline (cylinder axis)', startX, centerY - 10);
 
       // Sample the path
       const numSamples = 500;
@@ -98,7 +108,7 @@ Each stripe is a continuous S-shaped wave that appears and disappears
         const x = startX + t * pathLength;
         const arcLength = t * pathLength;
 
-        // Accumulate phase (twist)
+        // Accumulate phase (twist) - this is the rotation angle around the cylinder
         const phase = arcLength * twistFreq * (2 * Math.PI);
 
         samples.push({
@@ -109,99 +119,44 @@ Each stripe is a continuous S-shaped wave that appears and disappears
         });
       }
 
-      // Draw each stripe
-      const colors = ['#ff0000', '#0000ff', '#00ff00', '#ff00ff', '#00ffff'];
+      // Draw perpendicular stripes
+      // Concept: at each sample point, determine if a stripe is "facing forward"
+      // based on the phase. If so, draw perpendicular offsets.
 
-      for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
-        drawStripe(ctx, samples, stripeIdx, stripeCount, stripeWidth, gapWidth, colors[stripeIdx % colors.length]);
-      }
-    }
+      const totalStripeWidth = ribbonWidth + gapWidth;
+      const stripeRegionSize = (2 * Math.PI) / stripeCount;
 
-    function drawStripe(ctx, samples, stripeIndex, stripeCount, stripeWidth, gapWidth, color) {
-      const stripePhaseOffset = (stripeIndex / stripeCount) * 2 * Math.PI;
-
-      // Draw upper and lower curves for this stripe
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-
-      // Upper curve
-      ctx.beginPath();
-      let isDrawing = false;
-
-      for (let i = 0; i < samples.length; i++) {
+      // We'll draw this by creating "stripe segments" - sections where a stripe is visible
+      for (let i = 0; i < samples.length - 1; i++) {
         const sample = samples[i];
-        const localPhase = (sample.phase + stripePhaseOffset) % (2 * Math.PI);
+        const nextSample = samples[i + 1];
 
-        // Determine stripe region (0 to stripeCount-1)
-        const regionSize = (2 * Math.PI) / stripeCount;
-        const regionIndex = Math.floor(localPhase / regionSize);
+        // Normalize phase to 0-2π
+        const normalizedPhase = sample.phase % (2 * Math.PI);
 
-        // Only draw every other stripe (alternating filled/empty)
-        const isVisible = (regionIndex % 2 === 0);
+        // Determine which stripe region we're in
+        const regionIndex = Math.floor(normalizedPhase / stripeRegionSize);
 
-        if (isVisible) {
-          // Calculate offset distance for this point
-          // Simple binary: full width in stripe, 0 in gap
-          const offsetY = sample.y - stripeWidth;
+        // Alternate filled and empty
+        const isStripe = (regionIndex % 2 === 0);
 
-          if (!isDrawing) {
-            ctx.moveTo(sample.x, offsetY);
-            isDrawing = true;
-          } else {
-            ctx.lineTo(sample.x, offsetY);
-          }
-        } else {
-          // Gap - stop drawing
-          if (isDrawing) {
-            ctx.stroke();
-            isDrawing = false;
-            ctx.beginPath();
-          }
+        if (isStripe) {
+          // Draw perpendicular stripe segment
+          // Upper and lower boundaries
+          const upperY = sample.y - ribbonWidth;
+          const lowerY = sample.y + ribbonWidth;
+
+          // Draw a small rectangle representing this perpendicular slice
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+          ctx.fillRect(sample.x, upperY, Math.max(1, nextSample.x - sample.x), lowerY - upperY);
         }
-      }
-
-      if (isDrawing) {
-        ctx.stroke();
-      }
-
-      // Lower curve
-      ctx.beginPath();
-      isDrawing = false;
-
-      for (let i = 0; i < samples.length; i++) {
-        const sample = samples[i];
-        const localPhase = (sample.phase + stripePhaseOffset) % (2 * Math.PI);
-
-        const regionSize = (2 * Math.PI) / stripeCount;
-        const regionIndex = Math.floor(localPhase / regionSize);
-        const isVisible = (regionIndex % 2 === 0);
-
-        if (isVisible) {
-          const offsetY = sample.y + stripeWidth;
-
-          if (!isDrawing) {
-            ctx.moveTo(sample.x, offsetY);
-            isDrawing = true;
-          } else {
-            ctx.lineTo(sample.x, offsetY);
-          }
-        } else {
-          if (isDrawing) {
-            ctx.stroke();
-            isDrawing = false;
-            ctx.beginPath();
-          }
-        }
-      }
-
-      if (isDrawing) {
-        ctx.stroke();
       }
 
       // Label
-      ctx.fillStyle = color;
+      ctx.fillStyle = '#ff0000';
       ctx.font = '10px monospace';
-      ctx.fillText(`Stripe ${stripeIndex + 1}`, 10, 20 + stripeIndex * 15);
+      ctx.fillText('Red = stripe visible (facing forward)', 10, 20);
+      ctx.fillText('Gap = stripe hidden (facing back)', 10, 35);
     }
 
     // Initial draw
