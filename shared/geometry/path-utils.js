@@ -2043,6 +2043,17 @@ function generateBarberPolePixelated(pathData, options = {}) {
       minOcclusion
     );
 
+    // Debug: Check segments
+    let totalSegments = 0;
+    stripeBoundaries.forEach(stripe => {
+      totalSegments += stripe.segments.length;
+    });
+
+    if (totalSegments === 0) {
+      const maxTwist = centerlineWithPhase[centerlineWithPhase.length - 1]?.accumulatedTwist || 0;
+      console.warn(`Pixelated barber pole: 0 segments. Path ${pathId}, length ${totalLength.toFixed(2)}mm, samples ${centerlineWithPhase.length}, twist ${maxTwist.toFixed(3)} rotations`);
+    }
+
     // Step 3: Fill each stripe
     const paths = fillStripeBoundaries(
       stripeBoundaries,
@@ -2142,7 +2153,9 @@ function samplePathWithTwist(
       nx,
       ny,
       localWidth,
+      width: localWidth, // Alias for smooth barber pole compatibility
       accumulatedTwist,
+      phase: accumulatedTwist, // Alias for smooth barber pole compatibility
       t,
       arcLength
     });
