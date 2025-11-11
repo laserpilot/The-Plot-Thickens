@@ -215,6 +215,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     // Handle barber-pole mode separately (doesn't use generatePasses)
     if (config.fillMode === 'barber-pole') {
       const barberPolePaths = generateBarberPoleFill(path.d, {
+        barberPoleStyle: config.barberPoleStyle || 'smooth',
+        edgeSoftness: config.barberPoleEdgeSoftness !== undefined ? config.barberPoleEdgeSoftness : 0.15,
         stripeCount: config.stripeCount !== undefined ? config.stripeCount : 3,
         twistFrequency: config.twistFrequency !== undefined ? config.twistFrequency : 0.2,
         twistRateMode: config.twistRateMode || 'inverse',

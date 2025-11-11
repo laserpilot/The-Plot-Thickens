@@ -101,6 +101,8 @@ function buildCLICommand(config) {
     if (config.shapeMaxWidth !== undefined && config.shapeMaxWidth !== 3.0) parts.push(`--shape-max-width ${config.shapeMaxWidth}`);
     if (config.shapeMinWidth !== undefined && config.shapeMinWidth !== 0.0) parts.push(`--shape-min-width ${config.shapeMinWidth}`);
   } else if (config.fillMode === 'barber-pole') {
+    if (config.barberPoleStyle && config.barberPoleStyle !== 'smooth') parts.push(`--barber-pole-style ${config.barberPoleStyle}`);
+    if (config.barberPoleEdgeSoftness !== undefined && config.barberPoleEdgeSoftness !== 0.15) parts.push(`--barber-pole-edge-softness ${config.barberPoleEdgeSoftness}`);
     if (config.stripeCount !== undefined && config.stripeCount !== 3) parts.push(`--stripe-count ${config.stripeCount}`);
     if (config.twistFrequency !== undefined && config.twistFrequency !== 0.2) parts.push(`--twist-frequency ${config.twistFrequency}`);
     if (config.twistRateMode && config.twistRateMode !== 'inverse') parts.push(`--twist-rate-mode ${config.twistRateMode}`);
@@ -542,7 +544,9 @@ export function initUI(store, renderer) {
     occlusionMode: document.getElementById('occlusion-mode'),
     minOcclusion: document.getElementById('min-occlusion'),
     barberPoleMaxWidth: document.getElementById('barber-pole-max-width'),
-    barberPoleMinWidth: document.getElementById('barber-pole-min-width')
+    barberPoleMinWidth: document.getElementById('barber-pole-min-width'),
+    barberPoleStyle: document.getElementById('barber-pole-style'),
+    barberPoleEdgeSoftness: document.getElementById('barber-pole-edge-softness')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {

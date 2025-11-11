@@ -136,6 +136,8 @@ const initialState = {
     minOcclusion: 0.0,
     barberPoleMaxWidth: 3.0,
     barberPoleMinWidth: 0.0,
+    barberPoleStyle: 'smooth',  // 'smooth' or 'pixelated'
+    barberPoleEdgeSoftness: 0.15,  // 0-1, controls stripe edge smoothness
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',

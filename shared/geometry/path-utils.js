@@ -1986,7 +1986,11 @@ function generateShapeFill(pathData, options = {}) {
  * @param {string} options.pathId - Optional path identifier
  * @returns {Array<string>} Array of path data for all stripe fills
  */
-function generateBarberPoleFill(pathData, options = {}) {
+/**
+ * Generate pixelated barber pole fill (experimental discrete stripe regions)
+ * Creates rectangular stripe regions with gaps - produces a mosaic/tiled effect
+ */
+function generateBarberPolePixelated(pathData, options = {}) {
   const {
     stripeCount = 3,
     twistFrequency = 0.2,
@@ -2315,6 +2319,265 @@ function fillStripeBoundaries(stripeBoundaries, baseOffset, noise, seed) {
   return allPaths;
 }
 
+/**
+ * Generate smooth sigmoid barber pole fill
+ * Creates continuous flowing stripe curves that spiral around the path
+ * @param {string} pathData - SVG path data string
+ * @param {Object} options - Configuration options
+ * @param {number} options.stripeCount - Number of stripes (default: 3)
+ * @param {number} options.twistFrequency - Twist rate (default: 0.2)
+ * @param {string} options.twistRateMode - 'constant', 'inverse', or 'proportional' (default: 'inverse')
+ * @param {string} options.occlusionMode - 'none', 'hard', or 'smooth' (default: 'smooth')
+ * @param {number} options.edgeSoftness - Stripe edge smoothness 0-1 (default: 0.15)
+ * @param {number} options.baseOffset - Base offset distance in mm (default: 0.25)
+ * @param {string} options.envelope - Envelope preset name (default: 'flat')
+ * @param {number} options.maxWidth - Maximum envelope width in mm (default: 3.0)
+ * @param {number} options.minWidth - Minimum envelope width in mm (default: 0.0)
+ * @param {number} options.sampleRate - Sample interval in mm (default: 0.5)
+ * @param {string} options.pathId - Optional path identifier
+ * @returns {Array<string>} Array of path data strings for stripe curves
+ */
+function generateBarberPoleSmooth(pathData, options = {}) {
+  const {
+    stripeCount = 3,
+    twistFrequency = 0.2,
+    twistRateMode = 'inverse',
+    occlusionMode = 'smooth',
+    edgeSoftness = 0.15,
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    sampleRate = 0.5,
+    pathId = '',
+  } = options;
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return [];
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+
+    // Sample path with twist phase accumulation
+    const centerlineWithPhase = samplePathWithTwist(
+      absolutePath,
+      totalLength,
+      envelopeFn,
+      pathId,
+      maxWidth,
+      minWidth,
+      twistFrequency,
+      twistRateMode,
+      sampleRate
+    );
+
+    if (centerlineWithPhase.length === 0) {
+      return [];
+    }
+
+    // Generate smooth stripe curves
+    const stripePaths = [];
+
+    for (let stripeIdx = 0; stripeIdx < stripeCount * 2; stripeIdx++) {
+      // Generate both sides of each stripe (positive and negative offset)
+      const side = stripeIdx % 2 === 0 ? 1 : -1;
+      const actualStripeIdx = Math.floor(stripeIdx / 2);
+
+      const stripePath = generateSmoothStripeCurve(
+        centerlineWithPhase,
+        actualStripeIdx,
+        side,
+        {
+          stripeCount,
+          occlusionMode,
+          edgeSoftness,
+          baseOffset
+        }
+      );
+
+      if (stripePath) {
+        stripePaths.push(stripePath);
+      }
+    }
+
+    return stripePaths;
+
+  } catch (error) {
+    console.warn('Failed to generate smooth barber pole fill:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Generate a single smooth stripe curve
+ * @private
+ */
+function generateSmoothStripeCurve(centerlinePoints, stripeIndex, side, options) {
+  const { stripeCount, occlusionMode, edgeSoftness, baseOffset } = options;
+  const points = [];
+  let hasVisibleSegments = false;
+
+  for (let i = 0; i < centerlinePoints.length; i++) {
+    const centerPoint = centerlinePoints[i];
+
+    // Calculate stripe offset distance at this point
+    const offsetDist = calculateStripeOffset(
+      centerPoint.phase,
+      stripeIndex,
+      side,
+      stripeCount,
+      centerPoint.width,
+      occlusionMode,
+      edgeSoftness,
+      baseOffset
+    );
+
+    if (offsetDist === null || Math.abs(offsetDist) < 0.01) {
+      // Stripe not visible here - continue to create gaps
+      if (points.length > 2) {
+        // We have a segment, but it's ending - could break into multiple paths
+        // For now, continue to allow gaps in stripes
+      }
+      continue;
+    }
+
+    hasVisibleSegments = true;
+
+    // Offset perpendicular to path
+    const offsetPoint = {
+      x: centerPoint.x + centerPoint.nx * offsetDist,
+      y: centerPoint.y + centerPoint.ny * offsetDist
+    };
+
+    points.push(offsetPoint);
+  }
+
+  if (!hasVisibleSegments || points.length < 2) {
+    return null;
+  }
+
+  // Convert points to SVG path
+  return pointsToSmoothPath(points);
+}
+
+/**
+ * Calculate stripe offset distance using sigmoid modulation
+ * @private
+ */
+function calculateStripeOffset(phase, stripeIndex, side, stripeCount, envelopeWidth, occlusionMode, edgeSoftness, baseOffset) {
+  // Normalize phase to 0-2π
+  const normalizedPhase = phase % (2 * Math.PI);
+
+  // Calculate which stripe region we're in
+  // Each full rotation divided into stripeCount regions
+  const stripePhaseOffset = (stripeIndex / stripeCount) * 2 * Math.PI;
+  const localPhase = (normalizedPhase + stripePhaseOffset) % (2 * Math.PI);
+
+  // Determine stripe region (0 to stripeCount-1)
+  const regionSize = (2 * Math.PI) / stripeCount;
+  const regionIndex = Math.floor(localPhase / regionSize);
+
+  // Only draw every other stripe (alternating filled/empty)
+  if (regionIndex % 2 !== 0) {
+    return null; // Empty stripe region
+  }
+
+  // Position within this stripe region (0-1)
+  const regionPhase = (localPhase % regionSize) / regionSize;
+
+  // Apply sigmoid smoothing at edges
+  let alpha = 1.0;
+
+  if (edgeSoftness > 0) {
+    if (regionPhase < edgeSoftness) {
+      // Smooth fade-in at start of stripe
+      alpha = smoothstep(0, edgeSoftness, regionPhase);
+    } else if (regionPhase > 1 - edgeSoftness) {
+      // Smooth fade-out at end of stripe
+      alpha = smoothstep(1, 1 - edgeSoftness, regionPhase);
+    }
+  }
+
+  // Calculate occlusion factor
+  const occlusionFactor = calculateOcclusionFactor(normalizedPhase, occlusionMode);
+
+  // Calculate final offset distance
+  // Use envelope width to modulate the offset distance
+  // side determines if we offset positive or negative direction
+  const maxOffsetDist = envelopeWidth / 2;
+  const offsetDist = side * maxOffsetDist * alpha * occlusionFactor;
+
+  return offsetDist;
+}
+
+/**
+ * Calculate occlusion factor based on phase
+ * @private
+ */
+function calculateOcclusionFactor(phase, mode) {
+  // Normalize to 0-1
+  const normalizedPhase = (phase % (2 * Math.PI)) / (2 * Math.PI);
+
+  if (mode === 'none') {
+    return 1.0;
+  }
+
+  if (mode === 'hard') {
+    // Back half (0.25-0.75) is fully occluded
+    return (normalizedPhase < 0.25 || normalizedPhase > 0.75) ? 1.0 : 0.0;
+  }
+
+  if (mode === 'smooth') {
+    // Smooth cosine falloff - visible at 0/1, hidden at 0.5
+    return (Math.cos(2 * Math.PI * normalizedPhase) + 1) / 2;
+  }
+
+  return 1.0;
+}
+
+/**
+ * Smoothstep interpolation function
+ * @private
+ */
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Convert array of points to smooth SVG path
+ * @private
+ */
+function pointsToSmoothPath(points) {
+  if (points.length < 2) return '';
+
+  let pathData = `M ${points[0].x.toFixed(3)},${points[0].y.toFixed(3)}`;
+
+  for (let i = 1; i < points.length; i++) {
+    pathData += ` L ${points[i].x.toFixed(3)},${points[i].y.toFixed(3)}`;
+  }
+
+  return pathData;
+}
+
+/**
+ * Main barber pole generator - delegates to smooth or pixelated based on style
+ */
+function generateBarberPoleFill(pathData, options = {}) {
+  const { barberPoleStyle = 'smooth', ...rest } = options;
+
+  if (barberPoleStyle === 'pixelated') {
+    return generateBarberPolePixelated(pathData, rest);
+  } else {
+    return generateBarberPoleSmooth(pathData, rest);
+  }
+}
+
 export {
   measurePathLength,
   offsetPath,
@@ -2329,4 +2592,6 @@ export {
   generateFilledCircle,
   generateShapeFill,
   generateBarberPoleFill,
+  generateBarberPolePixelated,
+  generateBarberPoleSmooth,
 };
