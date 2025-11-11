@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Barber Pole Visual Test</title>
+  <style>
+    body {
+      margin: 20px;
+      font-family: monospace;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      display: block;
+      margin: 20px 0;
+    }
+    .controls {
+      margin: 20px 0;
+    }
+    label {
+      display: inline-block;
+      margin-right: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Barber Pole Visual Test</h1>
+  <p>Simple straight line to get the visual right before integration</p>
+
+  <div class="controls">
+    <label>
+      Stripe Count: <input type="number" id="stripeCount" value="3" min="1" max="10" />
+    </label>
+    <label>
+      Twist Frequency: <input type="number" id="twistFreq" value="0.05" min="0.01" max="0.5" step="0.01" />
+    </label>
+    <label>
+      Stripe Width: <input type="number" id="stripeWidth" value="20" min="5" max="50" />
+    </label>
+    <label>
+      Gap Width: <input type="number" id="gapWidth" value="10" min="0" max="50" />
+    </label>
+    <button onclick="draw()">Redraw</button>
+  </div>
+
+  <canvas id="canvas" width="800" height="200"></canvas>
+
+  <h2>Expected Pattern:</h2>
+  <pre>
+Path:     ═══════════════════════════════════════════
+
+Stripe 1: ▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓
+Stripe 2:    ░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░
+Stripe 3: ░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░░▓▓▓▓▓░░░░░
+
+▓ = filled stripe segment
+░ = empty gap
+
+Each stripe is a continuous S-shaped wave that appears and disappears
+  </pre>
+
+  <script>
+    function draw() {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Get parameters
+      const stripeCount = parseInt(document.getElementById('stripeCount').value);
+      const twistFreq = parseFloat(document.getElementById('twistFreq').value);
+      const stripeWidth = parseInt(document.getElementById('stripeWidth').value);
+      const gapWidth = parseInt(document.getElementById('gapWidth').value);
+
+      // Draw centerline
+      const startX = 50;
+      const endX = 750;
+      const centerY = canvas.height / 2;
+      const pathLength = endX - startX;
+
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(startX, centerY);
+      ctx.lineTo(endX, centerY);
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = '#000';
+      ctx.font = '12px monospace';
+      ctx.fillText('Path centerline', startX, centerY - 10);
+
+      // Sample the path
+      const numSamples = 500;
+      const samples = [];
+
+      for (let i = 0; i <= numSamples; i++) {
+        const t = i / numSamples;
+        const x = startX + t * pathLength;
+        const arcLength = t * pathLength;
+
+        // Accumulate phase (twist)
+        const phase = arcLength * twistFreq * (2 * Math.PI);
+
+        samples.push({
+          x: x,
+          y: centerY,
+          phase: phase,
+          t: t
+        });
+      }
+
+      // Draw each stripe
+      const colors = ['#ff0000', '#0000ff', '#00ff00', '#ff00ff', '#00ffff'];
+
+      for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
+        drawStripe(ctx, samples, stripeIdx, stripeCount, stripeWidth, gapWidth, colors[stripeIdx % colors.length]);
+      }
+    }
+
+    function drawStripe(ctx, samples, stripeIndex, stripeCount, stripeWidth, gapWidth, color) {
+      const stripePhaseOffset = (stripeIndex / stripeCount) * 2 * Math.PI;
+
+      // Draw upper and lower curves for this stripe
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+
+      // Upper curve
+      ctx.beginPath();
+      let isDrawing = false;
+
+      for (let i = 0; i < samples.length; i++) {
+        const sample = samples[i];
+        const localPhase = (sample.phase + stripePhaseOffset) % (2 * Math.PI);
+
+        // Determine stripe region (0 to stripeCount-1)
+        const regionSize = (2 * Math.PI) / stripeCount;
+        const regionIndex = Math.floor(localPhase / regionSize);
+
+        // Only draw every other stripe (alternating filled/empty)
+        const isVisible = (regionIndex % 2 === 0);
+
+        if (isVisible) {
+          // Calculate offset distance for this point
+          // Simple binary: full width in stripe, 0 in gap
+          const offsetY = sample.y - stripeWidth;
+
+          if (!isDrawing) {
+            ctx.moveTo(sample.x, offsetY);
+            isDrawing = true;
+          } else {
+            ctx.lineTo(sample.x, offsetY);
+          }
+        } else {
+          // Gap - stop drawing
+          if (isDrawing) {
+            ctx.stroke();
+            isDrawing = false;
+            ctx.beginPath();
+          }
+        }
+      }
+
+      if (isDrawing) {
+        ctx.stroke();
+      }
+
+      // Lower curve
+      ctx.beginPath();
+      isDrawing = false;
+
+      for (let i = 0; i < samples.length; i++) {
+        const sample = samples[i];
+        const localPhase = (sample.phase + stripePhaseOffset) % (2 * Math.PI);
+
+        const regionSize = (2 * Math.PI) / stripeCount;
+        const regionIndex = Math.floor(localPhase / regionSize);
+        const isVisible = (regionIndex % 2 === 0);
+
+        if (isVisible) {
+          const offsetY = sample.y + stripeWidth;
+
+          if (!isDrawing) {
+            ctx.moveTo(sample.x, offsetY);
+            isDrawing = true;
+          } else {
+            ctx.lineTo(sample.x, offsetY);
+          }
+        } else {
+          if (isDrawing) {
+            ctx.stroke();
+            isDrawing = false;
+            ctx.beginPath();
+          }
+        }
+      }
+
+      if (isDrawing) {
+        ctx.stroke();
+      }
+
+      // Label
+      ctx.fillStyle = color;
+      ctx.font = '10px monospace';
+      ctx.fillText(`Stripe ${stripeIndex + 1}`, 10, 20 + stripeIndex * 15);
+    }
+
+    // Initial draw
+    draw();
+  </script>
+</body>
+</html>
