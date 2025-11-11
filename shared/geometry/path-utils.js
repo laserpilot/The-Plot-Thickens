@@ -2394,68 +2394,86 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Generate diagonal stripe bands with curved boundaries
-    // Concept: Stripe edges are at specific angular positions on the cylinder
-    // As the cylinder rotates, these edges create diagonal/helical curves
-    // We track both edges of each stripe and fill the region between them
+    // Generate discrete diagonal stripe bands
+    // Each stripe appears/disappears as the cylinder rotates
+    // We create separate band segments with actual gaps between them
 
-    const stripePaths = [];
+    const allBands = [];
 
-    // Generate stripes by tracking boundary curves
+    // For each stripe
     for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
-      // Each stripe has two edges (start and end)
-      const stripeStartPhase = (stripeIdx / stripeCount) * 2 * Math.PI;
-      const stripeEndPhase = ((stripeIdx + 0.5) / stripeCount) * 2 * Math.PI; // Half-width stripe, half-width gap
+      // Stripe occupies a range of angles on the cylinder
+      const stripeStartAngle = (stripeIdx / stripeCount) * 2 * Math.PI;
+      const stripeEndAngle = ((stripeIdx + 0.5) / stripeCount) * 2 * Math.PI; // Half stripe, half gap
+      const stripeMidAngle = (stripeStartAngle + stripeEndAngle) / 2;
 
-      // Track points along both edges of this stripe
-      const startEdge = [];
-      const endEdge = [];
+      // Collect segments where this stripe is visible
+      let currentSegment = null;
 
       for (let i = 0; i < centerlineWithPhase.length; i++) {
         const centerPoint = centerlineWithPhase[i];
         const phase = centerPoint.accumulatedTwist % (2 * Math.PI);
         const halfWidth = centerPoint.localWidth / 2;
 
-        // Calculate where this stripe's edges are relative to current phase
-        // The stripe rotates around the cylinder, we see it when it's facing forward
+        // Check if stripe is visible at this point
+        // Stripe is visible when its angular range is on the front half of cylinder
+        const stripePhaseDiff = normalizeAngle(phase - stripeMidAngle);
+        const isVisible = stripePhaseDiff < Math.PI / 2 || stripePhaseDiff > 3 * Math.PI / 2;
 
-        // Start edge of stripe
-        const startPhaseDiff = normalizeAngle(phase - stripeStartPhase);
-        if (startPhaseDiff < Math.PI) { // Visible on front half
-          const angleOffset = startPhaseDiff - Math.PI / 2; // -π/2 to π/2 when visible
-          const lateralOffset = Math.sin(angleOffset) * halfWidth;
+        if (isVisible) {
+          // Calculate both stripe edges with diagonal offset
+          const startDiff = normalizeAngle(phase - stripeStartAngle);
+          const endDiff = normalizeAngle(phase - stripeEndAngle);
 
-          startEdge.push({
-            x: centerPoint.x + centerPoint.nx * lateralOffset,
-            y: centerPoint.y + centerPoint.ny * lateralOffset,
-            visible: Math.cos(angleOffset) // Fade based on viewing angle
-          });
-        }
+          // Only show if both edges are somewhat facing forward
+          if ((startDiff < Math.PI && endDiff < Math.PI) ||
+              (startDiff > Math.PI && endDiff > Math.PI)) {
 
-        // End edge of stripe
-        const endPhaseDiff = normalizeAngle(phase - stripeEndPhase);
-        if (endPhaseDiff < Math.PI) { // Visible on front half
-          const angleOffset = endPhaseDiff - Math.PI / 2;
-          const lateralOffset = Math.sin(angleOffset) * halfWidth;
+            const startAngleOffset = startDiff < Math.PI ? startDiff - Math.PI / 2 : startDiff - 3 * Math.PI / 2;
+            const endAngleOffset = endDiff < Math.PI ? endDiff - Math.PI / 2 : endDiff - 3 * Math.PI / 2;
 
-          endEdge.push({
-            x: centerPoint.x + centerPoint.nx * lateralOffset,
-            y: centerPoint.y + centerPoint.ny * lateralOffset,
-            visible: Math.cos(angleOffset)
-          });
+            const startLateralOffset = Math.sin(startAngleOffset) * halfWidth;
+            const endLateralOffset = Math.sin(endAngleOffset) * halfWidth;
+
+            const edgePoint1 = {
+              x: centerPoint.x + centerPoint.nx * startLateralOffset,
+              y: centerPoint.y + centerPoint.ny * startLateralOffset
+            };
+
+            const edgePoint2 = {
+              x: centerPoint.x + centerPoint.nx * endLateralOffset,
+              y: centerPoint.y + centerPoint.ny * endLateralOffset
+            };
+
+            if (!currentSegment) {
+              currentSegment = { edge1: [], edge2: [] };
+            }
+
+            currentSegment.edge1.push(edgePoint1);
+            currentSegment.edge2.push(edgePoint2);
+          }
+        } else {
+          // Stripe not visible - emit current segment if any
+          if (currentSegment && currentSegment.edge1.length > 2) {
+            const bandPath = createBandFromEdges(currentSegment.edge1, currentSegment.edge2);
+            if (bandPath) {
+              allBands.push(bandPath);
+            }
+          }
+          currentSegment = null;
         }
       }
 
-      // Create filled stripe region between the two edges
-      if (startEdge.length > 2 && endEdge.length > 2) {
-        const stripePath = createStripeBandFromEdges(startEdge, endEdge);
-        if (stripePath) {
-          stripePaths.push(stripePath);
+      // Emit final segment for this stripe
+      if (currentSegment && currentSegment.edge1.length > 2) {
+        const bandPath = createBandFromEdges(currentSegment.edge1, currentSegment.edge2);
+        if (bandPath) {
+          allBands.push(bandPath);
         }
       }
     }
 
-    return stripePaths;
+    return allBands;
 
   } catch (error) {
     console.warn('Failed to generate smooth barber pole fill:', error.message);
@@ -2473,33 +2491,33 @@ function normalizeAngle(angle) {
 }
 
 /**
- * Create a filled stripe region from two edge curves
+ * Create a filled band from two edge curves
  * @private
  */
-function createStripeBandFromEdges(startEdge, endEdge) {
-  if (startEdge.length < 2 || endEdge.length < 2) {
+function createBandFromEdges(edge1, edge2) {
+  if (edge1.length < 2 || edge2.length < 2) {
     return null;
   }
 
   // Create a filled polygon by connecting:
-  // - Start edge: all points from first to last
-  // - End edge: all points from last to first (reversed)
+  // - Edge 1: all points from first to last
+  // - Edge 2: all points from last to first (reversed)
 
-  let pathData = `M ${startEdge[0].x.toFixed(3)},${startEdge[0].y.toFixed(3)}`;
+  let pathData = `M ${edge1[0].x.toFixed(3)},${edge1[0].y.toFixed(3)}`;
 
-  // Start edge forward
-  for (let i = 1; i < startEdge.length; i++) {
-    pathData += ` L ${startEdge[i].x.toFixed(3)},${startEdge[i].y.toFixed(3)}`;
+  // Edge 1 forward
+  for (let i = 1; i < edge1.length; i++) {
+    pathData += ` L ${edge1[i].x.toFixed(3)},${edge1[i].y.toFixed(3)}`;
   }
 
-  // Connect to end edge
-  if (endEdge.length > 0) {
-    pathData += ` L ${endEdge[endEdge.length - 1].x.toFixed(3)},${endEdge[endEdge.length - 1].y.toFixed(3)}`;
+  // Connect to edge 2
+  if (edge2.length > 0) {
+    pathData += ` L ${edge2[edge2.length - 1].x.toFixed(3)},${edge2[edge2.length - 1].y.toFixed(3)}`;
   }
 
-  // End edge backward
-  for (let i = endEdge.length - 2; i >= 0; i--) {
-    pathData += ` L ${endEdge[i].x.toFixed(3)},${endEdge[i].y.toFixed(3)}`;
+  // Edge 2 backward
+  for (let i = edge2.length - 2; i >= 0; i--) {
+    pathData += ` L ${edge2[i].x.toFixed(3)},${edge2[i].y.toFixed(3)}`;
   }
 
   // Close path
