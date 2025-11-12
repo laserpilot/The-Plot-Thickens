@@ -2380,6 +2380,10 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     // Get envelope function
     const envelopeFn = getEnvelopePreset(envelope);
 
+    // Use finer sample rate for smooth curves (barber pole needs dense sampling)
+    // User's sampleRate might be coarse (2mm+), but we need ~0.5mm for smooth sigmoids
+    const effectiveSampleRate = Math.min(sampleRate, 0.5);
+
     // Sample path with twist phase accumulation
     const centerlineWithPhase = samplePathWithTwist(
       absolutePath,
@@ -2390,7 +2394,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       minWidth,
       twistFrequency,
       twistRateMode,
-      sampleRate
+      effectiveSampleRate
     );
 
     if (centerlineWithPhase.length === 0) {
@@ -2455,16 +2459,22 @@ function generateBarberPoleSmooth(pathData, options = {}) {
           // Base diagonal offset for the S-curve
           const diagonalOffset = smoothOffset * halfWidth;
 
-          // Perpendicular offset for line stacking
-          // This creates the stripe thickness
+          // Stripe ribbon width factor - creates pinched ribbon effect
+          // Narrow at stripe edges (-1, +1), wide in middle (0)
+          // Using cosine for smooth width variation: cos(0) = 1, cos(±π/2) = 0
+          const stripeWidthFactor = Math.cos(stripeProgress * Math.PI / 2);
+
+          // Perpendicular offset for line stacking (creates stripe thickness)
           const perpOffset = linePositionInStripe * effectiveStripeThickness;
 
-          // Apply envelope taper to create clean pinch
-          // Lines converge toward centerline as envelope shrinks
-          const taperedPerpOffset = perpOffset * envelopeTaper;
+          // Apply stripe ribbon taper (all lines converge to same pinch points)
+          const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
+
+          // Also apply path envelope taper (lines follow path width changes)
+          const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
 
           // Combine offsets
-          const totalOffset = diagonalOffset + taperedPerpOffset;
+          const totalOffset = diagonalOffset + fullyTaperedOffset;
 
           const point = {
             x: centerPoint.x + centerPoint.nx * totalOffset,
