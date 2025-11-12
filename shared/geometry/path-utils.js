@@ -2396,69 +2396,75 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 
     // Generate discrete stacked stroke paths (not fills!)
     // Each stripe is multiple parallel S-curve lines stacked close together
-    // Example: 5 lines @ 0.2mm spacing = 1mm thick stripe
-    // Then a gap with no lines
-    // Then another stripe of 5 lines, etc.
+    // The NUMBER of stripes you see is determined by: pathLength × twistFrequency
+    // NOT by a stripeCount parameter!
 
     const strokePaths = [];
     const linesPerStripe = 5; // Number of parallel lines in each stripe
     const lineSpacing = 0.2; // mm between parallel lines
 
-    // For each stripe
-    for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
-      // Stripe occupies a range of angles on the cylinder
-      const stripeStartAngle = (stripeIdx / stripeCount) * 2 * Math.PI;
-      const stripeEndAngle = ((stripeIdx + 0.5) / stripeCount) * 2 * Math.PI; // Half stripe, half gap
-      const stripeMidAngle = (stripeStartAngle + stripeEndAngle) / 2;
+    // Define stripe and gap widths in RADIANS (not count!)
+    // This determines the pattern repeat cycle
+    const stripeWidthRadians = Math.PI * 0.8; // How wide each stripe is (in rotation angle)
+    const gapWidthRadians = Math.PI * 1.2;     // How wide each gap is
+    const cycleWidth = stripeWidthRadians + gapWidthRadians; // Full stripe+gap cycle
 
-      // Generate multiple parallel lines for this stripe
-      for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
-        // Offset from center of stripe
-        const lineOffset = (lineIdx - (linesPerStripe - 1) / 2) * lineSpacing;
+    // Smooth sigmoid function for S-curve shape
+    // Maps x from -1 to 1 → output from -1 to 1 smoothly
+    const smoothSigmoid = (x) => {
+      // Tanh gives a smooth S-curve, smoother than sin
+      return Math.tanh(x * 2.5); // 2.5 controls steepness
+    };
 
-        // Collect points for this S-curve line
-        let currentLineSegment = [];
+    // Generate lines for each stripe instance that appears along the path
+    for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
+      // Offset from center of stripe
+      const lineOffset = (lineIdx - (linesPerStripe - 1) / 2) * lineSpacing;
 
-        for (let i = 0; i < centerlineWithPhase.length; i++) {
-          const centerPoint = centerlineWithPhase[i];
-          const phase = centerPoint.accumulatedTwist % (2 * Math.PI);
-          const halfWidth = centerPoint.localWidth / 2;
+      // Collect points for this S-curve line
+      let currentLineSegment = [];
 
-          // Check if stripe is visible at this point
-          const stripePhaseDiff = normalizeAngle(phase - stripeMidAngle);
-          const isVisible = stripePhaseDiff < Math.PI / 2 || stripePhaseDiff > 3 * Math.PI / 2;
+      for (let i = 0; i < centerlineWithPhase.length; i++) {
+        const centerPoint = centerlineWithPhase[i];
+        const phase = centerPoint.accumulatedTwist;
+        const halfWidth = centerPoint.localWidth / 2;
 
-          if (isVisible) {
-            // Calculate diagonal offset based on twist angle
-            const midAngleDiff = normalizeAngle(phase - stripeMidAngle);
-            const angleOffset = midAngleDiff < Math.PI ? midAngleDiff - Math.PI / 2 : midAngleDiff - 3 * Math.PI / 2;
-            const diagonalOffset = Math.sin(angleOffset) * halfWidth;
+        // Position within current stripe+gap cycle
+        const cyclePhase = phase % cycleWidth;
 
-            // Apply both diagonal offset (for S-curve) and perpendicular offset (for line stacking)
-            const point = {
-              x: centerPoint.x + centerPoint.nx * (diagonalOffset + lineOffset),
-              y: centerPoint.y + centerPoint.ny * (diagonalOffset + lineOffset)
-            };
+        // Are we in a stripe region or gap region?
+        const inStripe = cyclePhase < stripeWidthRadians;
 
-            currentLineSegment.push(point);
-          } else {
-            // Stripe not visible - emit current line segment if any
-            if (currentLineSegment.length > 2) {
-              const linePath = pointsToPath(currentLineSegment);
-              if (linePath) {
-                strokePaths.push(linePath);
-              }
+        if (inStripe) {
+          // Map position within stripe (0 to stripeWidth) to smooth S-curve (-1 to 1)
+          const stripeProgress = (cyclePhase / stripeWidthRadians) * 2 - 1; // -1 to 1
+          const smoothOffset = smoothSigmoid(stripeProgress); // Smooth S-curve
+          const diagonalOffset = smoothOffset * halfWidth;
+
+          // Apply both diagonal offset (for S-curve) and perpendicular offset (for line stacking)
+          const point = {
+            x: centerPoint.x + centerPoint.nx * (diagonalOffset + lineOffset),
+            y: centerPoint.y + centerPoint.ny * (diagonalOffset + lineOffset)
+          };
+
+          currentLineSegment.push(point);
+        } else {
+          // In gap region - emit current line segment if any
+          if (currentLineSegment.length > 2) {
+            const linePath = pointsToPath(currentLineSegment);
+            if (linePath) {
+              strokePaths.push(linePath);
             }
-            currentLineSegment = [];
           }
+          currentLineSegment = [];
         }
+      }
 
-        // Emit final line segment
-        if (currentLineSegment.length > 2) {
-          const linePath = pointsToPath(currentLineSegment);
-          if (linePath) {
-            strokePaths.push(linePath);
-          }
+      // Emit final line segment
+      if (currentLineSegment.length > 2) {
+        const linePath = pointsToPath(currentLineSegment);
+        if (linePath) {
+          strokePaths.push(linePath);
         }
       }
     }
