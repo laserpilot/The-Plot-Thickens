@@ -110,9 +110,11 @@ function buildCLICommand(config) {
     if (config.minOcclusion !== undefined && config.minOcclusion !== 0.0) parts.push(`--min-occlusion ${config.minOcclusion}`);
     if (config.barberPoleMaxWidth !== undefined && config.barberPoleMaxWidth !== 3.0) parts.push(`--barber-pole-max-width ${config.barberPoleMaxWidth}`);
     if (config.barberPoleMinWidth !== undefined && config.barberPoleMinWidth !== 0.0) parts.push(`--barber-pole-min-width ${config.barberPoleMinWidth}`);
-    if (config.stripeThickness !== null && config.stripeThickness !== undefined) parts.push(`--stripe-thickness ${config.stripeThickness}`);
+    if (config.stripeHeight !== null && config.stripeHeight !== undefined) parts.push(`--stripe-height ${config.stripeHeight}`);
     if (config.stripeGapRatio !== undefined && config.stripeGapRatio !== 1.0) parts.push(`--stripe-gap-ratio ${config.stripeGapRatio}`);
-    if (config.stripeLineSpacing !== undefined && config.stripeLineSpacing !== 0.3) parts.push(`--stripe-line-spacing ${config.stripeLineSpacing}`);
+    if (config.lineSpacing !== undefined && config.lineSpacing !== 0.3) parts.push(`--line-spacing ${config.lineSpacing}`);
+    if (config.stripeTaperSharpness !== undefined && config.stripeTaperSharpness !== 1.0) parts.push(`--stripe-taper-sharpness ${config.stripeTaperSharpness}`);
+    if (config.showGapOutlines) parts.push(`--show-gap-outlines`);
   } else if (config.fillMode === 'curly') {
     if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
     if (config.curlyLoopAmplitude !== undefined && config.curlyLoopAmplitude !== 1.0) parts.push(`--curly-loop-amplitude ${config.curlyLoopAmplitude}`);
@@ -562,9 +564,11 @@ export function initUI(store, renderer) {
     barberPoleMinWidth: document.getElementById('barber-pole-min-width'),
     barberPoleStyle: document.getElementById('barber-pole-style'),
     barberPoleEdgeSoftness: document.getElementById('barber-pole-edge-softness'),
-    stripeThickness: document.getElementById('stripe-thickness'),
+    stripeHeight: document.getElementById('stripe-height'),
     stripeGapRatio: document.getElementById('stripe-gap-ratio'),
-    stripeLineSpacing: document.getElementById('stripe-line-spacing'),
+    lineSpacing: document.getElementById('line-spacing'),
+    stripeTaperSharpness: document.getElementById('stripe-taper-sharpness'),
+    showGapOutlines: document.getElementById('show-gap-outlines'),
     // Curly mode controls
     curlyLoopFrequency: document.getElementById('curly-loop-frequency'),
     curlyLoopAmplitude: document.getElementById('curly-loop-amplitude'),
@@ -581,9 +585,11 @@ export function initUI(store, renderer) {
 
       // Handle both numeric and string values
       let value;
-      if (input.type === 'number') {
-        // Special case: empty stripeThickness should be null (auto-scale)
-        if (key === 'stripeThickness' && input.value === '') {
+      if (input.type === 'checkbox') {
+        value = input.checked;
+      } else if (input.type === 'number') {
+        // Special case: empty stripeHeight should be null (auto-scale)
+        if (key === 'stripeHeight' && input.value === '') {
           value = null;
         } else {
           value = parseFloat(input.value);

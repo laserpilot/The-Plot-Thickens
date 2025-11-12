@@ -528,9 +528,9 @@
                     </label>
 
                     <label>
-                      Stripe Thickness (mm)
-                      <input type="number" id="stripe-thickness" step="0.5" min="1" max="20" value="" placeholder="Auto"/>
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Stripe width in mm (empty = auto-scale with path length: 2-10mm)</div>
+                      Stripe Height (mm)
+                      <input type="number" id="stripe-height" step="0.5" min="1" max="20" value="" placeholder="Auto"/>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular thickness of stripe band (empty = auto-scale: 2-10mm). Use twist-frequency to control stripe stretch along path.</div>
                     </label>
 
                     <label>
@@ -541,13 +541,25 @@
 
                     <label>
                       Line Spacing (mm)
-                      <input type="number" id="stripe-line-spacing" step="0.05" min="0.1" max="1" value="0.3" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance between lines within each stripe</div>
+                      <input type="number" id="line-spacing" step="0.05" min="0.1" max="1" value="0.3" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular distance between lines within each stripe</div>
+                    </label>
+
+                    <label>
+                      Stripe Taper Sharpness
+                      <input type="number" id="stripe-taper-sharpness" step="0.1" min="0.1" max="5" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls pointiness of stripe pinch (1.0 = default, higher = sharper/more angular)</div>
+                    </label>
+
+                    <label>
+                      <input type="checkbox" id="show-gap-outlines" />
+                      Show Gap Outlines
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Draw boundary lines at gap edges</div>
                     </label>
                   </div>
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
-                    <strong>Tip:</strong> Leave Stripe Thickness empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Stripe/Gap Ratio to control the balance between filled and empty areas. Lower Line Spacing = denser stripes.
+                    <strong>Tip:</strong> Leave Stripe Height empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Stripe/Gap Ratio to control filled vs empty areas. Higher Taper Sharpness = pointier spirals.
                   </div>
                 </div>
 

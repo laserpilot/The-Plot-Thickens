@@ -2,6 +2,9 @@
  * SVG file loading and parsing utilities
  */
 
+// Import measurePathLength for calculating path lengths
+import { measurePathLength } from '../../../shared/geometry/path-utils.js';
+
 export async function loadSVGFile(file) {
   const text = await file.text();
   return parseSVG(text);
@@ -26,16 +29,25 @@ export function parseSVG(svgText) {
     viewBox: svgEl.getAttribute('viewBox')
   };
 
-  // Extract all path elements
+  // Extract all path elements and calculate their lengths
   const pathElements = svgEl.querySelectorAll('path');
-  const paths = Array.from(pathElements).map((pathEl, index) => ({
-    id: pathEl.id || `path-${index}`,
-    d: pathEl.getAttribute('d'),
-    fill: pathEl.getAttribute('fill'),
-    stroke: pathEl.getAttribute('stroke'),
-    strokeWidth: pathEl.getAttribute('stroke-width'),
-    transform: pathEl.getAttribute('transform')
-  })).filter(p => p.d); // Only paths with data
+  const paths = Array.from(pathElements).map((pathEl, index) => {
+    const d = pathEl.getAttribute('d');
+    if (!d) return null;
+
+    // Calculate path length for binning and outline filtering
+    const length = measurePathLength(d);
+
+    return {
+      id: pathEl.id || `path-${index}`,
+      d,
+      length,  // Add length property for binning/filtering
+      fill: pathEl.getAttribute('fill'),
+      stroke: pathEl.getAttribute('stroke'),
+      strokeWidth: pathEl.getAttribute('stroke-width'),
+      transform: pathEl.getAttribute('transform')
+    };
+  }).filter(p => p !== null); // Only valid paths
 
   return {
     raw: svgText,

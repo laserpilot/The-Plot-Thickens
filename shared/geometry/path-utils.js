@@ -2364,9 +2364,11 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     minWidth = 0.0,
     sampleRate = 0.5,
     pathId = '',
-    stripeThickness = null,      // mm - if null, auto-scale with path length
+    stripeHeight = null,         // mm - perpendicular thickness of stripe band (if null, auto-scale with path length)
     stripeGapRatio = 1.0,        // ratio of gap width to stripe width
-    stripeLineSpacing = 0.3,     // mm - spacing between lines within stripe
+    lineSpacing = 0.3,           // mm - spacing between lines within stripe (perpendicular)
+    stripeTaperSharpness = 1.0,  // 0.1-5.0 - controls pointiness of stripe pinch (1.0=default, higher=sharper)
+    showGapOutlines = false,     // whether to draw boundary lines at gap edges
   } = options;
 
   try {
@@ -2401,27 +2403,25 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Auto-scale stripe thickness based on path length if not specified
+    // Auto-scale stripe height based on path length if not specified
     // Short paths (< 50mm): 2-3mm stripes
     // Medium paths (50-200mm): 3-6mm stripes
     // Long paths (> 200mm): 6-10mm stripes
-    const effectiveStripeThickness = stripeThickness !== null
-      ? stripeThickness
+    const effectiveStripeHeight = stripeHeight !== null
+      ? stripeHeight
       : Math.max(2.0, Math.min(10.0, 2.0 + (totalLength / 50)));
 
-    const gapThickness = effectiveStripeThickness * stripeGapRatio;
+    const gapHeight = effectiveStripeHeight * stripeGapRatio;
 
-    // Calculate lines per stripe based on thickness and line spacing
-    const linesPerStripe = Math.max(3, Math.ceil(effectiveStripeThickness / stripeLineSpacing));
-    const actualLineSpacing = effectiveStripeThickness / linesPerStripe;
+    // Calculate lines per stripe based on height and line spacing
+    const linesPerStripe = Math.max(3, Math.ceil(effectiveStripeHeight / lineSpacing));
+    const actualLineSpacing = effectiveStripeHeight / linesPerStripe;
 
-    console.log(`Barber pole: path=${totalLength.toFixed(1)}mm, stripeThickness=${effectiveStripeThickness.toFixed(2)}mm, gapThickness=${gapThickness.toFixed(2)}mm, linesPerStripe=${linesPerStripe}`);
-
-    // Convert stripe/gap widths from mm to radians
+    // Convert stripe/gap heights from mm to radians
     // Use average circumference for conversion
     const avgCircumference = maxWidth * Math.PI;
-    const stripeWidthRadians = (effectiveStripeThickness / avgCircumference) * 2 * Math.PI;
-    const gapWidthRadians = (gapThickness / avgCircumference) * 2 * Math.PI;
+    const stripeWidthRadians = (effectiveStripeHeight / avgCircumference) * 2 * Math.PI;
+    const gapWidthRadians = (gapHeight / avgCircumference) * 2 * Math.PI;
     const cycleWidth = stripeWidthRadians + gapWidthRadians;
 
     // Smooth sigmoid function for S-curve shape
@@ -2462,10 +2462,12 @@ function generateBarberPoleSmooth(pathData, options = {}) {
           // Stripe ribbon width factor - creates pinched ribbon effect
           // Narrow at stripe edges (-1, +1), wide in middle (0)
           // Using cosine for smooth width variation: cos(0) = 1, cos(±π/2) = 0
-          const stripeWidthFactor = Math.cos(stripeProgress * Math.PI / 2);
+          // Apply sharpness: higher values = more angular/pointy pinch
+          const sharpnessExponent = stripeTaperSharpness;
+          const stripeWidthFactor = Math.pow(Math.cos(stripeProgress * Math.PI / 2), 1.0 / sharpnessExponent);
 
-          // Perpendicular offset for line stacking (creates stripe thickness)
-          const perpOffset = linePositionInStripe * effectiveStripeThickness;
+          // Perpendicular offset for line stacking (creates stripe height)
+          const perpOffset = linePositionInStripe * effectiveStripeHeight;
 
           // Apply stripe ribbon taper (all lines converge to same pinch points)
           const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
@@ -2494,6 +2496,59 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       // Emit final segment
       if (currentLineSegment.length > 2) {
         strokePaths.push(pointsToPath(currentLineSegment));
+      }
+    }
+
+    // Generate gap boundary outlines if requested
+    if (showGapOutlines) {
+      // Generate two boundary lines for each gap (top and bottom edges)
+      for (let boundaryIdx = 0; boundaryIdx < 2; boundaryIdx++) {
+        // boundaryIdx 0 = bottom edge, 1 = top edge
+        const boundaryOffset = boundaryIdx === 0 ? -effectiveStripeHeight / 2 : effectiveStripeHeight / 2;
+
+        let currentBoundarySegment = [];
+
+        for (let i = 0; i < centerlineWithPhase.length; i++) {
+          const centerPoint = centerlineWithPhase[i];
+          const phase = centerPoint.accumulatedTwist;
+          const halfWidth = centerPoint.localWidth / 2;
+          const t = centerPoint.t;
+          const envelopeTaper = envelopeFn(pathId, t);
+
+          const cyclePhase = phase % cycleWidth;
+          const inGap = cyclePhase >= stripeWidthRadians;
+
+          if (inGap) {
+            // Progress through gap (0 to 1)
+            const gapProgress = (cyclePhase - stripeWidthRadians) / gapWidthRadians;
+            const gapCenter = gapProgress * 2 - 1; // -1 to 1
+            const smoothOffset = smoothSigmoid(gapCenter);
+            const diagonalOffset = smoothOffset * halfWidth;
+
+            // Apply envelope taper to boundary offset
+            const taperedBoundaryOffset = boundaryOffset * envelopeTaper;
+
+            const totalOffset = diagonalOffset + taperedBoundaryOffset;
+
+            const point = {
+              x: centerPoint.x + centerPoint.nx * totalOffset,
+              y: centerPoint.y + centerPoint.ny * totalOffset
+            };
+
+            currentBoundarySegment.push(point);
+          } else {
+            // In stripe region - emit current boundary segment if any
+            if (currentBoundarySegment.length > 2) {
+              strokePaths.push(pointsToPath(currentBoundarySegment));
+            }
+            currentBoundarySegment = [];
+          }
+        }
+
+        // Emit final boundary segment
+        if (currentBoundarySegment.length > 2) {
+          strokePaths.push(pointsToPath(currentBoundarySegment));
+        }
       }
     }
 
