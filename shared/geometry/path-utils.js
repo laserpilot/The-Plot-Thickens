@@ -2394,11 +2394,15 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Generate discrete diagonal stripe bands
-    // Each stripe appears/disappears as the cylinder rotates
-    // We create separate band segments with actual gaps between them
+    // Generate discrete stacked stroke paths (not fills!)
+    // Each stripe is multiple parallel S-curve lines stacked close together
+    // Example: 5 lines @ 0.2mm spacing = 1mm thick stripe
+    // Then a gap with no lines
+    // Then another stripe of 5 lines, etc.
 
-    const allBands = [];
+    const strokePaths = [];
+    const linesPerStripe = 5; // Number of parallel lines in each stripe
+    const lineSpacing = 0.2; // mm between parallel lines
 
     // For each stripe
     for (let stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++) {
@@ -2407,73 +2411,59 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       const stripeEndAngle = ((stripeIdx + 0.5) / stripeCount) * 2 * Math.PI; // Half stripe, half gap
       const stripeMidAngle = (stripeStartAngle + stripeEndAngle) / 2;
 
-      // Collect segments where this stripe is visible
-      let currentSegment = null;
+      // Generate multiple parallel lines for this stripe
+      for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
+        // Offset from center of stripe
+        const lineOffset = (lineIdx - (linesPerStripe - 1) / 2) * lineSpacing;
 
-      for (let i = 0; i < centerlineWithPhase.length; i++) {
-        const centerPoint = centerlineWithPhase[i];
-        const phase = centerPoint.accumulatedTwist % (2 * Math.PI);
-        const halfWidth = centerPoint.localWidth / 2;
+        // Collect points for this S-curve line
+        let currentLineSegment = [];
 
-        // Check if stripe is visible at this point
-        // Stripe is visible when its angular range is on the front half of cylinder
-        const stripePhaseDiff = normalizeAngle(phase - stripeMidAngle);
-        const isVisible = stripePhaseDiff < Math.PI / 2 || stripePhaseDiff > 3 * Math.PI / 2;
+        for (let i = 0; i < centerlineWithPhase.length; i++) {
+          const centerPoint = centerlineWithPhase[i];
+          const phase = centerPoint.accumulatedTwist % (2 * Math.PI);
+          const halfWidth = centerPoint.localWidth / 2;
 
-        if (isVisible) {
-          // Calculate both stripe edges with diagonal offset
-          const startDiff = normalizeAngle(phase - stripeStartAngle);
-          const endDiff = normalizeAngle(phase - stripeEndAngle);
+          // Check if stripe is visible at this point
+          const stripePhaseDiff = normalizeAngle(phase - stripeMidAngle);
+          const isVisible = stripePhaseDiff < Math.PI / 2 || stripePhaseDiff > 3 * Math.PI / 2;
 
-          // Only show if both edges are somewhat facing forward
-          if ((startDiff < Math.PI && endDiff < Math.PI) ||
-              (startDiff > Math.PI && endDiff > Math.PI)) {
+          if (isVisible) {
+            // Calculate diagonal offset based on twist angle
+            const midAngleDiff = normalizeAngle(phase - stripeMidAngle);
+            const angleOffset = midAngleDiff < Math.PI ? midAngleDiff - Math.PI / 2 : midAngleDiff - 3 * Math.PI / 2;
+            const diagonalOffset = Math.sin(angleOffset) * halfWidth;
 
-            const startAngleOffset = startDiff < Math.PI ? startDiff - Math.PI / 2 : startDiff - 3 * Math.PI / 2;
-            const endAngleOffset = endDiff < Math.PI ? endDiff - Math.PI / 2 : endDiff - 3 * Math.PI / 2;
-
-            const startLateralOffset = Math.sin(startAngleOffset) * halfWidth;
-            const endLateralOffset = Math.sin(endAngleOffset) * halfWidth;
-
-            const edgePoint1 = {
-              x: centerPoint.x + centerPoint.nx * startLateralOffset,
-              y: centerPoint.y + centerPoint.ny * startLateralOffset
+            // Apply both diagonal offset (for S-curve) and perpendicular offset (for line stacking)
+            const point = {
+              x: centerPoint.x + centerPoint.nx * (diagonalOffset + lineOffset),
+              y: centerPoint.y + centerPoint.ny * (diagonalOffset + lineOffset)
             };
 
-            const edgePoint2 = {
-              x: centerPoint.x + centerPoint.nx * endLateralOffset,
-              y: centerPoint.y + centerPoint.ny * endLateralOffset
-            };
-
-            if (!currentSegment) {
-              currentSegment = { edge1: [], edge2: [] };
+            currentLineSegment.push(point);
+          } else {
+            // Stripe not visible - emit current line segment if any
+            if (currentLineSegment.length > 2) {
+              const linePath = pointsToPath(currentLineSegment);
+              if (linePath) {
+                strokePaths.push(linePath);
+              }
             }
-
-            currentSegment.edge1.push(edgePoint1);
-            currentSegment.edge2.push(edgePoint2);
+            currentLineSegment = [];
           }
-        } else {
-          // Stripe not visible - emit current segment if any
-          if (currentSegment && currentSegment.edge1.length > 2) {
-            const bandPath = createBandFromEdges(currentSegment.edge1, currentSegment.edge2);
-            if (bandPath) {
-              allBands.push(bandPath);
-            }
-          }
-          currentSegment = null;
         }
-      }
 
-      // Emit final segment for this stripe
-      if (currentSegment && currentSegment.edge1.length > 2) {
-        const bandPath = createBandFromEdges(currentSegment.edge1, currentSegment.edge2);
-        if (bandPath) {
-          allBands.push(bandPath);
+        // Emit final line segment
+        if (currentLineSegment.length > 2) {
+          const linePath = pointsToPath(currentLineSegment);
+          if (linePath) {
+            strokePaths.push(linePath);
+          }
         }
       }
     }
 
-    return allBands;
+    return strokePaths;
 
   } catch (error) {
     console.warn('Failed to generate smooth barber pole fill:', error.message);
@@ -2527,10 +2517,10 @@ function createBandFromEdges(edge1, edge2) {
 }
 
 /**
- * Convert array of points to smooth SVG path
+ * Convert array of points to stroke SVG path (no fill)
  * @private
  */
-function pointsToSmoothPath(points) {
+function pointsToPath(points) {
   if (points.length < 2) return '';
 
   let pathData = `M ${points[0].x.toFixed(3)},${points[0].y.toFixed(3)}`;
@@ -2540,6 +2530,14 @@ function pointsToSmoothPath(points) {
   }
 
   return pathData;
+}
+
+/**
+ * Alias for pointsToPath
+ * @private
+ */
+function pointsToSmoothPath(points) {
+  return pointsToPath(points);
 }
 
 /**
