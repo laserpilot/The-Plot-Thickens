@@ -138,6 +138,9 @@ const initialState = {
     barberPoleMinWidth: 0.0,
     barberPoleStyle: 'smooth',  // 'smooth' or 'pixelated'
     barberPoleEdgeSoftness: 0.15,  // 0-1, controls stripe edge smoothness
+    stripeThickness: null,      // mm - null = auto-scale with path length
+    stripeGapRatio: 1.0,        // ratio of gap width to stripe width (1.0 = equal)
+    stripeLineSpacing: 0.3,     // mm - spacing between lines within stripe
     // Curly/Spring fill options
     curlyLoopFrequency: 1.0,    // loops per 10mm (e.g., 1.0 = 1 loop every 10mm)
     curlyLoopAmplitude: 1.0,    // multiplier of envelope width (0.5-2.0)

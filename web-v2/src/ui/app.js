@@ -110,6 +110,9 @@ function buildCLICommand(config) {
     if (config.minOcclusion !== undefined && config.minOcclusion !== 0.0) parts.push(`--min-occlusion ${config.minOcclusion}`);
     if (config.barberPoleMaxWidth !== undefined && config.barberPoleMaxWidth !== 3.0) parts.push(`--barber-pole-max-width ${config.barberPoleMaxWidth}`);
     if (config.barberPoleMinWidth !== undefined && config.barberPoleMinWidth !== 0.0) parts.push(`--barber-pole-min-width ${config.barberPoleMinWidth}`);
+    if (config.stripeThickness !== null && config.stripeThickness !== undefined) parts.push(`--stripe-thickness ${config.stripeThickness}`);
+    if (config.stripeGapRatio !== undefined && config.stripeGapRatio !== 1.0) parts.push(`--stripe-gap-ratio ${config.stripeGapRatio}`);
+    if (config.stripeLineSpacing !== undefined && config.stripeLineSpacing !== 0.3) parts.push(`--stripe-line-spacing ${config.stripeLineSpacing}`);
   } else if (config.fillMode === 'curly') {
     if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
     if (config.curlyLoopAmplitude !== undefined && config.curlyLoopAmplitude !== 1.0) parts.push(`--curly-loop-amplitude ${config.curlyLoopAmplitude}`);
@@ -559,6 +562,9 @@ export function initUI(store, renderer) {
     barberPoleMinWidth: document.getElementById('barber-pole-min-width'),
     barberPoleStyle: document.getElementById('barber-pole-style'),
     barberPoleEdgeSoftness: document.getElementById('barber-pole-edge-softness'),
+    stripeThickness: document.getElementById('stripe-thickness'),
+    stripeGapRatio: document.getElementById('stripe-gap-ratio'),
+    stripeLineSpacing: document.getElementById('stripe-line-spacing'),
     // Curly mode controls
     curlyLoopFrequency: document.getElementById('curly-loop-frequency'),
     curlyLoopAmplitude: document.getElementById('curly-loop-amplitude'),
@@ -572,8 +578,19 @@ export function initUI(store, renderer) {
 
     input.addEventListener('change', () => {
       const config = store.getState('config');
+
       // Handle both numeric and string values
-      const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+      let value;
+      if (input.type === 'number') {
+        // Special case: empty stripeThickness should be null (auto-scale)
+        if (key === 'stripeThickness' && input.value === '') {
+          value = null;
+        } else {
+          value = parseFloat(input.value);
+        }
+      } else {
+        value = input.value;
+      }
 
       // Map spiral stripe controls to config keys
       const configKey = key === 'spiralStripeFilled' ? 'stripeFilled' :

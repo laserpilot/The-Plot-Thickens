@@ -2364,6 +2364,9 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     minWidth = 0.0,
     sampleRate = 0.5,
     pathId = '',
+    stripeThickness = null,      // mm - if null, auto-scale with path length
+    stripeGapRatio = 1.0,        // ratio of gap width to stripe width
+    stripeLineSpacing = 0.3,     // mm - spacing between lines within stripe
   } = options;
 
   try {
@@ -2394,85 +2397,100 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       return [];
     }
 
-    // Generate discrete stacked stroke paths (not fills!)
-    // Each stripe is multiple parallel S-curve lines stacked close together
-    // The NUMBER of stripes you see is determined by: pathLength × twistFrequency
-    // NOT by a stripeCount parameter!
+    // Auto-scale stripe thickness based on path length if not specified
+    // Short paths (< 50mm): 2-3mm stripes
+    // Medium paths (50-200mm): 3-6mm stripes
+    // Long paths (> 200mm): 6-10mm stripes
+    const effectiveStripeThickness = stripeThickness !== null
+      ? stripeThickness
+      : Math.max(2.0, Math.min(10.0, 2.0 + (totalLength / 50)));
 
-    const strokePaths = [];
-    const linesPerStripe = 5; // Number of parallel lines in each stripe
-    const lineSpacing = 0.2; // mm between parallel lines
+    const gapThickness = effectiveStripeThickness * stripeGapRatio;
 
-    // Define stripe and gap widths in RADIANS (not count!)
-    // This determines the pattern repeat cycle
-    const stripeWidthRadians = Math.PI * 0.8; // How wide each stripe is (in rotation angle)
-    const gapWidthRadians = Math.PI * 1.2;     // How wide each gap is
-    const cycleWidth = stripeWidthRadians + gapWidthRadians; // Full stripe+gap cycle
+    // Calculate lines per stripe based on thickness and line spacing
+    const linesPerStripe = Math.max(3, Math.ceil(effectiveStripeThickness / stripeLineSpacing));
+    const actualLineSpacing = effectiveStripeThickness / linesPerStripe;
+
+    console.log(`Barber pole: path=${totalLength.toFixed(1)}mm, stripeThickness=${effectiveStripeThickness.toFixed(2)}mm, gapThickness=${gapThickness.toFixed(2)}mm, linesPerStripe=${linesPerStripe}`);
+
+    // Convert stripe/gap widths from mm to radians
+    // Use average circumference for conversion
+    const avgCircumference = maxWidth * Math.PI;
+    const stripeWidthRadians = (effectiveStripeThickness / avgCircumference) * 2 * Math.PI;
+    const gapWidthRadians = (gapThickness / avgCircumference) * 2 * Math.PI;
+    const cycleWidth = stripeWidthRadians + gapWidthRadians;
 
     // Smooth sigmoid function for S-curve shape
-    // Maps x from -1 to 1 → output from -1 to 1 smoothly
     const smoothSigmoid = (x) => {
-      // Tanh gives a smooth S-curve, smoother than sin
-      return Math.tanh(x * 2.5); // 2.5 controls steepness
+      return Math.tanh(x * 2.5);
     };
 
-    // Generate lines for each stripe instance that appears along the path
-    for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
-      // Offset from center of stripe
-      const lineOffset = (lineIdx - (linesPerStripe - 1) / 2) * lineSpacing;
+    const strokePaths = [];
 
-      // Collect points for this S-curve line
+    // Generate lines for each stripe
+    for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
+      // Position within stripe (-0.5 to 0.5, where 0 is center)
+      const linePositionInStripe = (lineIdx - (linesPerStripe - 1) / 2) / linesPerStripe;
+
       let currentLineSegment = [];
 
       for (let i = 0; i < centerlineWithPhase.length; i++) {
         const centerPoint = centerlineWithPhase[i];
         const phase = centerPoint.accumulatedTwist;
         const halfWidth = centerPoint.localWidth / 2;
+        const t = centerPoint.t; // Normalized position along path (0-1)
+
+        // Get envelope taper at this point for clean pinch
+        const envelopeTaper = envelopeFn(pathId, t);
 
         // Position within current stripe+gap cycle
         const cyclePhase = phase % cycleWidth;
-
-        // Are we in a stripe region or gap region?
         const inStripe = cyclePhase < stripeWidthRadians;
 
         if (inStripe) {
-          // Map position within stripe (0 to stripeWidth) to smooth S-curve (-1 to 1)
-          const stripeProgress = (cyclePhase / stripeWidthRadians) * 2 - 1; // -1 to 1
-          const smoothOffset = smoothSigmoid(stripeProgress); // Smooth S-curve
+          // Progress through stripe width (-1 to 1)
+          const stripeProgress = (cyclePhase / stripeWidthRadians) * 2 - 1;
+          const smoothOffset = smoothSigmoid(stripeProgress);
+
+          // Base diagonal offset for the S-curve
           const diagonalOffset = smoothOffset * halfWidth;
 
-          // Apply both diagonal offset (for S-curve) and perpendicular offset (for line stacking)
+          // Perpendicular offset for line stacking
+          // This creates the stripe thickness
+          const perpOffset = linePositionInStripe * effectiveStripeThickness;
+
+          // Apply envelope taper to create clean pinch
+          // Lines converge toward centerline as envelope shrinks
+          const taperedPerpOffset = perpOffset * envelopeTaper;
+
+          // Combine offsets
+          const totalOffset = diagonalOffset + taperedPerpOffset;
+
           const point = {
-            x: centerPoint.x + centerPoint.nx * (diagonalOffset + lineOffset),
-            y: centerPoint.y + centerPoint.ny * (diagonalOffset + lineOffset)
+            x: centerPoint.x + centerPoint.nx * totalOffset,
+            y: centerPoint.y + centerPoint.ny * totalOffset
           };
 
           currentLineSegment.push(point);
         } else {
           // In gap region - emit current line segment if any
           if (currentLineSegment.length > 2) {
-            const linePath = pointsToPath(currentLineSegment);
-            if (linePath) {
-              strokePaths.push(linePath);
-            }
+            strokePaths.push(pointsToPath(currentLineSegment));
           }
           currentLineSegment = [];
         }
       }
 
-      // Emit final line segment
+      // Emit final segment
       if (currentLineSegment.length > 2) {
-        const linePath = pointsToPath(currentLineSegment);
-        if (linePath) {
-          strokePaths.push(linePath);
-        }
+        strokePaths.push(pointsToPath(currentLineSegment));
       }
     }
 
     return strokePaths;
 
   } catch (error) {
-    console.warn('Failed to generate smooth barber pole fill:', error.message);
+    console.error('Error generating smooth barber pole:', error);
     return [];
   }
 }
