@@ -138,6 +138,15 @@ const initialState = {
     barberPoleMinWidth: 0.0,
     barberPoleStyle: 'smooth',  // 'smooth' or 'pixelated'
     barberPoleEdgeSoftness: 0.15,  // 0-1, controls stripe edge smoothness
+    // Curly/Spring fill options
+    curlyLoopFrequency: 1.0,    // loops per 10mm (e.g., 1.0 = 1 loop every 10mm)
+    curlyLoopAmplitude: 1.0,    // multiplier of envelope width (0.5-2.0)
+    curlyOverlap: 0.3,          // 0-1, controls loop density/overlap
+    curlyMinWidth: 0.5,         // mm - min width threshold for rendering loops
+    curlyLoopStyle: 'circular', // 'circular' or 'elliptical' (future)
+    curlyStrands: 1,            // number of parallel spring strands
+    curlyStrandPhaseOffset: 0.5, // 0-1, phase offset between strands
+    curlyMaxWidth: 4.0,         // maximum envelope width (mm)
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',

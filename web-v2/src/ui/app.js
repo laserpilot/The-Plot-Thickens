@@ -110,6 +110,12 @@ function buildCLICommand(config) {
     if (config.minOcclusion !== undefined && config.minOcclusion !== 0.0) parts.push(`--min-occlusion ${config.minOcclusion}`);
     if (config.barberPoleMaxWidth !== undefined && config.barberPoleMaxWidth !== 3.0) parts.push(`--barber-pole-max-width ${config.barberPoleMaxWidth}`);
     if (config.barberPoleMinWidth !== undefined && config.barberPoleMinWidth !== 0.0) parts.push(`--barber-pole-min-width ${config.barberPoleMinWidth}`);
+  } else if (config.fillMode === 'curly') {
+    if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
+    if (config.curlyLoopAmplitude !== undefined && config.curlyLoopAmplitude !== 1.0) parts.push(`--curly-loop-amplitude ${config.curlyLoopAmplitude}`);
+    if (config.curlyMinWidth !== undefined && config.curlyMinWidth !== 0.5) parts.push(`--curly-min-width ${config.curlyMinWidth}`);
+    if (config.curlyStrands !== undefined && config.curlyStrands !== 1) parts.push(`--curly-strands ${config.curlyStrands}`);
+    if (config.curlyMaxWidth !== undefined && config.curlyMaxWidth !== 4.0) parts.push(`--curly-max-width ${config.curlyMaxWidth}`);
   }
 
   parts.push(`--sample-rate ${config.sampleRate}`);
@@ -552,7 +558,13 @@ export function initUI(store, renderer) {
     barberPoleMaxWidth: document.getElementById('barber-pole-max-width'),
     barberPoleMinWidth: document.getElementById('barber-pole-min-width'),
     barberPoleStyle: document.getElementById('barber-pole-style'),
-    barberPoleEdgeSoftness: document.getElementById('barber-pole-edge-softness')
+    barberPoleEdgeSoftness: document.getElementById('barber-pole-edge-softness'),
+    // Curly mode controls
+    curlyLoopFrequency: document.getElementById('curly-loop-frequency'),
+    curlyLoopAmplitude: document.getElementById('curly-loop-amplitude'),
+    curlyMinWidth: document.getElementById('curly-min-width'),
+    curlyStrands: document.getElementById('curly-strands'),
+    curlyMaxWidth: document.getElementById('curly-max-width')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -1076,6 +1088,7 @@ export function initUI(store, renderer) {
     const hatchGradientControls = document.getElementById('mode-hatch-gradient-controls');
     const shapeFillControls = document.getElementById('mode-shape-fill-controls');
     const barberPoleControls = document.getElementById('mode-barber-pole-controls');
+    const curlyControls = document.getElementById('mode-curly-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
@@ -1085,6 +1098,7 @@ export function initUI(store, renderer) {
     hatchGradientControls.style.display = 'none';
     shapeFillControls.style.display = 'none';
     barberPoleControls.style.display = 'none';
+    curlyControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -1101,6 +1115,8 @@ export function initUI(store, renderer) {
       shapeFillControls.style.display = 'block';
     } else if (mode === 'barber-pole') {
       barberPoleControls.style.display = 'block';
+    } else if (mode === 'curly') {
+      curlyControls.style.display = 'block';
     }
   }
 

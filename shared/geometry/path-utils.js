@@ -2559,6 +2559,152 @@ function generateBarberPoleFill(pathData, options = {}) {
   }
 }
 
+/**
+ * Generate a continuous curly/spring fill that loops along the path
+ * Creates a telephone-cord or spring-like pattern following the centerline
+ *
+ * @param {string} pathData - SVG path d attribute
+ * @param {Object} options - Configuration options
+ * @returns {Array<string>} Array of SVG path data strings (one per strand)
+ */
+function generateCurlyFill(pathData, options = {}) {
+  const {
+    loopFrequency = 1.0,      // loops per 10mm
+    loopAmplitude = 1.0,      // multiplier of envelope width (0.5 = 50%, 1.0 = 100%)
+    overlap = 0.3,            // 0-1, controls loop density/overlap (unused for now)
+    minWidthThreshold = 0.5,  // mm - below this width, render as centerline
+    loopStyle = 'circular',   // 'circular' or 'elliptical' (future)
+    strands = 1,              // number of parallel spring strands
+    strandPhaseOffset = 0.5,  // 0-1, phase offset between strands
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    sampleRate = 0.5,         // mm between sample points
+    noise = 0,
+    seed = null,
+    pathId = 'path'
+  } = options;
+
+  const paths = [];
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return paths;
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+
+    // Sample path to get centerline points with normals
+    const centerline = [];
+
+    for (let dist = 0; dist <= totalLength; dist += sampleRate) {
+      const point = getPointAtLength(absolutePath, dist);
+
+      if (!point || isNaN(point.x) || isNaN(point.y)) {
+        break;
+      }
+
+      // Calculate normal vector (perpendicular to path)
+      const nextDist = Math.min(dist + sampleRate * 0.1, totalLength);
+      const nextPoint = getPointAtLength(absolutePath, nextDist);
+
+      if (nextPoint && !isNaN(nextPoint.x) && !isNaN(nextPoint.y)) {
+        const dx = nextPoint.x - point.x;
+        const dy = nextPoint.y - point.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+
+        if (len > 0) {
+          // Normal is perpendicular to tangent
+          point.nx = -dy / len;
+          point.ny = dx / len;
+        } else {
+          point.nx = 0;
+          point.ny = 1;
+        }
+      } else {
+        point.nx = 0;
+        point.ny = 1;
+      }
+
+      // Calculate envelope width at this position
+      const t = dist / totalLength;
+      const envelopeMultiplier = envelopeFn(pathId, t);
+      point.localWidth = minWidth + envelopeMultiplier * (maxWidth - minWidth);
+      point.distance = dist;
+
+      centerline.push(point);
+    }
+
+    if (centerline.length < 2) {
+      return paths;
+    }
+
+    // Generate curly paths (one per strand)
+    for (let strandIdx = 0; strandIdx < strands; strandIdx++) {
+      const strandPhase = strandIdx * strandPhaseOffset * Math.PI * 2;
+      const curlyPoints = [];
+
+      for (let i = 0; i < centerline.length; i++) {
+        const point = centerline[i];
+        const width = point.localWidth;
+        const dist = point.distance;
+
+        // If width is below threshold, follow centerline
+        if (width < minWidthThreshold) {
+          curlyPoints.push({
+            x: point.x,
+            y: point.y
+          });
+          continue;
+        }
+
+        // Calculate loop phase based on distance traveled
+        // loopFrequency is loops per 10mm, so divide by 10 to get loops per mm
+        const loopsPerMm = loopFrequency / 10;
+        const phase = (dist * loopsPerMm * Math.PI * 2) + strandPhase;
+
+        // Calculate perpendicular offset using sine wave
+        // The sine wave creates the looping motion
+        const loopRadius = width * loopAmplitude * 0.5;
+        const offset = Math.sin(phase) * loopRadius;
+
+        // Apply offset perpendicular to path
+        const x = point.x + point.nx * offset;
+        const y = point.y + point.ny * offset;
+
+        // Add noise if specified
+        let noiseOffsetX = 0;
+        let noiseOffsetY = 0;
+        if (noise > 0) {
+          const noiseSeed = seed !== null ? seed : pathId.length;
+          noiseOffsetX = simpleNoise(dist / 10 + strandIdx * 100, noiseSeed) * noise;
+          noiseOffsetY = simpleNoise(dist / 10 + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
+        }
+
+        curlyPoints.push({
+          x: x + noiseOffsetX,
+          y: y + noiseOffsetY
+        });
+      }
+
+      // Convert points to SVG path
+      if (curlyPoints.length > 1) {
+        paths.push(pointsToPath(curlyPoints));
+      }
+    }
+
+  } catch (error) {
+    console.error(`Error generating curly fill for path ${pathId}:`, error);
+  }
+
+  return paths;
+}
+
 export {
   measurePathLength,
   offsetPath,
@@ -2575,4 +2721,5 @@ export {
   generateBarberPoleFill,
   generateBarberPolePixelated,
   generateBarberPoleSmooth,
+  generateCurlyFill,
 };

@@ -121,6 +121,7 @@
                       <option value="hatch-gradient">Hatch Gradient</option>
                       <option value="shape-fill">Shape Fill</option>
                       <option value="barber-pole">Barber Pole</option>
+                      <option value="curly">Curly</option>
                     </select>
                   </label>
 
@@ -529,6 +530,50 @@
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
                     <strong>Tip:</strong> Base Offset above controls spacing between fill lines within each stripe. Use envelope presets (Effects section) for dramatic breathing/flowing motion. Inverse twist mode with sinTaperBoth envelope creates the most dynamic effect.
+                  </div>
+                </div>
+
+                <!-- Curly Fill Mode Controls -->
+                <div id="mode-curly-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Curly Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates a continuous looping/spring pattern that follows the path like a telephone cord or coiled spring. Loop size follows the envelope taper.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Loop Frequency (loops/10mm)
+                      <input type="number" id="curly-loop-frequency" step="0.1" min="0.2" max="5.0" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How tight the curls are (1.0 = 1 loop per 10mm)</div>
+                    </label>
+
+                    <label>
+                      Loop Amplitude
+                      <input type="number" id="curly-loop-amplitude" step="0.1" min="0.3" max="2.0" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Loop size as multiplier of width (1.0 = 100% of envelope width)</div>
+                    </label>
+
+                    <label>
+                      Min Width Threshold (mm)
+                      <input type="number" id="curly-min-width" step="0.1" min="0" max="2.0" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Below this width, render as straight line</div>
+                    </label>
+
+                    <label>
+                      Strands
+                      <input type="number" id="curly-strands" step="1" min="1" max="5" value="1" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Number of parallel spring strands</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="curly-max-width" step="0.1" min="1.0" max="10" value="4.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum width at widest envelope point</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Try sinTaperBoth envelope for springs that tighten at the ends. Multiple strands create a braided effect. Higher frequency = tighter coils, lower = lazy loops.
                   </div>
                 </div>
 

@@ -7,7 +7,8 @@ import {
   generatePasses,
   measurePathLength,
   lengthToWeight,
-  getEnvelopePreset
+  getEnvelopePreset,
+  generateCurlyFill
 } from '../../shared/geometry/path-utils.js';
 
 import { AttractorSystem } from '../../shared/fields/attractor.js';
@@ -167,6 +168,43 @@ export function processPathsWithProgress(
         shadowSoftness: hatchGradient.shadowSoftness || 0.5,
         viewBox: viewBox || { x: 0, y: 0, width: 100, height: 100 }
       };
+    }
+
+    // Handle curly mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'curly') {
+      const curlyPaths = generateCurlyFill(path.d, {
+        loopFrequency: config.curlyLoopFrequency !== undefined ? config.curlyLoopFrequency : 1.0,
+        loopAmplitude: config.curlyLoopAmplitude !== undefined ? config.curlyLoopAmplitude : 1.0,
+        overlap: config.curlyOverlap !== undefined ? config.curlyOverlap : 0.3,
+        minWidthThreshold: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.5,
+        loopStyle: config.curlyLoopStyle || 'circular',
+        strands: config.curlyStrands !== undefined ? config.curlyStrands : 1,
+        strandPhaseOffset: config.curlyStrandPhaseOffset !== undefined ? config.curlyStrandPhaseOffset : 0.5,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 3.0,
+        minWidth: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.0,
+        noise: config.noise || 0,
+        seed: null,
+        sampleRate: config.sampleRate || 0.5,
+        pathId: `path-${i}`
+      });
+
+      // Add each generated curly path
+      curlyPaths.forEach((curlyData, curlyIndex) => {
+        processed.push({
+          id: `${path.id || i}-curly-${curlyIndex}`,
+          d: curlyData,
+          originalIndex: i,
+          curlyIndex,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
     }
 
     // Generate offset passes for this path
