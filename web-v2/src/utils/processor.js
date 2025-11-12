@@ -273,7 +273,19 @@ export async function processPaths(paths, config, attractors = [], attractorConf
 
     // Handle result - could be array of paths or {fills, outlines} object
     const passes = config.addOutline && result.fills ? result.fills : (Array.isArray(result) ? result : []);
-    const outlines = config.addOutline && result.outlines ? result.outlines : [];
+    let outlines = config.addOutline && result.outlines ? result.outlines : [];
+
+    // Filter outlines by path length (based on original path length)
+    if (outlines.length > 0 && (config.outlineMinLength !== null || config.outlineMaxLength !== null)) {
+      const passesFilter =
+        (config.outlineMinLength === null || length >= config.outlineMinLength) &&
+        (config.outlineMaxLength === null || length <= config.outlineMaxLength);
+
+      if (!passesFilter) {
+        // Path doesn't meet length criteria for outlines - clear them
+        outlines = [];
+      }
+    }
 
     // Add each pass as a separate path with proper SVG attributes
     passes.forEach((passData, passIndex) => {

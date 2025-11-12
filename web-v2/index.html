@@ -909,7 +909,44 @@
                         style="width: 100%;"
                       />
                     </div>
-                    <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
+
+                    <!-- Outline Length Filtering -->
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                      <div style="margin-bottom: 0.5rem;">
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                          <span>Min Length (mm)</span>
+                          <input
+                            type="number"
+                            id="outline-min-length"
+                            value=""
+                            placeholder="No min"
+                            min="0"
+                            step="1"
+                            style="width: 80px; padding: 0.25rem; text-align: right;"
+                          />
+                        </label>
+                      </div>
+
+                      <div>
+                        <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                          <span>Max Length (mm)</span>
+                          <input
+                            type="number"
+                            id="outline-max-length"
+                            value=""
+                            placeholder="No max"
+                            min="0"
+                            step="1"
+                            style="width: 80px; padding: 0.25rem; text-align: right;"
+                          />
+                        </label>
+                      </div>
+                      <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
+                        Filter outlines by original path length. Useful to skip outlines on very short paths where they just overlay the fill.
+                      </div>
+                    </div>
+
+                    <div class="info-box" style="display: block; margin-top: 0.75rem; font-size: 0.85em;">
                       Outline strokes are rendered as multiple offset passes to add thickness. Each pass adds the specified offset distance.
                     </div>
                   </div>

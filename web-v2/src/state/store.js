@@ -170,6 +170,8 @@ const initialState = {
     addOutline: false,
     outlineOffset: 0.25,    // Base offset for outline thickness (mm)
     outlinePasses: 1,       // Number of passes for outline thickness
+    outlineMinLength: null, // Minimum path length to generate outlines (null = no minimum)
+    outlineMaxLength: null, // Maximum path length to generate outlines (null = no maximum)
     // Length binning for SVG organization
     enableBinning: false,
     binCount: 4

@@ -131,6 +131,12 @@ function buildCLICommand(config) {
     if (config.outlinePasses !== undefined && config.outlinePasses !== 1) {
       parts.push(`--outline-passes ${config.outlinePasses}`);
     }
+    if (config.outlineMinLength !== null && config.outlineMinLength !== undefined) {
+      parts.push(`--outline-min-length ${config.outlineMinLength}`);
+    }
+    if (config.outlineMaxLength !== null && config.outlineMaxLength !== undefined) {
+      parts.push(`--outline-max-length ${config.outlineMaxLength}`);
+    }
   }
 
   // Output size
@@ -969,6 +975,36 @@ export function initUI(store, renderer) {
     const config = store.getState('config');
     store.setState({
       config: { ...config, outlinePasses: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
+    const originalPaths = store.getState('originalPaths');
+    if (originalPaths && originalPaths.length > 0) {
+      throttledProcess();
+    }
+  });
+
+  // Outline min/max length filtering controls
+  const outlineMinLengthInput = document.getElementById('outline-min-length');
+  const outlineMaxLengthInput = document.getElementById('outline-max-length');
+
+  outlineMinLengthInput.addEventListener('input', (e) => {
+    const value = e.target.value === '' ? null : parseFloat(e.target.value);
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlineMinLength: value }
+    });
+    updateCLICommandDisplay(store.getState('config'));
+    const originalPaths = store.getState('originalPaths');
+    if (originalPaths && originalPaths.length > 0) {
+      throttledProcess();
+    }
+  });
+
+  outlineMaxLengthInput.addEventListener('input', (e) => {
+    const value = e.target.value === '' ? null : parseFloat(e.target.value);
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, outlineMaxLength: value }
     });
     updateCLICommandDisplay(store.getState('config'));
     const originalPaths = store.getState('originalPaths');
