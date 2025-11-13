@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Barber Pole Stripe Taper Tuner</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 20px;
+    }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      height: fit-content;
+      position: sticky;
+      top: 20px;
+    }
+
+    h1 {
+      font-size: 1.5em;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 0.9em;
+      font-weight: 500;
+      color: #555;
+      margin-bottom: 5px;
+    }
+
+    .control-group input[type="range"] {
+      width: 100%;
+      margin-bottom: 5px;
+    }
+
+    .control-group .value-display {
+      font-size: 0.85em;
+      color: #666;
+      font-family: 'Courier New', monospace;
+    }
+
+    .control-group select {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .control-group input[type="checkbox"] {
+      margin-right: 8px;
+    }
+
+    .control-group .checkbox-label {
+      display: flex;
+      align-items: center;
+      font-size: 0.9em;
+    }
+
+    .preview {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .preview h2 {
+      font-size: 1.2em;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    #svg-preview {
+      width: 100%;
+      height: auto;
+      border: 1px solid #eee;
+      background: white;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      flex: 1;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button.secondary {
+      background: #6c757d;
+    }
+
+    button.secondary:hover {
+      background: #545b62;
+    }
+
+    .cli-output {
+      margin-top: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8em;
+      word-wrap: break-word;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .help-text {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .section-title {
+      font-size: 1em;
+      font-weight: 600;
+      color: #333;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .section-title:first-child {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="controls">
+      <h1>Barber Pole Tuner</h1>
+
+      <div class="section-title">Sample Path</div>
+      <div class="control-group">
+        <label>Path Type</label>
+        <select id="path-type">
+          <option value="wavy">Wavy (sine wave)</option>
+          <option value="straight">Straight horizontal</option>
+          <option value="curved">Curved (arc)</option>
+          <option value="s-curve">S-Curve</option>
+        </select>
+      </div>
+
+      <div class="section-title">Stripe Configuration</div>
+      <div class="control-group">
+        <label>Stripe Count <span class="value-display" id="val-stripe-count">2</span></label>
+        <input type="range" id="stripe-count" min="1" max="5" step="1" value="2">
+      </div>
+
+      <div class="control-group">
+        <label>Twist Frequency <span class="value-display" id="val-twist-frequency">0.3</span></label>
+        <input type="range" id="twist-frequency" min="0.1" max="1.0" step="0.05" value="0.3">
+        <div class="help-text">Controls stripe "horizontal" stretch</div>
+      </div>
+
+      <div class="control-group">
+        <label>Stripe Height (mm) <span class="value-display" id="val-stripe-height">6</span></label>
+        <input type="range" id="stripe-height" min="2" max="15" step="0.5" value="6">
+        <div class="help-text">Perpendicular thickness of stripe band</div>
+      </div>
+
+      <div class="control-group">
+        <label>Stripe/Gap Ratio <span class="value-display" id="val-stripe-gap-ratio">0.5</span></label>
+        <input type="range" id="stripe-gap-ratio" min="0.2" max="3" step="0.1" value="0.5">
+      </div>
+
+      <div class="control-group">
+        <label>Line Spacing (mm) <span class="value-display" id="val-line-spacing">0.5</span></label>
+        <input type="range" id="line-spacing" min="0.2" max="1.5" step="0.05" value="0.5">
+      </div>
+
+      <div class="section-title">Stripe Taper Control</div>
+      <div class="control-group">
+        <label>Edge Sharpness <span class="value-display" id="val-edge-sharpness">1.0</span></label>
+        <input type="range" id="edge-sharpness" min="0.1" max="5" step="0.1" value="1.0">
+        <div class="help-text">Controls pointiness at stripe edges</div>
+      </div>
+
+      <div class="control-group">
+        <label>Middle Angle <span class="value-display" id="val-middle-angle">1.0</span></label>
+        <input type="range" id="middle-angle" min="0.1" max="3" step="0.1" value="1.0">
+        <div class="help-text">Controls diagonal slope in middle</div>
+      </div>
+
+      <div class="section-title">Display Options</div>
+      <div class="control-group">
+        <label>Envelope</label>
+        <select id="envelope">
+          <option value="flat">Flat</option>
+          <option value="sinTaperBoth" selected>Sin Taper Both</option>
+          <option value="sinTaperStart">Sin Taper Start</option>
+          <option value="sinTaperEnd">Sin Taper End</option>
+          <option value="linearTaperBoth">Linear Taper Both</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Max Width (mm) <span class="value-display" id="val-max-width">8</span></label>
+        <input type="range" id="max-width" min="2" max="20" step="0.5" value="8">
+      </div>
+
+      <div class="control-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="show-gap-outlines">
+          Show Gap Outlines
+        </label>
+      </div>
+
+      <div class="button-group">
+        <button id="btn-reset">Reset Defaults</button>
+        <button id="btn-copy-cli" class="secondary">Copy CLI</button>
+      </div>
+
+      <div class="cli-output" id="cli-output"></div>
+    </div>
+
+    <div class="preview">
+      <h2>Live Preview</h2>
+      <svg id="svg-preview" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+        <!-- Preview will be rendered here -->
+      </svg>
+    </div>
+  </div>
+
+  <script type="module">
+    import { generateBarberPoleSmooth } from '../shared/geometry/path-utils.js';
+
+    // Generate sample paths
+    function generateSamplePath(type, width = 300, height = 200) {
+      const centerX = 200;
+      const centerY = 150;
+
+      switch (type) {
+        case 'straight':
+          return `M ${centerX - width/2} ${centerY} L ${centerX + width/2} ${centerY}`;
+
+        case 'wavy': {
+          const points = [];
+          const segments = 40;
+          for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const x = centerX - width/2 + t * width;
+            const y = centerY + Math.sin(t * Math.PI * 3) * 30;
+            points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
+          }
+          return points.join(' ');
+        }
+
+        case 'curved': {
+          const startX = centerX - width/2;
+          const endX = centerX + width/2;
+          const startY = centerY + 40;
+          const endY = centerY - 40;
+          const controlX = centerX;
+          const controlY = centerY - 80;
+          return `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+        }
+
+        case 's-curve': {
+          const points = [];
+          const segments = 40;
+          for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const x = centerX - width/2 + t * width;
+            const y = centerY + Math.sin(t * Math.PI * 2) * 50;
+            points.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
+          }
+          return points.join(' ');
+        }
+
+        default:
+          return `M ${centerX - width/2} ${centerY} L ${centerX + width/2} ${centerY}`;
+      }
+    }
+
+    // Get all controls
+    const controls = {
+      pathType: document.getElementById('path-type'),
+      stripeCount: document.getElementById('stripe-count'),
+      twistFrequency: document.getElementById('twist-frequency'),
+      stripeHeight: document.getElementById('stripe-height'),
+      stripeGapRatio: document.getElementById('stripe-gap-ratio'),
+      lineSpacing: document.getElementById('line-spacing'),
+      edgeSharpness: document.getElementById('edge-sharpness'),
+      middleAngle: document.getElementById('middle-angle'),
+      envelope: document.getElementById('envelope'),
+      maxWidth: document.getElementById('max-width'),
+      showGapOutlines: document.getElementById('show-gap-outlines')
+    };
+
+    const valueDisplays = {
+      stripeCount: document.getElementById('val-stripe-count'),
+      twistFrequency: document.getElementById('val-twist-frequency'),
+      stripeHeight: document.getElementById('val-stripe-height'),
+      stripeGapRatio: document.getElementById('val-stripe-gap-ratio'),
+      lineSpacing: document.getElementById('val-line-spacing'),
+      edgeSharpness: document.getElementById('val-edge-sharpness'),
+      middleAngle: document.getElementById('val-middle-angle'),
+      maxWidth: document.getElementById('val-max-width')
+    };
+
+    const svgPreview = document.getElementById('svg-preview');
+    const cliOutput = document.getElementById('cli-output');
+
+    // Update preview
+    function updatePreview() {
+      // Get current values
+      const config = {
+        pathType: controls.pathType.value,
+        stripeCount: parseInt(controls.stripeCount.value),
+        twistFrequency: parseFloat(controls.twistFrequency.value),
+        stripeHeight: parseFloat(controls.stripeHeight.value),
+        stripeGapRatio: parseFloat(controls.stripeGapRatio.value),
+        lineSpacing: parseFloat(controls.lineSpacing.value),
+        edgeSharpness: parseFloat(controls.edgeSharpness.value),
+        middleAngle: parseFloat(controls.middleAngle.value),
+        envelope: controls.envelope.value,
+        maxWidth: parseFloat(controls.maxWidth.value),
+        showGapOutlines: controls.showGapOutlines.checked
+      };
+
+      // Update value displays
+      valueDisplays.stripeCount.textContent = config.stripeCount;
+      valueDisplays.twistFrequency.textContent = config.twistFrequency.toFixed(2);
+      valueDisplays.stripeHeight.textContent = config.stripeHeight.toFixed(1);
+      valueDisplays.stripeGapRatio.textContent = config.stripeGapRatio.toFixed(1);
+      valueDisplays.lineSpacing.textContent = config.lineSpacing.toFixed(2);
+      valueDisplays.edgeSharpness.textContent = config.edgeSharpness.toFixed(1);
+      valueDisplays.middleAngle.textContent = config.middleAngle.toFixed(1);
+      valueDisplays.maxWidth.textContent = config.maxWidth.toFixed(1);
+
+      // Generate sample path
+      const samplePath = generateSamplePath(config.pathType);
+
+      // Generate barber pole
+      try {
+        const barberPolePaths = generateBarberPoleSmooth(samplePath, {
+          stripeCount: config.stripeCount,
+          twistFrequency: config.twistFrequency,
+          twistRateMode: 'constant',
+          envelope: config.envelope,
+          maxWidth: config.maxWidth,
+          minWidth: 0,
+          stripeHeight: config.stripeHeight,
+          stripeGapRatio: config.stripeGapRatio,
+          lineSpacing: config.lineSpacing,
+          stripeTaperEdgeSharpness: config.edgeSharpness,
+          stripeTaperMiddleAngle: config.middleAngle,
+          showGapOutlines: config.showGapOutlines,
+          sampleRate: 0.5
+        });
+
+        // Clear SVG and render paths
+        svgPreview.innerHTML = '';
+
+        // Add background grid for reference
+        const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        grid.setAttribute('opacity', '0.1');
+        for (let x = 0; x <= 400; x += 20) {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', x);
+          line.setAttribute('y1', 0);
+          line.setAttribute('x2', x);
+          line.setAttribute('y2', 300);
+          line.setAttribute('stroke', '#ccc');
+          line.setAttribute('stroke-width', '0.5');
+          grid.appendChild(line);
+        }
+        for (let y = 0; y <= 300; y += 20) {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', 0);
+          line.setAttribute('y1', y);
+          line.setAttribute('x2', 400);
+          line.setAttribute('y2', y);
+          line.setAttribute('stroke', '#ccc');
+          line.setAttribute('stroke-width', '0.5');
+          grid.appendChild(line);
+        }
+        svgPreview.appendChild(grid);
+
+        // Render barber pole paths
+        barberPolePaths.forEach(pathD => {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', pathD);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', 'black');
+          path.setAttribute('stroke-width', '0.3');
+          svgPreview.appendChild(path);
+        });
+
+        // Show original path faintly for reference
+        const refPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        refPath.setAttribute('d', samplePath);
+        refPath.setAttribute('fill', 'none');
+        refPath.setAttribute('stroke', 'red');
+        refPath.setAttribute('stroke-width', '0.5');
+        refPath.setAttribute('opacity', '0.3');
+        svgPreview.appendChild(refPath);
+
+        // Update CLI output
+        updateCLIOutput(config);
+
+      } catch (err) {
+        console.error('Error generating barber pole:', err);
+        svgPreview.innerHTML = `<text x="200" y="150" text-anchor="middle" fill="red" font-size="14">Error: ${err.message}</text>`;
+      }
+    }
+
+    // Update CLI output
+    function updateCLIOutput(config) {
+      const parts = [
+        'node process-svg.js input.svg output.svg',
+        '  --fill-mode barber-pole',
+        `  --stripe-count ${config.stripeCount}`,
+        `  --twist-frequency ${config.twistFrequency}`,
+        `  --envelope ${config.envelope}`,
+        `  --barber-pole-max-width ${config.maxWidth}`,
+        `  --stripe-height ${config.stripeHeight}`,
+        `  --stripe-gap-ratio ${config.stripeGapRatio}`,
+        `  --line-spacing ${config.lineSpacing}`,
+        `  --stripe-taper-edge-sharpness ${config.edgeSharpness}`,
+        `  --stripe-taper-middle-angle ${config.middleAngle}`
+      ];
+
+      if (config.showGapOutlines) {
+        parts.push('  --show-gap-outlines');
+      }
+
+      cliOutput.textContent = parts.join(' \\\n');
+    }
+
+    // Reset to defaults
+    function resetDefaults() {
+      controls.pathType.value = 'wavy';
+      controls.stripeCount.value = 2;
+      controls.twistFrequency.value = 0.3;
+      controls.stripeHeight.value = 6;
+      controls.stripeGapRatio.value = 0.5;
+      controls.lineSpacing.value = 0.5;
+      controls.edgeSharpness.value = 1.0;
+      controls.middleAngle.value = 1.0;
+      controls.envelope.value = 'sinTaperBoth';
+      controls.maxWidth.value = 8;
+      controls.showGapOutlines.checked = false;
+      updatePreview();
+    }
+
+    // Copy CLI command
+    function copyCLI() {
+      navigator.clipboard.writeText(cliOutput.textContent).then(() => {
+        const btn = document.getElementById('btn-copy-cli');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 1000);
+      });
+    }
+
+    // Attach event listeners
+    Object.values(controls).forEach(control => {
+      control.addEventListener('input', updatePreview);
+      control.addEventListener('change', updatePreview);
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+    document.getElementById('btn-copy-cli').addEventListener('click', copyCLI);
+
+    // Initial render
+    updatePreview();
+  </script>
+</body>
+</html>
