@@ -24,8 +24,8 @@ import fs from 'fs';
 // Parse command line arguments
 const args = process.argv.slice(2);
 let outputFile = 'barber-pole-taper-test.svg';
-let edgeRange = [0.5, 3, 0.5];  // min, max, step
-let angleRange = [0.5, 2, 0.5];
+let edgeRange = [0.1, 2, 0.2];  // min, max, step
+let angleRange = [0.1, 2, 0.2];
 let samplePathType = 'wavy';
 
 for (let i = 0; i < args.length; i++) {
@@ -146,11 +146,11 @@ for (let row = 0; row < angleValues.length; row++) {
         maxWidth: 8,
         minWidth: 0,
         stripeHeight: null,  // auto
-        stripeGapRatio: 0.5,
+        stripeGapRatio: 1,
         lineSpacing: 0.5,
         stripeTaperEdgeSharpness: edgeValue,
         stripeTaperMiddleAngle: angleValue,
-        showGapOutlines: false,
+        showGapOutlines: true,
         sampleRate: 0.5
       });
 
