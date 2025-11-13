@@ -198,24 +198,30 @@
 
       <div class="control-group">
         <label>Twist Frequency <span class="value-display" id="val-twist-frequency">0.3</span></label>
-        <input type="range" id="twist-frequency" min="0.1" max="1.0" step="0.05" value="0.3">
+        <input type="range" id="twist-frequency" min="0.01" max="1.0" step="0.01" value="0.3">
         <div class="help-text">Controls stripe "horizontal" stretch</div>
       </div>
 
       <div class="control-group">
         <label>Stripe Height (mm) <span class="value-display" id="val-stripe-height">6</span></label>
-        <input type="range" id="stripe-height" min="2" max="15" step="0.5" value="6">
+        <input type="range" id="stripe-height" min="2" max="30" step="0.5" value="6">
         <div class="help-text">Perpendicular thickness of stripe band</div>
       </div>
 
       <div class="control-group">
-        <label>Stripe/Gap Ratio <span class="value-display" id="val-stripe-gap-ratio">0.5</span></label>
-        <input type="range" id="stripe-gap-ratio" min="0.2" max="3" step="0.1" value="0.5">
+        <label>Stripe Rotation (°) <span class="value-display" id="val-stripe-rotation">0</span></label>
+        <input type="range" id="stripe-rotation" min="-45" max="45" step="1" value="0">
+        <div class="help-text">Tilts stripe pattern around path normal</div>
       </div>
 
       <div class="control-group">
-        <label>Line Spacing (mm) <span class="value-display" id="val-line-spacing">0.5</span></label>
-        <input type="range" id="line-spacing" min="0.2" max="1.5" step="0.05" value="0.5">
+        <label>Stripe/Gap Ratio <span class="value-display" id="val-stripe-gap-ratio">0.5</span></label>
+        <input type="range" id="stripe-gap-ratio" min="0.01" max="3" step="0.01" value="0.5">
+      </div>
+
+      <div class="control-group">
+        <label>Line Spacing (mm) <span class="value-display" id="val-line-spacing">1.5</span></label>
+        <input type="range" id="line-spacing" min="0.2" max="2.0" step="0.05" value="1.5">
       </div>
 
       <div class="section-title">Stripe Taper Control</div>
@@ -229,6 +235,12 @@
         <label>Middle Angle <span class="value-display" id="val-middle-angle">1.0</span></label>
         <input type="range" id="middle-angle" min="0.1" max="3" step="0.1" value="1.0">
         <div class="help-text">Controls diagonal slope in middle</div>
+      </div>
+
+      <div class="control-group">
+        <label>Tip Angle (°) <span class="value-display" id="val-tip-angle">0</span></label>
+        <input type="range" id="tip-angle" min="-15" max="15" step="0.5" value="0">
+        <div class="help-text">Rotates stripe tip direction</div>
       </div>
 
       <div class="section-title">Display Options</div>
@@ -251,8 +263,14 @@
       <div class="control-group">
         <label class="checkbox-label">
           <input type="checkbox" id="show-gap-outlines">
-          Show Gap Outlines
+          Show Gap Stripes (Red)
         </label>
+      </div>
+
+      <div class="control-group">
+        <label>Gap Stripe Offset <span class="value-display" id="val-gap-phase-offset">0</span></label>
+        <input type="range" id="gap-phase-offset" min="-1.0" max="1.0" step="0.01" value="0">
+        <div class="help-text">Adjusts where gap stripes start relative to main stripes</div>
       </div>
 
       <div class="button-group">
@@ -328,24 +346,30 @@
       stripeCount: document.getElementById('stripe-count'),
       twistFrequency: document.getElementById('twist-frequency'),
       stripeHeight: document.getElementById('stripe-height'),
+      stripeRotation: document.getElementById('stripe-rotation'),
       stripeGapRatio: document.getElementById('stripe-gap-ratio'),
       lineSpacing: document.getElementById('line-spacing'),
       edgeSharpness: document.getElementById('edge-sharpness'),
       middleAngle: document.getElementById('middle-angle'),
+      tipAngle: document.getElementById('tip-angle'),
       envelope: document.getElementById('envelope'),
       maxWidth: document.getElementById('max-width'),
-      showGapOutlines: document.getElementById('show-gap-outlines')
+      showGapOutlines: document.getElementById('show-gap-outlines'),
+      gapPhaseOffset: document.getElementById('gap-phase-offset')
     };
 
     const valueDisplays = {
       stripeCount: document.getElementById('val-stripe-count'),
       twistFrequency: document.getElementById('val-twist-frequency'),
       stripeHeight: document.getElementById('val-stripe-height'),
+      stripeRotation: document.getElementById('val-stripe-rotation'),
       stripeGapRatio: document.getElementById('val-stripe-gap-ratio'),
       lineSpacing: document.getElementById('val-line-spacing'),
       edgeSharpness: document.getElementById('val-edge-sharpness'),
       middleAngle: document.getElementById('val-middle-angle'),
-      maxWidth: document.getElementById('val-max-width')
+      tipAngle: document.getElementById('val-tip-angle'),
+      maxWidth: document.getElementById('val-max-width'),
+      gapPhaseOffset: document.getElementById('val-gap-phase-offset')
     };
 
     const svgPreview = document.getElementById('svg-preview');
@@ -359,31 +383,37 @@
         stripeCount: parseInt(controls.stripeCount.value),
         twistFrequency: parseFloat(controls.twistFrequency.value),
         stripeHeight: parseFloat(controls.stripeHeight.value),
+        stripeRotation: parseFloat(controls.stripeRotation.value),
         stripeGapRatio: parseFloat(controls.stripeGapRatio.value),
         lineSpacing: parseFloat(controls.lineSpacing.value),
         edgeSharpness: parseFloat(controls.edgeSharpness.value),
         middleAngle: parseFloat(controls.middleAngle.value),
+        tipAngle: parseFloat(controls.tipAngle.value),
         envelope: controls.envelope.value,
         maxWidth: parseFloat(controls.maxWidth.value),
-        showGapOutlines: controls.showGapOutlines.checked
+        showGapOutlines: controls.showGapOutlines.checked,
+        gapPhaseOffset: parseFloat(controls.gapPhaseOffset.value)
       };
 
       // Update value displays
       valueDisplays.stripeCount.textContent = config.stripeCount;
       valueDisplays.twistFrequency.textContent = config.twistFrequency.toFixed(2);
       valueDisplays.stripeHeight.textContent = config.stripeHeight.toFixed(1);
+      valueDisplays.stripeRotation.textContent = config.stripeRotation.toFixed(1);
       valueDisplays.stripeGapRatio.textContent = config.stripeGapRatio.toFixed(1);
       valueDisplays.lineSpacing.textContent = config.lineSpacing.toFixed(2);
       valueDisplays.edgeSharpness.textContent = config.edgeSharpness.toFixed(1);
       valueDisplays.middleAngle.textContent = config.middleAngle.toFixed(1);
+      valueDisplays.tipAngle.textContent = config.tipAngle.toFixed(1);
       valueDisplays.maxWidth.textContent = config.maxWidth.toFixed(1);
+      valueDisplays.gapPhaseOffset.textContent = config.gapPhaseOffset.toFixed(2);
 
       // Generate sample path
       const samplePath = generateSamplePath(config.pathType);
 
       // Generate barber pole
       try {
-        const barberPolePaths = generateBarberPoleSmooth(samplePath, {
+        const barberPoleResult = generateBarberPoleSmooth(samplePath, {
           stripeCount: config.stripeCount,
           twistFrequency: config.twistFrequency,
           twistRateMode: 'constant',
@@ -395,9 +425,16 @@
           lineSpacing: config.lineSpacing,
           stripeTaperEdgeSharpness: config.edgeSharpness,
           stripeTaperMiddleAngle: config.middleAngle,
+          stripeRotation: config.stripeRotation,
+          tipAngle: config.tipAngle,
           showGapOutlines: config.showGapOutlines,
+          gapPhaseOffset: config.gapPhaseOffset,
           sampleRate: 0.5
         });
+
+        // Handle both old array format and new object format
+        const stripePaths = Array.isArray(barberPoleResult) ? barberPoleResult : barberPoleResult.stripes;
+        const gapOutlinePaths = barberPoleResult.gapOutlines || [];
 
         // Clear SVG and render paths
         svgPreview.innerHTML = '';
@@ -427,12 +464,22 @@
         }
         svgPreview.appendChild(grid);
 
-        // Render barber pole paths
-        barberPolePaths.forEach(pathD => {
+        // Render stripe paths (black)
+        stripePaths.forEach(pathD => {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', pathD);
           path.setAttribute('fill', 'none');
           path.setAttribute('stroke', 'black');
+          path.setAttribute('stroke-width', '0.3');
+          svgPreview.appendChild(path);
+        });
+
+        // Render gap outline paths (red)
+        gapOutlinePaths.forEach(pathD => {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', pathD);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', 'red');
           path.setAttribute('stroke-width', '0.3');
           svgPreview.appendChild(path);
         });
@@ -468,7 +515,9 @@
         `  --stripe-gap-ratio ${config.stripeGapRatio}`,
         `  --line-spacing ${config.lineSpacing}`,
         `  --stripe-taper-edge-sharpness ${config.edgeSharpness}`,
-        `  --stripe-taper-middle-angle ${config.middleAngle}`
+        `  --stripe-taper-middle-angle ${config.middleAngle}`,
+        `  --stripe-rotation ${config.stripeRotation}`,
+        `  --tip-angle ${config.tipAngle}`
       ];
 
       if (config.showGapOutlines) {
@@ -484,13 +533,16 @@
       controls.stripeCount.value = 2;
       controls.twistFrequency.value = 0.3;
       controls.stripeHeight.value = 6;
+      controls.stripeRotation.value = 0;
       controls.stripeGapRatio.value = 0.5;
-      controls.lineSpacing.value = 0.5;
+      controls.lineSpacing.value = 1.5;
       controls.edgeSharpness.value = 1.0;
       controls.middleAngle.value = 1.0;
+      controls.tipAngle.value = 0;
       controls.envelope.value = 'sinTaperBoth';
       controls.maxWidth.value = 8;
       controls.showGapOutlines.checked = false;
+      controls.gapPhaseOffset.value = 0;
       updatePreview();
     }
 

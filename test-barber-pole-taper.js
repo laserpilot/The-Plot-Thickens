@@ -138,7 +138,7 @@ for (let row = 0; row < angleValues.length; row++) {
     );
 
     try {
-      const barberPolePaths = generateBarberPoleSmooth(samplePath, {
+      const barberPoleResult = generateBarberPoleSmooth(samplePath, {
         stripeCount: 2,
         twistFrequency: 0.3,
         twistRateMode: 'constant',
@@ -150,15 +150,30 @@ for (let row = 0; row < angleValues.length; row++) {
         lineSpacing: 0.5,
         stripeTaperEdgeSharpness: edgeValue,
         stripeTaperMiddleAngle: angleValue,
+        stripeRotation: 0,
+        tipAngle: 0,
         showGapOutlines: true,
+        gapPhaseOffset: 0,
         sampleRate: 0.5
       });
 
+      // Handle both old array format and new object format
+      const stripePaths = Array.isArray(barberPoleResult) ? barberPoleResult : barberPoleResult.stripes;
+      const gapOutlinePaths = barberPoleResult.gapOutlines || [];
+
       // Render paths
       svgParts.push(`  <g id="cell-${row}-${col}">`);
-      barberPolePaths.forEach(pathD => {
+
+      // Render stripe paths in black
+      stripePaths.forEach(pathD => {
         svgParts.push(`    <path d="${pathD}" fill="none" stroke="black" stroke-width="0.1"/>`);
       });
+
+      // Render gap outline paths in red
+      gapOutlinePaths.forEach(pathD => {
+        svgParts.push(`    <path d="${pathD}" fill="none" stroke="red" stroke-width="0.1"/>`);
+      });
+
       svgParts.push('  </g>');
 
     } catch (err) {
