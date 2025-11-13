@@ -2367,7 +2367,8 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     stripeHeight = null,         // mm - perpendicular thickness of stripe band (if null, auto-scale with path length)
     stripeGapRatio = 1.0,        // ratio of gap width to stripe width
     lineSpacing = 0.3,           // mm - spacing between lines within stripe (perpendicular)
-    stripeTaperSharpness = 1.0,  // 0.1-5.0 - controls pointiness of stripe pinch (1.0=default, higher=sharper)
+    stripeTaperEdgeSharpness = 1.0,  // 0.1-5.0 - controls pointiness at stripe edges (1.0=default, higher=sharper pinch)
+    stripeTaperMiddleAngle = 1.0,    // 0.1-3.0 - controls diagonal slope in middle (1.0=default, higher=steeper angle)
     showGapOutlines = false,     // whether to draw boundary lines at gap edges
   } = options;
 
@@ -2461,10 +2462,15 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 
           // Stripe ribbon width factor - creates pinched ribbon effect
           // Narrow at stripe edges (-1, +1), wide in middle (0)
-          // Using cosine for smooth width variation: cos(0) = 1, cos(±π/2) = 0
-          // Apply sharpness: higher values = more angular/pointy pinch
-          const sharpnessExponent = stripeTaperSharpness;
-          const stripeWidthFactor = Math.pow(Math.cos(stripeProgress * Math.PI / 2), 1.0 / sharpnessExponent);
+          // Two-stage control:
+          // 1. Middle angle: affects diagonal slope by scaling input (higher = steeper)
+          // 2. Edge sharpness: affects pointiness at edges by power function (higher = sharper)
+
+          // Apply middle angle scaling to input (affects slope in middle)
+          const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+
+          // Apply edge sharpness to cosine output (affects pointiness at edges)
+          const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
 
           // Perpendicular offset for line stacking (creates stripe height)
           const perpOffset = linePositionInStripe * effectiveStripeHeight;
@@ -2500,11 +2506,12 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     }
 
     // Generate gap boundary outlines if requested
+    // These trace the outer edges of stripes (which define the gap boundaries)
     if (showGapOutlines) {
-      // Generate two boundary lines for each gap (top and bottom edges)
+      // Generate boundary lines at the outermost edges of stripes
       for (let boundaryIdx = 0; boundaryIdx < 2; boundaryIdx++) {
-        // boundaryIdx 0 = bottom edge, 1 = top edge
-        const boundaryOffset = boundaryIdx === 0 ? -effectiveStripeHeight / 2 : effectiveStripeHeight / 2;
+        // boundaryIdx 0 = bottom edge, 1 = top edge (at ±effectiveStripeHeight/2)
+        const edgePosition = boundaryIdx === 0 ? -0.5 : 0.5; // Position within stripe thickness
 
         let currentBoundarySegment = [];
 
@@ -2516,19 +2523,24 @@ function generateBarberPoleSmooth(pathData, options = {}) {
           const envelopeTaper = envelopeFn(pathId, t);
 
           const cyclePhase = phase % cycleWidth;
-          const inGap = cyclePhase >= stripeWidthRadians;
+          const inStripe = cyclePhase < stripeWidthRadians;
 
-          if (inGap) {
-            // Progress through gap (0 to 1)
-            const gapProgress = (cyclePhase - stripeWidthRadians) / gapWidthRadians;
-            const gapCenter = gapProgress * 2 - 1; // -1 to 1
-            const smoothOffset = smoothSigmoid(gapCenter);
+          if (inStripe) {
+            // Progress through stripe width (-1 to 1)
+            const stripeProgress = (cyclePhase / stripeWidthRadians) * 2 - 1;
+            const smoothOffset = smoothSigmoid(stripeProgress);
             const diagonalOffset = smoothOffset * halfWidth;
 
-            // Apply envelope taper to boundary offset
-            const taperedBoundaryOffset = boundaryOffset * envelopeTaper;
+            // Apply same taper as stripes use
+            const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+            const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
 
-            const totalOffset = diagonalOffset + taperedBoundaryOffset;
+            // Boundary is at the outer edge of the stripe
+            const perpOffset = edgePosition * effectiveStripeHeight;
+            const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
+            const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
+
+            const totalOffset = diagonalOffset + fullyTaperedOffset;
 
             const point = {
               x: centerPoint.x + centerPoint.nx * totalOffset,
@@ -2537,7 +2549,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 
             currentBoundarySegment.push(point);
           } else {
-            // In stripe region - emit current boundary segment if any
+            // In gap region - emit current boundary segment if any
             if (currentBoundarySegment.length > 2) {
               strokePaths.push(pointsToPath(currentBoundarySegment));
             }

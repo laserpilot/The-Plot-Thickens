@@ -141,7 +141,8 @@ const initialState = {
     stripeHeight: null,         // mm - perpendicular thickness of stripe band (null = auto-scale)
     stripeGapRatio: 1.0,        // ratio of gap width to stripe width (1.0 = equal)
     lineSpacing: 0.3,           // mm - perpendicular spacing between lines within stripe
-    stripeTaperSharpness: 1.0,  // 0.1-5.0 - controls pointiness of stripe pinch
+    stripeTaperEdgeSharpness: 1.0,  // 0.1-5.0 - controls pointiness at stripe edges
+    stripeTaperMiddleAngle: 1.0,    // 0.1-3.0 - controls diagonal slope in middle
     showGapOutlines: false,     // whether to draw boundary lines at gap edges
     // Curly/Spring fill options
     curlyLoopFrequency: 1.0,    // loops per 10mm (e.g., 1.0 = 1 loop every 10mm)

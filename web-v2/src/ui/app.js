@@ -113,7 +113,8 @@ function buildCLICommand(config) {
     if (config.stripeHeight !== null && config.stripeHeight !== undefined) parts.push(`--stripe-height ${config.stripeHeight}`);
     if (config.stripeGapRatio !== undefined && config.stripeGapRatio !== 1.0) parts.push(`--stripe-gap-ratio ${config.stripeGapRatio}`);
     if (config.lineSpacing !== undefined && config.lineSpacing !== 0.3) parts.push(`--line-spacing ${config.lineSpacing}`);
-    if (config.stripeTaperSharpness !== undefined && config.stripeTaperSharpness !== 1.0) parts.push(`--stripe-taper-sharpness ${config.stripeTaperSharpness}`);
+    if (config.stripeTaperEdgeSharpness !== undefined && config.stripeTaperEdgeSharpness !== 1.0) parts.push(`--stripe-taper-edge-sharpness ${config.stripeTaperEdgeSharpness}`);
+    if (config.stripeTaperMiddleAngle !== undefined && config.stripeTaperMiddleAngle !== 1.0) parts.push(`--stripe-taper-middle-angle ${config.stripeTaperMiddleAngle}`);
     if (config.showGapOutlines) parts.push(`--show-gap-outlines`);
   } else if (config.fillMode === 'curly') {
     if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
@@ -567,7 +568,8 @@ export function initUI(store, renderer) {
     stripeHeight: document.getElementById('stripe-height'),
     stripeGapRatio: document.getElementById('stripe-gap-ratio'),
     lineSpacing: document.getElementById('line-spacing'),
-    stripeTaperSharpness: document.getElementById('stripe-taper-sharpness'),
+    stripeTaperEdgeSharpness: document.getElementById('stripe-taper-edge-sharpness'),
+    stripeTaperMiddleAngle: document.getElementById('stripe-taper-middle-angle'),
     showGapOutlines: document.getElementById('show-gap-outlines'),
     // Curly mode controls
     curlyLoopFrequency: document.getElementById('curly-loop-frequency'),

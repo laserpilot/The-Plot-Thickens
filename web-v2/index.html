@@ -546,9 +546,15 @@
                     </label>
 
                     <label>
-                      Stripe Taper Sharpness
-                      <input type="number" id="stripe-taper-sharpness" step="0.1" min="0.1" max="5" value="1.0" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls pointiness of stripe pinch (1.0 = default, higher = sharper/more angular)</div>
+                      Stripe Taper Edge Sharpness
+                      <input type="number" id="stripe-taper-edge-sharpness" step="0.1" min="0.1" max="5" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls pointiness at stripe edges (1.0 = default, higher = sharper pinch)</div>
+                    </label>
+
+                    <label>
+                      Stripe Taper Middle Angle
+                      <input type="number" id="stripe-taper-middle-angle" step="0.1" min="0.1" max="3" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls diagonal slope in middle (1.0 = default, higher = steeper angle)</div>
                     </label>
 
                     <label>
@@ -559,7 +565,7 @@
                   </div>
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
-                    <strong>Tip:</strong> Leave Stripe Height empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Stripe/Gap Ratio to control filled vs empty areas. Higher Taper Sharpness = pointier spirals.
+                    <strong>Tip:</strong> Leave Stripe Height empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Edge Sharpness for pointier spirals, Middle Angle for steeper slopes. Try the test-barber-pole-taper.js script to visualize different combinations.
                   </div>
                 </div>
 
