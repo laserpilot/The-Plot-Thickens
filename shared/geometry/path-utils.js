@@ -2440,149 +2440,51 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     const strokePaths = [];
     const gapOutlinePaths = [];
 
-    // Generate lines for each stripe
-    for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
-      // Position within stripe (-0.5 to 0.5, where 0 is center)
-      const linePositionInStripe = (lineIdx - (linesPerStripe - 1) / 2) / linesPerStripe;
-
-      let currentLineSegment = [];
-
-      for (let i = 0; i < centerlineWithPhase.length; i++) {
-        const centerPoint = centerlineWithPhase[i];
-        const phase = centerPoint.accumulatedTwist;
-        const halfWidth = centerPoint.localWidth / 2;
-        const t = centerPoint.t; // Normalized position along path (0-1)
-
-        // Get envelope taper at this point for clean pinch
-        const envelopeTaper = envelopeFn(pathId, t);
-
-        // Position within current stripe+gap cycle
-        const cyclePhase = phase % cycleWidth;
-
-        // Extend stripe boundaries based on gapPhaseOffset to allow overlap
-        // Extension reduces the gap and extends both stripes into it
-        // At gapPhaseOffset = 1.0, black stripe extends to fill entire cycle
-        const extensionRadians = Math.abs(gapPhaseOffset) * gapWidthRadians; // Full gap width available for extension
-        const extendedStripeWidth = stripeWidthRadians + extensionRadians;
-        const inStripe = cyclePhase < extendedStripeWidth;
-
-        if (inStripe) {
-          // Progress through extended stripe width (-1 to 1)
-          // Map the extended region back to the same -1 to 1 range for consistent tapering
-          const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
-          const smoothOffset = smoothSigmoid(stripeProgress);
-
-          // Base diagonal offset for the S-curve
-          let diagonalOffset = smoothOffset * halfWidth;
-
-          // Stripe ribbon width factor - creates pinched ribbon effect
-          // Narrow at stripe edges (-1, +1), wide in middle (0)
-          // Two-stage control:
-          // 1. Middle angle: affects diagonal slope by scaling input (higher = steeper)
-          // 2. Edge sharpness: affects pointiness at edges by power function (higher = sharper)
-
-          // Apply middle angle scaling to input (affects slope in middle)
-          const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
-
-          // Apply edge sharpness to cosine output (affects pointiness at edges)
-          const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
-
-          // Perpendicular offset for line stacking (creates stripe height)
-          const perpOffset = linePositionInStripe * effectiveStripeHeight;
-
-          // Apply stripe ribbon taper (all lines converge to same pinch points)
-          const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
-
-          // Also apply path envelope taper (lines follow path width changes)
-          const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
-
-          // Apply tip angle rotation - creates asymmetric tips
-          // On one edge (stripeProgress = -1), rotate one direction
-          // On other edge (stripeProgress = +1), rotate opposite direction
-          // stripeProgress gives us the sign to make tips point opposite ways
-          const tipRotationAmount = stripeProgress * tipAngleRad;
-
-          // Apply tip angle rotation to perpendicular offset
-          const cosTip = Math.cos(tipRotationAmount);
-          const sinTip = Math.sin(tipRotationAmount);
-          const tipAdjustedPerpOffset = fullyTaperedOffset * cosTip;
-          const tipAdjustedDiagOffset = diagonalOffset + fullyTaperedOffset * sinTip;
-
-          // Combine offsets (revert stripe rotation - was causing visual issues)
-          const totalOffset = tipAdjustedDiagOffset + tipAdjustedPerpOffset;
-
-          const point = {
-            x: centerPoint.x + centerPoint.nx * totalOffset,
-            y: centerPoint.y + centerPoint.ny * totalOffset
-          };
-
-          currentLineSegment.push(point);
-        } else {
-          // In gap region - emit current line segment if any
-          if (currentLineSegment.length > 2) {
-            strokePaths.push(pointsToPath(currentLineSegment));
-          }
-          currentLineSegment = [];
-        }
-      }
-
-      // Emit final segment
-      if (currentLineSegment.length > 2) {
-        strokePaths.push(pointsToPath(currentLineSegment));
-      }
-    }
-
-    // Generate gap stripes if requested
-    // These are full stripes in the gap regions (opposite phase from main stripes)
-    if (showGapOutlines) {
-      // Generate lines for gap stripes (same structure as main stripes)
+    // Helper function to generate a single stripe family
+    const generateStripeFamily = (phaseOffset, outputArray) => {
       for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
         const linePositionInStripe = (lineIdx - (linesPerStripe - 1) / 2) / linesPerStripe;
-
-        let currentGapLineSegment = [];
+        let currentLineSegment = [];
 
         for (let i = 0; i < centerlineWithPhase.length; i++) {
           const centerPoint = centerlineWithPhase[i];
-          const phase = centerPoint.accumulatedTwist;
+          const phase = centerPoint.accumulatedTwist + phaseOffset;
           const halfWidth = centerPoint.localWidth / 2;
           const t = centerPoint.t;
           const envelopeTaper = envelopeFn(pathId, t);
 
-          const cyclePhase = phase % cycleWidth;
+          // Normalize phase to prevent floating-point jumps
+          const phaseNormalized = ((phase / cycleWidth) % 1 + 1) % 1;
+          const cyclePhase = phaseNormalized * cycleWidth;
 
-          // Extend gap stripe boundaries to overlap with main stripes
-          // Extension reduces the gap and extends both stripes into it
-          // At gapPhaseOffset = 1.0, gap disappears and red stripe overlaps with black
-          const extensionRadians = Math.abs(gapPhaseOffset) * gapWidthRadians; // Full gap width available
-          const gapStartPhase = stripeWidthRadians; // Gap starts right after base stripe width
-          const reducedGapWidth = gapWidthRadians - extensionRadians; // Gap shrinks as stripes extend
-          // Allow gap to compress to zero - stripes will abut/overlap
-          const inGap = reducedGapWidth > 0 && cyclePhase >= gapStartPhase && cyclePhase < (gapStartPhase + reducedGapWidth);
+          // Calculate stripe width with overlap allowance
+          // gapPhaseOffset controls how much the stripes extend into each other
+          const extension = Math.abs(gapPhaseOffset) * gapWidthRadians * 0.5; // Each stripe gets half the overlap
+          const extendedStripeWidth = stripeWidthRadians + extension;
 
-          if (inGap && reducedGapWidth > 0) {
-            // Progress through reduced gap width (-1 to 1)
-            // Map the reduced region back to the same -1 to 1 range for consistent tapering
-            const gapProgress = ((cyclePhase - gapStartPhase) / reducedGapWidth) * 2 - 1;
-            const smoothOffset = smoothSigmoid(gapProgress);
+          // Stripe is visible within its extended window
+          const inStripe = cyclePhase < extendedStripeWidth;
+
+          if (inStripe) {
+            const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
+            const smoothOffset = smoothSigmoid(stripeProgress);
             let diagonalOffset = smoothOffset * halfWidth;
 
-            // Apply same taper and transformations as main stripes
-            const scaledProgress = Math.pow(Math.abs(gapProgress), stripeTaperMiddleAngle) * Math.sign(gapProgress);
+            // Stripe ribbon taper
+            const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
             const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
 
             const perpOffset = linePositionInStripe * effectiveStripeHeight;
             const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
             const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
 
-            // Apply tip angle rotation (asymmetric - same as main stripes)
-            const tipRotationAmount = gapProgress * tipAngleRad;
-
+            // Tip angle rotation
+            const tipRotationAmount = stripeProgress * tipAngleRad;
             const cosTip = Math.cos(tipRotationAmount);
             const sinTip = Math.sin(tipRotationAmount);
             const tipAdjustedPerpOffset = fullyTaperedOffset * cosTip;
             const tipAdjustedDiagOffset = diagonalOffset + fullyTaperedOffset * sinTip;
 
-            // Combine offsets (same as main stripes - no rotation)
             const totalOffset = tipAdjustedDiagOffset + tipAdjustedPerpOffset;
 
             const point = {
@@ -2590,21 +2492,34 @@ function generateBarberPoleSmooth(pathData, options = {}) {
               y: centerPoint.y + centerPoint.ny * totalOffset
             };
 
-            currentGapLineSegment.push(point);
+            currentLineSegment.push(point);
           } else {
-            // In main stripe region - emit current gap line segment if any
-            if (currentGapLineSegment.length > 2) {
-              gapOutlinePaths.push(pointsToPath(currentGapLineSegment));
+            // Outside stripe window - emit current segment
+            if (currentLineSegment.length > 2) {
+              outputArray.push(pointsToPath(currentLineSegment));
             }
-            currentGapLineSegment = [];
+            currentLineSegment = [];
           }
         }
 
-        // Emit final gap line segment
-        if (currentGapLineSegment.length > 2) {
-          gapOutlinePaths.push(pointsToPath(currentGapLineSegment));
+        // Emit final segment
+        if (currentLineSegment.length > 2) {
+          outputArray.push(pointsToPath(currentLineSegment));
         }
       }
+    };
+
+    // Generate first stripe family (black stripes)
+    generateStripeFamily(0, strokePaths);
+
+    // Generate second stripe family (red/gap stripes) if requested
+    // Uses same code as first family but with phase offset to create interlocking effect
+    if (showGapOutlines) {
+      // Phase offset positions second family in the "gap" region
+      // At gapPhaseOffset = 0: full gap between families (traditional barber pole)
+      // At gapPhaseOffset = 1.0: families overlap completely (braided rope effect)
+      const secondFamilyPhaseOffset = stripeWidthRadians + gapWidthRadians * (1 - Math.abs(gapPhaseOffset));
+      generateStripeFamily(secondFamilyPhaseOffset, gapOutlinePaths);
     }
 
     // Return paths with metadata for styling
