@@ -215,7 +215,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
 
     // Handle barber-pole mode separately (doesn't use generatePasses)
     if (config.fillMode === 'barber-pole') {
-      const barberPolePaths = generateBarberPoleFill(path.d, {
+      const barberPoleResult = generateBarberPoleFill(path.d, {
         barberPoleStyle: config.barberPoleStyle || 'smooth',
         edgeSoftness: config.barberPoleEdgeSoftness !== undefined ? config.barberPoleEdgeSoftness : 0.15,
         stripeCount: config.stripeCount !== undefined ? config.stripeCount : 3,
@@ -232,6 +232,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         lineSpacing: config.lineSpacing !== undefined ? config.lineSpacing : 0.3,
         stripeTaperEdgeSharpness: config.stripeTaperEdgeSharpness !== undefined ? config.stripeTaperEdgeSharpness : 1.0,
         stripeTaperMiddleAngle: config.stripeTaperMiddleAngle !== undefined ? config.stripeTaperMiddleAngle : 1.0,
+        tipAngle: config.tipAngle !== undefined ? config.tipAngle : 0,
+        gapPhaseOffset: config.gapPhaseOffset !== undefined ? config.gapPhaseOffset : 0,
         showGapOutlines: config.showGapOutlines !== undefined ? config.showGapOutlines : false,
         noise: config.noise || 0,
         seed: null,
@@ -239,7 +241,19 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         pathId: `path-${i}`
       });
 
-      // Add each generated stripe path
+      // Handle result - can be array or object with {stripes, gapOutlines}
+      let barberPolePaths, gapOutlinePaths;
+      if (Array.isArray(barberPoleResult)) {
+        // Legacy: just an array of paths
+        barberPolePaths = barberPoleResult;
+        gapOutlinePaths = [];
+      } else {
+        // New format: {stripes, gapOutlines}
+        barberPolePaths = barberPoleResult.stripes || [];
+        gapOutlinePaths = barberPoleResult.gapOutlines || [];
+      }
+
+      // Add main stripe paths (black)
       barberPolePaths.forEach((stripeData, stripeIndex) => {
         processed.push({
           id: `${path.id || i}-stripe-${stripeIndex}`,
@@ -248,6 +262,19 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           stripeIndex,
           fill: 'none',
           stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Add gap outline paths (red)
+      gapOutlinePaths.forEach((gapData, gapIndex) => {
+        processed.push({
+          id: `${path.id || i}-gap-${gapIndex}`,
+          d: gapData,
+          originalIndex: i,
+          stripeIndex: gapIndex,
+          fill: 'none',
+          stroke: 'red',
           strokeWidth: 0.1
         });
       });
