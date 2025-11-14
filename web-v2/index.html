@@ -499,6 +499,7 @@
                         <option value="smooth">Smooth (gradual stripe shortening)</option>
                         <option value="hard">Hard (sharp visibility cutoff)</option>
                         <option value="none" selected>None (flat 2D spiral, no hiding)</option>
+                        <option value="braid">Braid (weaving occlusion for braids)</option>
                       </select>
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How stripes hide when "wrapping to back"</div>
                     </label>
@@ -568,10 +569,60 @@
                       Show Gap Outlines
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Draw second stripe family (red stripes)</div>
                     </label>
+
+                    <label>
+                      Braid Variant
+                      <select id="braid-variant">
+                        <option value="two-strand" selected>Two-Strand Rope</option>
+                        <option value="three-strand">Three-Strand Braid</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Number of interlocking stripe families</div>
+                    </label>
+
+                    <label>
+                      Profile
+                      <select id="barber-profile">
+                        <option value="sigmoid" selected>Sigmoid Hair</option>
+                        <option value="flat-candy">Flat Candy Cane</option>
+                        <option value="cylindrical">Cylindrical Band</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Stripe shape profile (sigmoid = S-curve, flat = ribbon wrap, cylindrical = constant width)</div>
+                    </label>
+
+                    <label>
+                      Braid Tightness
+                      <input type="number" id="braid-tightness" step="0.05" min="0" max="1" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls stripe overlap (0 = no overlap, 1 = full interlock)</div>
+                    </label>
+
+                    <label>
+                      Braid Occlusion Threshold
+                      <input type="number" id="braid-occlusion-threshold" step="0.05" min="0" max="1.0" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Visibility threshold for braid mode (0 = show all, 0.5 = hide back half, 1.0 = hide all)</div>
+                    </label>
+
+                    <label>
+                      Visible Families
+                      <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <label style="display: inline-flex; align-items: center; gap: 5px;">
+                          <input type="checkbox" id="visible-family-1" checked style="margin: 0;"/>
+                          <span style="font-size: 0.9em;">Family 1</span>
+                        </label>
+                        <label style="display: inline-flex; align-items: center; gap: 5px;">
+                          <input type="checkbox" id="visible-family-2" checked style="margin: 0;"/>
+                          <span style="font-size: 0.9em;">Family 2</span>
+                        </label>
+                        <label style="display: inline-flex; align-items: center; gap: 5px;">
+                          <input type="checkbox" id="visible-family-3" checked style="margin: 0;"/>
+                          <span style="font-size: 0.9em;">Family 3</span>
+                        </label>
+                      </div>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Choose which stripe families to render</div>
+                    </label>
                   </div>
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
-                    <strong>Tip:</strong> Leave Stripe Height empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Edge Sharpness for pointier spirals, Middle Angle for steeper slopes. Try the test-barber-pole-taper.js script to visualize different combinations.
+                    <strong>Tip:</strong> Leave Stripe Height empty for auto-scaling (2mm on short paths, 10mm on long paths). Use Edge Sharpness for pointier spirals, Middle Angle for steeper slopes. Try Three-Strand Braid for complex weaving effects. Braid occlusion only works when Occlusion Mode is set to "Braid".
                   </div>
                 </div>
 

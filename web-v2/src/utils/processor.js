@@ -235,25 +235,32 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         tipAngle: config.tipAngle !== undefined ? config.tipAngle : 0,
         gapPhaseOffset: config.gapPhaseOffset !== undefined ? config.gapPhaseOffset : 0,
         showGapOutlines: config.showGapOutlines !== undefined ? config.showGapOutlines : false,
+        braidVariant: config.braidVariant || 'two-strand',
+        profile: config.barberProfile || 'sigmoid',
+        braidTightness: config.braidTightness !== undefined ? config.braidTightness : 1.0,
+        braidOcclusionThreshold: config.braidOcclusionThreshold !== undefined ? config.braidOcclusionThreshold : 0.5,
+        visibleFamilies: config.visibleFamilies || null,
         noise: config.noise || 0,
         seed: null,
         sampleRate: config.sampleRate || 0.5,
         pathId: `path-${i}`
       });
 
-      // Handle result - can be array or object with {stripes, gapOutlines}
-      let barberPolePaths, gapOutlinePaths;
+      // Handle result - can be array or object with {stripes, gapOutlines, family3}
+      let barberPolePaths, gapOutlinePaths, family3Paths;
       if (Array.isArray(barberPoleResult)) {
         // Legacy: just an array of paths
         barberPolePaths = barberPoleResult;
         gapOutlinePaths = [];
+        family3Paths = [];
       } else {
-        // New format: {stripes, gapOutlines}
+        // New format: {stripes, gapOutlines, family3}
         barberPolePaths = barberPoleResult.stripes || [];
         gapOutlinePaths = barberPoleResult.gapOutlines || [];
+        family3Paths = barberPoleResult.family3 || [];
       }
 
-      // Add main stripe paths (black)
+      // Add main stripe paths - Family 1 (black)
       barberPolePaths.forEach((stripeData, stripeIndex) => {
         processed.push({
           id: `${path.id || i}-stripe-${stripeIndex}`,
@@ -266,7 +273,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         });
       });
 
-      // Add gap outline paths (red)
+      // Add gap outline paths - Family 2 (red)
       gapOutlinePaths.forEach((gapData, gapIndex) => {
         processed.push({
           id: `${path.id || i}-gap-${gapIndex}`,
@@ -275,6 +282,19 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           stripeIndex: gapIndex,
           fill: 'none',
           stroke: 'red',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Add family 3 paths (blue)
+      family3Paths.forEach((family3Data, family3Index) => {
+        processed.push({
+          id: `${path.id || i}-family3-${family3Index}`,
+          d: family3Data,
+          originalIndex: i,
+          stripeIndex: family3Index,
+          fill: 'none',
+          stroke: 'blue',
           strokeWidth: 0.1
         });
       });

@@ -118,6 +118,11 @@ function buildCLICommand(config) {
     if (config.tipAngle !== undefined && config.tipAngle !== 0) parts.push(`--tip-angle ${config.tipAngle}`);
     if (config.gapPhaseOffset !== undefined && config.gapPhaseOffset !== 0) parts.push(`--gap-phase-offset ${config.gapPhaseOffset}`);
     if (config.showGapOutlines) parts.push(`--show-gap-outlines`);
+    if (config.braidVariant && config.braidVariant !== 'two-strand') parts.push(`--braid-variant ${config.braidVariant}`);
+    if (config.barberProfile && config.barberProfile !== 'sigmoid') parts.push(`--barber-profile ${config.barberProfile}`);
+    if (config.braidTightness !== undefined && config.braidTightness !== 1.0) parts.push(`--braid-tightness ${config.braidTightness}`);
+    if (config.braidOcclusionThreshold !== undefined && config.braidOcclusionThreshold !== 0.5) parts.push(`--braid-occlusion-threshold ${config.braidOcclusionThreshold}`);
+    if (config.visibleFamilies && config.visibleFamilies.length > 0 && config.visibleFamilies.length < 3) parts.push(`--visible-families ${config.visibleFamilies.join(',')}`);
   } else if (config.fillMode === 'curly') {
     if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
     if (config.curlyLoopAmplitude !== undefined && config.curlyLoopAmplitude !== 1.0) parts.push(`--curly-loop-amplitude ${config.curlyLoopAmplitude}`);
@@ -575,6 +580,13 @@ export function initUI(store, renderer) {
     tipAngle: document.getElementById('tip-angle'),
     gapPhaseOffset: document.getElementById('gap-phase-offset'),
     showGapOutlines: document.getElementById('show-gap-outlines'),
+    braidVariant: document.getElementById('braid-variant'),
+    barberProfile: document.getElementById('barber-profile'),
+    braidTightness: document.getElementById('braid-tightness'),
+    braidOcclusionThreshold: document.getElementById('braid-occlusion-threshold'),
+    visibleFamily1: document.getElementById('visible-family-1'),
+    visibleFamily2: document.getElementById('visible-family-2'),
+    visibleFamily3: document.getElementById('visible-family-3'),
     // Curly mode controls
     curlyLoopFrequency: document.getElementById('curly-loop-frequency'),
     curlyLoopAmplitude: document.getElementById('curly-loop-amplitude'),
@@ -608,8 +620,20 @@ export function initUI(store, renderer) {
       const configKey = key === 'spiralStripeFilled' ? 'stripeFilled' :
                         key === 'spiralStripeEmpty' ? 'stripeEmpty' : key;
 
+      // Special handling for visible families checkboxes
+      // Build array from all three checkboxes when any of them changes
+      if (key === 'visibleFamily1' || key === 'visibleFamily2' || key === 'visibleFamily3') {
+        const visibleFamilies = [];
+        if (modeSpecificInputs.visibleFamily1?.checked) visibleFamilies.push(1);
+        if (modeSpecificInputs.visibleFamily2?.checked) visibleFamilies.push(2);
+        if (modeSpecificInputs.visibleFamily3?.checked) visibleFamilies.push(3);
+
+        store.setState({
+          config: { ...config, visibleFamilies: visibleFamilies.length > 0 ? visibleFamilies : null }
+        });
+      }
       // Update fillModeOptions for spiral mode
-      if (key === 'twistRate' || key === 'twistOffset') {
+      else if (key === 'twistRate' || key === 'twistOffset') {
         const fillModeOptions = config.fillModeOptions || {};
         store.setState({
           config: {
