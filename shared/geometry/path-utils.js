@@ -2356,7 +2356,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     stripeCount = 3,             // UNUSED - kept for API compatibility
     twistFrequency = 0.2,
     twistRateMode = 'inverse',
-    occlusionMode = 'smooth',
+    occlusionMode = 'smooth',    // 'smooth' | 'hard' | 'none' | 'braid'
     edgeSoftness = 0.15,
     baseOffset = 0.25,
     envelope = 'flat',
@@ -2373,6 +2373,12 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     gapPhaseOffset = 0,          // -1.0 to 1.0 - phase offset for gap stripes (adjusts where gap stripes start relative to main stripes)
     stripeRotation = 0,          // degrees - rotation of stripe pattern around path normal (-10 to +10)
     tipAngle = 0,                // degrees - rotation of stripe tips relative to stripe flow (-15 to +15)
+    // NEW: Multi-strand braid and profile parameters
+    braidVariant = 'two-strand', // 'two-strand' | 'three-strand' - number of stripe families
+    profile = 'sigmoid',         // 'sigmoid' | 'flat-candy' | 'cylindrical' - stripe shape profile
+    braidTightness = 1.0,        // 0.0-1.0 - controls stripe overlap/interlocking (0=no overlap, 1=full interlock)
+    braidOcclusionThreshold = 0.0, // 0.0-0.5 - visibility threshold for braid occlusion mode
+    visibleFamilies = null,      // [1,2,3] - which families to render (null = auto-set based on braidVariant)
   } = options;
 
   try {
@@ -2432,13 +2438,25 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     const stripeRotationRad = (stripeRotation * Math.PI) / 180;
     const tipAngleRad = (tipAngle * Math.PI) / 180;
 
+    // Determine number of stripe families and their phase offsets based on braid variant
+    const familyCount = braidVariant === 'three-strand' ? 3 : 2;
+    const familyPhaseOffsets = [];
+    for (let i = 0; i < familyCount; i++) {
+      familyPhaseOffsets.push((i * cycleWidth) / familyCount);
+    }
+
+    // Auto-set visibleFamilies based on braidVariant if not specified
+    const effectiveVisibleFamilies = visibleFamilies !== null
+      ? visibleFamilies
+      : (braidVariant === 'three-strand' ? [1, 2, 3] : [1, 2]);
+
     // Smooth sigmoid function for S-curve shape
     const smoothSigmoid = (x) => {
       return Math.tanh(x * 2.5);
     };
 
-    const strokePaths = [];
-    const gapOutlinePaths = [];
+    // Storage for each family's stripe paths
+    const familyPaths = [[], [], []]; // family1, family2, family3
 
     // Helper function to generate a single stripe family
     const generateStripeFamily = (phaseOffset, outputArray) => {
@@ -2458,14 +2476,19 @@ function generateBarberPoleSmooth(pathData, options = {}) {
           const cyclePhase = phaseNormalized * cycleWidth;
 
           // Calculate stripe width with overlap allowance
-          // gapPhaseOffset controls how much the stripes extend into each other
-          // At gapPhaseOffset = 1.0, stripes extend by full gap width to create perfect braid
-          const extension = Math.abs(gapPhaseOffset) * gapWidthRadians;
-          const extendedStripeWidth = stripeWidthRadians + extension;
+          // braidTightness controls how much stripes extend into gap (0=no overlap, 1=full interlock)
+          // If gapPhaseOffset is set, use it as the base; otherwise use braidTightness directly
+          const baseExtension = gapPhaseOffset !== 0
+            ? Math.abs(gapPhaseOffset) * gapWidthRadians
+            : gapWidthRadians; // Use full gap width as base when gapPhaseOffset not set
+          const effectiveExtension = baseExtension * braidTightness;
+          const extendedStripeWidth = stripeWidthRadians + effectiveExtension;
 
           // Gate: only process samples within this stripe's extended window
-          // This prevents polylines from continuing across gaps
-          const inStripeWindow = cyclePhase < extendedStripeWidth;
+          // IMPORTANT: Clamp to cycleWidth to prevent cross-gap connectors
+          // Even with full braid tightness, stripes must not bridge to next cycle
+          const maxStripeWindow = Math.min(extendedStripeWidth, cycleWidth * 0.99);
+          const inStripeWindow = cyclePhase < maxStripeWindow;
 
           if (inStripeWindow) {
             // Calculate stripe progress for this phase position (-1 to 1 over extended width)
@@ -2478,11 +2501,50 @@ function generateBarberPoleSmooth(pathData, options = {}) {
             // Fade threshold: break segment cleanly when taper drops below threshold
             // This prevents tiny offset artifacts at stripe edges
             const fadeThreshold = 0.02;
-            const isVisible = Math.abs(stripeWidthFactor) > fadeThreshold;
+            let isVisible = Math.abs(stripeWidthFactor) > fadeThreshold;
+
+            // Braid occlusion mode: use cosine visibility masking for weaving effect
+            // This creates the over/under pattern for three-strand braids
+            if (occlusionMode === 'braid' && isVisible) {
+              // Calculate visibility based on phase with repeating pattern
+              // For three-strand: Family 1 over 2, Family 2 over 3, Family 3 over 1
+              // Normalize phase to cycle (0 to 2π range for cosine)
+              const normalizedPhase = (phase / cycleWidth) * 2 * Math.PI;
+              const rawVisibility = Math.cos(normalizedPhase);
+
+              // Map cosine (-1 to 1) to visibility (0 to 1)
+              const visibility = (rawVisibility + 1) / 2; // Maps -1..1 to 0..1
+
+              // Hide stripe when visibility falls below threshold
+              // threshold 0.0 = show everything (hide when visibility < 0, never happens)
+              // threshold 0.5 = hide back half (hide when visibility < 0.5, i.e., rawVisibility < 0)
+              // Higher threshold = more aggressive hiding
+              if (visibility < braidOcclusionThreshold) {
+                isVisible = false;
+              }
+            }
 
             if (isVisible) {
-              const smoothOffset = smoothSigmoid(stripeProgress);
-              let diagonalOffset = smoothOffset * halfWidth;
+              // Calculate diagonal offset based on profile variant
+              let diagonalOffset;
+              if (profile === 'sigmoid') {
+                // Original sigmoid S-curve profile
+                const smoothOffset = smoothSigmoid(stripeProgress);
+                diagonalOffset = smoothOffset * halfWidth;
+              } else if (profile === 'flat-candy') {
+                // Linear/sinusoidal ramp for flat ribbon wrapping cylinder
+                // Use sine wave for smooth cylindrical wrapping effect
+                const normalizedPhase = phase / cycleWidth;
+                const sineOffset = Math.sin(normalizedPhase * 2 * Math.PI);
+                diagonalOffset = sineOffset * halfWidth;
+              } else if (profile === 'cylindrical') {
+                // Constant width band, no diagonal offset - pure visibility masking
+                diagonalOffset = 0;
+              } else {
+                // Fallback to sigmoid for unknown profiles
+                const smoothOffset = smoothSigmoid(stripeProgress);
+                diagonalOffset = smoothOffset * halfWidth;
+              }
 
               const perpOffset = linePositionInStripe * effectiveStripeHeight;
               const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
@@ -2526,29 +2588,39 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       }
     };
 
-    // Generate first stripe family (black stripes)
-    generateStripeFamily(0, strokePaths);
+    // Generate all stripe families based on braid variant
+    // Loop through each family and generate stripes with appropriate phase offset
+    for (let familyIdx = 0; familyIdx < familyCount; familyIdx++) {
+      const familyNumber = familyIdx + 1; // 1-indexed for visibility check
 
-    // Generate second stripe family (red/gap stripes) if requested
-    // Uses same code as first family but phase-shifted by half a cycle
-    if (showGapOutlines) {
-      // Second family is always at half-cycle offset (180° out of phase)
-      // This creates two independent, identical families that naturally interlock
-      const secondFamilyPhaseOffset = cycleWidth / 2;
-      generateStripeFamily(secondFamilyPhaseOffset, gapOutlinePaths);
+      // Only generate if this family is visible
+      if (effectiveVisibleFamilies.includes(familyNumber)) {
+        const phaseOffset = familyPhaseOffsets[familyIdx];
+        generateStripeFamily(phaseOffset, familyPaths[familyIdx]);
+      }
     }
 
     // Return paths with metadata for styling
-    // If gap outlines are requested, return an object with separate arrays
-    // Otherwise, return just the stroke paths for backward compatibility
-    if (showGapOutlines && gapOutlinePaths.length > 0) {
+    // Always return structured format when we generated multiple families
+    // This ensures two-strand mode doesn't lose the second family
+
+    // For two-strand: always return both families if second family has content
+    // For three-strand: always return all three families
+    // For single-family (if visibleFamilies = [1] only): return just array for backward compat
+
+    const hasSecondFamily = familyPaths[1].length > 0;
+    const hasThirdFamily = familyPaths[2].length > 0;
+
+    if (hasSecondFamily || hasThirdFamily) {
       return {
-        stripes: strokePaths,
-        gapOutlines: gapOutlinePaths
+        stripes: familyPaths[0],        // Family 1 (black)
+        gapOutlines: familyPaths[1],    // Family 2 (red)
+        family3: familyPaths[2]          // Family 3 (blue/green) - new
       };
     }
 
-    return strokePaths;
+    // Backward compatibility: just return family 1 paths if only one family generated
+    return familyPaths[0];
 
   } catch (error) {
     console.error('Error generating smooth barber pole:', error);

@@ -32,6 +32,7 @@
       display: grid;
       grid-template-columns: 350px 1fr;
       gap: 20px;
+      height: calc(100vh - 40px);
     }
 
     .controls {
@@ -39,9 +40,8 @@
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      height: fit-content;
-      position: sticky;
-      top: 20px;
+      overflow-y: auto;
+      max-height: calc(100vh - 40px);
     }
 
     h1 {
@@ -205,6 +205,17 @@
       </div>
 
       <div class="control-group">
+        <label>Occlusion Mode</label>
+        <select id="occlusion-mode">
+          <option value="smooth" selected>Smooth</option>
+          <option value="hard">Hard</option>
+          <option value="none">None</option>
+          <option value="braid">Braid</option>
+        </select>
+        <div class="help-text">How stripes hide each other (braid uses visibility masking)</div>
+      </div>
+
+      <div class="control-group">
         <label>Stripe Height (mm) <span class="value-display" id="val-stripe-height">6</span></label>
         <input type="range" id="stripe-height" min="2" max="30" step="0.5" value="6">
         <div class="help-text">Perpendicular thickness of stripe band</div>
@@ -273,6 +284,53 @@
         <label>Gap Stripe Offset <span class="value-display" id="val-gap-phase-offset">0</span></label>
         <input type="range" id="gap-phase-offset" min="-3.0" max="3.0" step="0.01" value="0">
         <div class="help-text">Adjusts where gap stripes start relative to main stripes</div>
+      </div>
+
+      <div class="control-group">
+        <label>Braid Variant</label>
+        <select id="braid-variant">
+          <option value="two-strand" selected>Two-Strand Rope</option>
+          <option value="three-strand">Three-Strand Braid</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Profile</label>
+        <select id="profile">
+          <option value="sigmoid" selected>Sigmoid Hair</option>
+          <option value="flat-candy">Flat Candy Cane</option>
+          <option value="cylindrical">Cylindrical Band</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Braid Tightness <span class="value-display" id="val-braid-tightness">1.0</span></label>
+        <input type="range" id="braid-tightness" min="0" max="1" step="0.05" value="1.0">
+        <div class="help-text">Controls stripe overlap (0=no overlap, 1=full interlock)</div>
+      </div>
+
+      <div class="control-group">
+        <label>Braid Occlusion Threshold <span class="value-display" id="val-braid-occlusion-threshold">0.5</span></label>
+        <input type="range" id="braid-occlusion-threshold" min="0" max="1.0" step="0.05" value="0.5">
+        <div class="help-text">Hides stripes when "behind" (0=show all, 0.5=hide back half, 1.0=hide all)</div>
+      </div>
+
+      <div class="control-group">
+        <label>Visible Families</label>
+        <div style="display: flex; gap: 15px; margin-top: 5px;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="visible-family-1" checked>
+            Family 1
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="visible-family-2" checked>
+            Family 2
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="visible-family-3" checked>
+            Family 3
+          </label>
+        </div>
       </div>
 
       <div class="button-group">
@@ -347,6 +405,7 @@
       pathType: document.getElementById('path-type'),
       stripeCount: document.getElementById('stripe-count'),
       twistFrequency: document.getElementById('twist-frequency'),
+      occlusionMode: document.getElementById('occlusion-mode'),
       stripeHeight: document.getElementById('stripe-height'),
       stripeRotation: document.getElementById('stripe-rotation'),
       stripeGapRatio: document.getElementById('stripe-gap-ratio'),
@@ -357,7 +416,14 @@
       envelope: document.getElementById('envelope'),
       maxWidth: document.getElementById('max-width'),
       showGapOutlines: document.getElementById('show-gap-outlines'),
-      gapPhaseOffset: document.getElementById('gap-phase-offset')
+      gapPhaseOffset: document.getElementById('gap-phase-offset'),
+      braidVariant: document.getElementById('braid-variant'),
+      profile: document.getElementById('profile'),
+      braidTightness: document.getElementById('braid-tightness'),
+      braidOcclusionThreshold: document.getElementById('braid-occlusion-threshold'),
+      visibleFamily1: document.getElementById('visible-family-1'),
+      visibleFamily2: document.getElementById('visible-family-2'),
+      visibleFamily3: document.getElementById('visible-family-3')
     };
 
     const valueDisplays = {
@@ -371,7 +437,9 @@
       middleAngle: document.getElementById('val-middle-angle'),
       tipAngle: document.getElementById('val-tip-angle'),
       maxWidth: document.getElementById('val-max-width'),
-      gapPhaseOffset: document.getElementById('val-gap-phase-offset')
+      gapPhaseOffset: document.getElementById('val-gap-phase-offset'),
+      braidTightness: document.getElementById('val-braid-tightness'),
+      braidOcclusionThreshold: document.getElementById('val-braid-occlusion-threshold')
     };
 
     const svgPreview = document.getElementById('svg-preview');
@@ -384,6 +452,7 @@
         pathType: controls.pathType.value,
         stripeCount: parseInt(controls.stripeCount.value),
         twistFrequency: parseFloat(controls.twistFrequency.value),
+        occlusionMode: controls.occlusionMode.value,
         stripeHeight: parseFloat(controls.stripeHeight.value),
         stripeRotation: parseFloat(controls.stripeRotation.value),
         stripeGapRatio: parseFloat(controls.stripeGapRatio.value),
@@ -394,8 +463,18 @@
         envelope: controls.envelope.value,
         maxWidth: parseFloat(controls.maxWidth.value),
         showGapOutlines: controls.showGapOutlines.checked,
-        gapPhaseOffset: parseFloat(controls.gapPhaseOffset.value)
+        gapPhaseOffset: parseFloat(controls.gapPhaseOffset.value),
+        braidVariant: controls.braidVariant.value,
+        profile: controls.profile.value,
+        braidTightness: parseFloat(controls.braidTightness.value),
+        braidOcclusionThreshold: parseFloat(controls.braidOcclusionThreshold.value),
+        visibleFamilies: []
       };
+
+      // Build visibleFamilies array from checkboxes
+      if (controls.visibleFamily1.checked) config.visibleFamilies.push(1);
+      if (controls.visibleFamily2.checked) config.visibleFamilies.push(2);
+      if (controls.visibleFamily3.checked) config.visibleFamilies.push(3);
 
       // Update value displays
       valueDisplays.stripeCount.textContent = config.stripeCount;
@@ -409,6 +488,8 @@
       valueDisplays.tipAngle.textContent = config.tipAngle.toFixed(1);
       valueDisplays.maxWidth.textContent = config.maxWidth.toFixed(1);
       valueDisplays.gapPhaseOffset.textContent = config.gapPhaseOffset.toFixed(2);
+      valueDisplays.braidTightness.textContent = config.braidTightness.toFixed(2);
+      valueDisplays.braidOcclusionThreshold.textContent = config.braidOcclusionThreshold.toFixed(2);
 
       // Generate sample path
       const samplePath = generateSamplePath(config.pathType);
@@ -419,6 +500,7 @@
           stripeCount: config.stripeCount,
           twistFrequency: config.twistFrequency,
           twistRateMode: 'constant',
+          occlusionMode: config.occlusionMode,
           envelope: config.envelope,
           maxWidth: config.maxWidth,
           minWidth: 0,
@@ -431,12 +513,18 @@
           tipAngle: config.tipAngle,
           showGapOutlines: config.showGapOutlines,
           gapPhaseOffset: config.gapPhaseOffset,
+          braidVariant: config.braidVariant,
+          profile: config.profile,
+          braidTightness: config.braidTightness,
+          braidOcclusionThreshold: config.braidOcclusionThreshold,
+          visibleFamilies: config.visibleFamilies.length > 0 ? config.visibleFamilies : null,
           sampleRate: 0.5
         });
 
         // Handle both old array format and new object format
-        const stripePaths = Array.isArray(barberPoleResult) ? barberPoleResult : barberPoleResult.stripes;
+        const stripePaths = Array.isArray(barberPoleResult) ? barberPoleResult : (barberPoleResult.stripes || []);
         const gapOutlinePaths = barberPoleResult.gapOutlines || [];
+        const family3Paths = barberPoleResult.family3 || [];
 
         // Clear SVG and render paths
         svgPreview.innerHTML = '';
@@ -466,7 +554,7 @@
         }
         svgPreview.appendChild(grid);
 
-        // Render stripe paths (black)
+        // Render stripe paths - Family 1 (black)
         stripePaths.forEach(pathD => {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', pathD);
@@ -476,12 +564,22 @@
           svgPreview.appendChild(path);
         });
 
-        // Render gap outline paths (red)
+        // Render gap outline paths - Family 2 (red)
         gapOutlinePaths.forEach(pathD => {
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', pathD);
           path.setAttribute('fill', 'none');
           path.setAttribute('stroke', 'red');
+          path.setAttribute('stroke-width', '0.3');
+          svgPreview.appendChild(path);
+        });
+
+        // Render family 3 paths (blue)
+        family3Paths.forEach(pathD => {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', pathD);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', 'blue');
           path.setAttribute('stroke-width', '0.3');
           svgPreview.appendChild(path);
         });
@@ -511,6 +609,7 @@
         '  --fill-mode barber-pole',
         `  --stripe-count ${config.stripeCount}`,
         `  --twist-frequency ${config.twistFrequency}`,
+        `  --occlusion-mode ${config.occlusionMode}`,
         `  --envelope ${config.envelope}`,
         `  --barber-pole-max-width ${config.maxWidth}`,
         `  --stripe-height ${config.stripeHeight}`,
@@ -519,11 +618,23 @@
         `  --stripe-taper-edge-sharpness ${config.edgeSharpness}`,
         `  --stripe-taper-middle-angle ${config.middleAngle}`,
         `  --stripe-rotation ${config.stripeRotation}`,
-        `  --tip-angle ${config.tipAngle}`
+        `  --tip-angle ${config.tipAngle}`,
+        `  --braid-variant ${config.braidVariant}`,
+        `  --barber-profile ${config.profile}`,
+        `  --braid-tightness ${config.braidTightness}`,
+        `  --braid-occlusion-threshold ${config.braidOcclusionThreshold}`
       ];
 
       if (config.showGapOutlines) {
         parts.push('  --show-gap-outlines');
+      }
+
+      if (config.gapPhaseOffset !== 0) {
+        parts.push(`  --gap-phase-offset ${config.gapPhaseOffset}`);
+      }
+
+      if (config.visibleFamilies.length > 0 && config.visibleFamilies.length < 3) {
+        parts.push(`  --visible-families ${config.visibleFamilies.join(',')}`);
       }
 
       cliOutput.textContent = parts.join(' \\\n');
@@ -534,6 +645,7 @@
       controls.pathType.value = 'wavy';
       controls.stripeCount.value = 2;
       controls.twistFrequency.value = 0.3;
+      controls.occlusionMode.value = 'smooth';
       controls.stripeHeight.value = 6;
       controls.stripeRotation.value = 0;
       controls.stripeGapRatio.value = 0.5;
@@ -545,6 +657,13 @@
       controls.maxWidth.value = 8;
       controls.showGapOutlines.checked = false;
       controls.gapPhaseOffset.value = 0;
+      controls.braidVariant.value = 'two-strand';
+      controls.profile.value = 'sigmoid';
+      controls.braidTightness.value = 1.0;
+      controls.braidOcclusionThreshold.value = 0.5;
+      controls.visibleFamily1.checked = true;
+      controls.visibleFamily2.checked = true;
+      controls.visibleFamily3.checked = true;
       updatePreview();
     }
 
