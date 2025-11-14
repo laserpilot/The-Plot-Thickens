@@ -193,10 +193,6 @@
       </div>
 
       <div class="section-title">Stripe Configuration</div>
-      <div class="control-group">
-        <label>Stripe Count <span class="value-display" id="val-stripe-count">2</span></label>
-        <input type="range" id="stripe-count" min="1" max="5" step="1" value="2">
-      </div>
 
       <div class="control-group">
         <label>Twist Frequency <span class="value-display" id="val-twist-frequency">0.3</span></label>
@@ -219,12 +215,6 @@
         <label>Stripe Height (mm) <span class="value-display" id="val-stripe-height">6</span></label>
         <input type="range" id="stripe-height" min="2" max="30" step="0.5" value="6">
         <div class="help-text">Perpendicular thickness of stripe band</div>
-      </div>
-
-      <div class="control-group">
-        <label>Stripe Rotation (°) <span class="value-display" id="val-stripe-rotation">0</span></label>
-        <input type="range" id="stripe-rotation" min="-45" max="45" step="1" value="0">
-        <div class="help-text">Tilts stripe pattern around path normal</div>
       </div>
 
       <div class="control-group">
@@ -274,13 +264,6 @@
       </div>
 
       <div class="control-group">
-        <label class="checkbox-label">
-          <input type="checkbox" id="show-gap-outlines">
-          Show Gap Stripes (Red)
-        </label>
-      </div>
-
-      <div class="control-group">
         <label>Gap Stripe Offset <span class="value-display" id="val-gap-phase-offset">0</span></label>
         <input type="range" id="gap-phase-offset" min="-3.0" max="3.0" step="0.01" value="0">
         <div class="help-text">Adjusts where gap stripes start relative to main stripes</div>
@@ -310,9 +293,9 @@
       </div>
 
       <div class="control-group">
-        <label>Braid Occlusion Threshold <span class="value-display" id="val-braid-occlusion-threshold">0.5</span></label>
-        <input type="range" id="braid-occlusion-threshold" min="0" max="1.0" step="0.05" value="0.5">
-        <div class="help-text">Hides stripes when "behind" (0=show all, 0.5=hide back half, 1.0=hide all)</div>
+        <label>Braid Occlusion Threshold <span class="value-display" id="val-braid-occlusion-threshold">0.25</span></label>
+        <input type="range" id="braid-occlusion-threshold" min="0" max="0.6" step="0.01" value="0.25">
+        <div class="help-text">Controls occlusion strength (0=no occlusion, 0.25=nice weave, 0.6=only lead visible)</div>
       </div>
 
       <div class="control-group">
@@ -403,11 +386,9 @@
     // Get all controls
     const controls = {
       pathType: document.getElementById('path-type'),
-      stripeCount: document.getElementById('stripe-count'),
       twistFrequency: document.getElementById('twist-frequency'),
       occlusionMode: document.getElementById('occlusion-mode'),
       stripeHeight: document.getElementById('stripe-height'),
-      stripeRotation: document.getElementById('stripe-rotation'),
       stripeGapRatio: document.getElementById('stripe-gap-ratio'),
       lineSpacing: document.getElementById('line-spacing'),
       edgeSharpness: document.getElementById('edge-sharpness'),
@@ -415,7 +396,6 @@
       tipAngle: document.getElementById('tip-angle'),
       envelope: document.getElementById('envelope'),
       maxWidth: document.getElementById('max-width'),
-      showGapOutlines: document.getElementById('show-gap-outlines'),
       gapPhaseOffset: document.getElementById('gap-phase-offset'),
       braidVariant: document.getElementById('braid-variant'),
       profile: document.getElementById('profile'),
@@ -427,10 +407,8 @@
     };
 
     const valueDisplays = {
-      stripeCount: document.getElementById('val-stripe-count'),
       twistFrequency: document.getElementById('val-twist-frequency'),
       stripeHeight: document.getElementById('val-stripe-height'),
-      stripeRotation: document.getElementById('val-stripe-rotation'),
       stripeGapRatio: document.getElementById('val-stripe-gap-ratio'),
       lineSpacing: document.getElementById('val-line-spacing'),
       edgeSharpness: document.getElementById('val-edge-sharpness'),
@@ -450,11 +428,9 @@
       // Get current values
       const config = {
         pathType: controls.pathType.value,
-        stripeCount: parseInt(controls.stripeCount.value),
         twistFrequency: parseFloat(controls.twistFrequency.value),
         occlusionMode: controls.occlusionMode.value,
         stripeHeight: parseFloat(controls.stripeHeight.value),
-        stripeRotation: parseFloat(controls.stripeRotation.value),
         stripeGapRatio: parseFloat(controls.stripeGapRatio.value),
         lineSpacing: parseFloat(controls.lineSpacing.value),
         edgeSharpness: parseFloat(controls.edgeSharpness.value),
@@ -462,7 +438,6 @@
         tipAngle: parseFloat(controls.tipAngle.value),
         envelope: controls.envelope.value,
         maxWidth: parseFloat(controls.maxWidth.value),
-        showGapOutlines: controls.showGapOutlines.checked,
         gapPhaseOffset: parseFloat(controls.gapPhaseOffset.value),
         braidVariant: controls.braidVariant.value,
         profile: controls.profile.value,
@@ -477,10 +452,8 @@
       if (controls.visibleFamily3.checked) config.visibleFamilies.push(3);
 
       // Update value displays
-      valueDisplays.stripeCount.textContent = config.stripeCount;
       valueDisplays.twistFrequency.textContent = config.twistFrequency.toFixed(2);
       valueDisplays.stripeHeight.textContent = config.stripeHeight.toFixed(1);
-      valueDisplays.stripeRotation.textContent = config.stripeRotation.toFixed(1);
       valueDisplays.stripeGapRatio.textContent = config.stripeGapRatio.toFixed(1);
       valueDisplays.lineSpacing.textContent = config.lineSpacing.toFixed(2);
       valueDisplays.edgeSharpness.textContent = config.edgeSharpness.toFixed(1);
@@ -607,7 +580,6 @@
       const parts = [
         'node process-svg.js input.svg output.svg',
         '  --fill-mode barber-pole',
-        `  --stripe-count ${config.stripeCount}`,
         `  --twist-frequency ${config.twistFrequency}`,
         `  --occlusion-mode ${config.occlusionMode}`,
         `  --envelope ${config.envelope}`,
@@ -617,17 +589,12 @@
         `  --line-spacing ${config.lineSpacing}`,
         `  --stripe-taper-edge-sharpness ${config.edgeSharpness}`,
         `  --stripe-taper-middle-angle ${config.middleAngle}`,
-        `  --stripe-rotation ${config.stripeRotation}`,
         `  --tip-angle ${config.tipAngle}`,
         `  --braid-variant ${config.braidVariant}`,
         `  --barber-profile ${config.profile}`,
         `  --braid-tightness ${config.braidTightness}`,
         `  --braid-occlusion-threshold ${config.braidOcclusionThreshold}`
       ];
-
-      if (config.showGapOutlines) {
-        parts.push('  --show-gap-outlines');
-      }
 
       if (config.gapPhaseOffset !== 0) {
         parts.push(`  --gap-phase-offset ${config.gapPhaseOffset}`);
@@ -643,11 +610,9 @@
     // Reset to defaults
     function resetDefaults() {
       controls.pathType.value = 'wavy';
-      controls.stripeCount.value = 2;
       controls.twistFrequency.value = 0.3;
       controls.occlusionMode.value = 'smooth';
       controls.stripeHeight.value = 6;
-      controls.stripeRotation.value = 0;
       controls.stripeGapRatio.value = 0.5;
       controls.lineSpacing.value = 1.5;
       controls.edgeSharpness.value = 1.0;
@@ -655,12 +620,11 @@
       controls.tipAngle.value = 0;
       controls.envelope.value = 'sinTaperBoth';
       controls.maxWidth.value = 8;
-      controls.showGapOutlines.checked = false;
       controls.gapPhaseOffset.value = 0;
       controls.braidVariant.value = 'two-strand';
       controls.profile.value = 'sigmoid';
       controls.braidTightness.value = 1.0;
-      controls.braidOcclusionThreshold.value = 0.5;
+      controls.braidOcclusionThreshold.value = 0.25;
       controls.visibleFamily1.checked = true;
       controls.visibleFamily2.checked = true;
       controls.visibleFamily3.checked = true;

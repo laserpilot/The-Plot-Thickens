@@ -2200,6 +2200,82 @@ function calculateExtension(phase, occlusionMode, minOcclusion) {
 }
 
 /**
+ * Calculate visibility for three-strand braid occlusion.
+ * Creates proper over/under weave pattern where each family leads in sequence.
+ *
+ * @param {number} phaseWithOffset - Phase including family offset
+ * @param {number} cycleWidth - Width of one complete cycle
+ * @param {number} familyIdx - Current family index (0, 1, or 2)
+ * @param {number} familyCount - Total number of families (should be 3)
+ * @returns {number} Visibility weight from 0.0 (hidden) to 1.0 (fully visible)
+ */
+function calculateThreeStrandVisibility(phaseWithOffset, cycleWidth, familyIdx, familyCount) {
+  // Normalize phase to 0.0-1.0 range
+  const normalizedPhase = ((phaseWithOffset / cycleWidth) % 1.0 + 1.0) % 1.0;
+
+  // Divide cycle into zones (one per family)
+  // Zone 0: Family 0 leads
+  // Zone 1: Family 1 leads
+  // Zone 2: Family 2 leads
+  const zoneIndex = Math.floor(normalizedPhase * familyCount);
+  const leadFamily = zoneIndex;
+
+  // Calculate base visibility
+  let visibility;
+
+  if (familyIdx === leadFamily) {
+    // This family is on top
+    visibility = 1.0;
+  } else {
+    // Determine over/under relationship
+    // The lead family occludes the next family in sequence
+    // This creates pattern: Family 0 over 1, Family 1 over 2, Family 2 over 0
+    const occludedFamily = (leadFamily + 1) % familyCount;
+
+    if (familyIdx === occludedFamily) {
+      // This family is directly behind the lead (mostly hidden)
+      visibility = 0.1;
+    } else {
+      // This family is the middle strand (partially visible)
+      visibility = 0.6;
+    }
+  }
+
+  // Apply smooth transition at zone boundaries
+  const fadeWidth = 0.05; // 5% fade zone at each boundary
+  const zoneProgress = (normalizedPhase * familyCount) % 1.0;
+
+  // Determine which families are adjacent at this boundary
+  const nextZone = (zoneIndex + 1) % familyCount;
+
+  if (zoneProgress < fadeWidth) {
+    // Fading in from previous zone
+    const prevZone = (zoneIndex - 1 + familyCount) % familyCount;
+    const prevOccludedFamily = (prevZone + 1) % familyCount;
+    const prevVisibility = (familyIdx === prevZone) ? 1.0 :
+                          (familyIdx === prevOccludedFamily) ? 0.1 : 0.6;
+
+    // Smooth transition using cosine
+    const t = zoneProgress / fadeWidth;
+    const smoothT = (1 - Math.cos(t * Math.PI)) / 2;
+    visibility = prevVisibility * (1 - smoothT) + visibility * smoothT;
+
+  } else if (zoneProgress > (1.0 - fadeWidth)) {
+    // Fading out to next zone
+    const nextOccludedFamily = (nextZone + 1) % familyCount;
+    const nextVisibility = (familyIdx === nextZone) ? 1.0 :
+                          (familyIdx === nextOccludedFamily) ? 0.1 : 0.6;
+
+    // Smooth transition using cosine
+    const t = (zoneProgress - (1.0 - fadeWidth)) / fadeWidth;
+    const smoothT = (1 - Math.cos(t * Math.PI)) / 2;
+    visibility = visibility * (1 - smoothT) + nextVisibility * smoothT;
+  }
+
+  return visibility;
+}
+
+/**
  * Generate stripe boundaries for each lane
  * Creates discrete S-shaped regions for each stripe
  * @private
@@ -2459,7 +2535,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     const familyPaths = [[], [], []]; // family1, family2, family3
 
     // Helper function to generate a single stripe family
-    const generateStripeFamily = (phaseOffset, outputArray) => {
+    const generateStripeFamily = (phaseOffset, outputArray, familyIdx) => {
       for (let lineIdx = 0; lineIdx < linesPerStripe; lineIdx++) {
         const linePositionInStripe = (lineIdx - (linesPerStripe - 1) / 2) / linesPerStripe;
         let currentLineSegment = [];
@@ -2536,25 +2612,45 @@ function generateBarberPoleSmooth(pathData, options = {}) {
             const fadeThreshold = 0.02;
             let isVisible = Math.abs(stripeWidthFactor) > fadeThreshold;
 
-            // Braid occlusion mode: use cosine visibility masking for weaving effect
-            // This creates the over/under pattern for three-strand braids
+            // Braid occlusion mode: creates over/under pattern for braids
             if (occlusionMode === 'braid' && isVisible) {
-              // Calculate visibility based on phase with repeating pattern
-              // For three-strand: Family 1 over 2, Family 2 over 3, Family 3 over 1
-              // Normalize phase to cycle (0 to 2π range for cosine)
-              const normalizedPhase = (phase / cycleWidth) * 2 * Math.PI;
-              const rawVisibility = Math.cos(normalizedPhase);
+              let visibility;
 
-              // Map cosine (-1 to 1) to visibility (0 to 1)
-              const visibility = (rawVisibility + 1) / 2; // Maps -1..1 to 0..1
-
-              // Hide stripe when visibility falls below threshold
-              // threshold 0.0 = show everything (hide when visibility < 0, never happens)
-              // threshold 0.5 = hide back half (hide when visibility < 0.5, i.e., rawVisibility < 0)
-              // Higher threshold = more aggressive hiding
-              if (visibility < braidOcclusionThreshold) {
-                isVisible = false;
+              if (braidVariant === 'three-strand' && familyCount === 3) {
+                // Three-strand braid: proper over/under weave
+                // Family 0 over 1, Family 1 over 2, Family 2 over 0
+                visibility = calculateThreeStrandVisibility(
+                  phase,          // Already includes familyPhaseOffset
+                  cycleWidth,
+                  familyIdx,
+                  familyCount
+                );
+              } else {
+                // Two-strand or legacy: simple cosine visibility mask
+                const normalizedPhase = (phase / cycleWidth) * 2 * Math.PI;
+                const rawVisibility = Math.cos(normalizedPhase);
+                visibility = (rawVisibility + 1) / 2; // Map -1..1 to 0..1
               }
+
+              // Apply hybrid visibility weighting
+              // Calculate weight after threshold (0 if below threshold)
+              const visibilityWeight = Math.max(0, visibility - braidOcclusionThreshold);
+
+              // Scale stripe width by visibility (min 5% to prevent full disappearance)
+              const visibilityScale = Math.max(0.05, visibilityWeight);
+              stripeWidthFactor *= visibilityScale;
+
+              // Apply lateral shift for flat-candy profile based on visibility
+              // This creates dovetail pattern by moving strands toward center as they narrow
+              if (profile === 'flat-candy') {
+                const normalizedPhase = phase / cycleWidth;
+                const sineOffset = Math.sin(normalizedPhase * 2 * Math.PI);
+                diagonalOffset = sineOffset * halfWidth * visibilityScale;
+              }
+
+              // Binary gate: cut polyline when combined weight falls near zero
+              // This prevents connector lines across gaps
+              isVisible = (Math.abs(stripeWidthFactor) * visibilityScale) > fadeThreshold;
             }
 
             if (isVisible) {
@@ -2609,7 +2705,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
       // Only generate if this family is visible
       if (effectiveVisibleFamilies.includes(familyNumber)) {
         const phaseOffset = familyPhaseOffsets[familyIdx];
-        generateStripeFamily(phaseOffset, familyPaths[familyIdx]);
+        generateStripeFamily(phaseOffset, familyPaths[familyIdx], familyIdx);
       }
     }
 
