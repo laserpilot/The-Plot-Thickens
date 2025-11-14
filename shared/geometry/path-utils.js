@@ -2494,9 +2494,42 @@ function generateBarberPoleSmooth(pathData, options = {}) {
             // Calculate stripe progress for this phase position (-1 to 1 over extended width)
             const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
 
-            // Stripe ribbon taper - naturally goes to zero at edges (stripeProgress = ±1)
-            const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
-            const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
+            // Calculate diagonal offset AND width taper based on profile variant
+            // Each profile defines its own shape geometry
+            let diagonalOffset;
+            let stripeWidthFactor;
+
+            if (profile === 'sigmoid') {
+              // Original sigmoid S-curve profile with configurable taper
+              const smoothOffset = smoothSigmoid(stripeProgress);
+              diagonalOffset = smoothOffset * halfWidth;
+
+              // Sigmoid ribbon taper - naturally goes to zero at edges (stripeProgress = ±1)
+              const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+              stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
+
+            } else if (profile === 'flat-candy') {
+              // Sinusoidal wrapping for flat ribbon around cylinder
+              const normalizedPhase = phase / cycleWidth;
+              const sineOffset = Math.sin(normalizedPhase * 2 * Math.PI);
+              diagonalOffset = sineOffset * halfWidth;
+
+              // Constant width for clean flat ribbon appearance
+              stripeWidthFactor = 1.0;
+
+            } else if (profile === 'cylindrical') {
+              // Constant width band, no diagonal offset - pure visibility masking
+              diagonalOffset = 0;
+              stripeWidthFactor = 1.0;
+
+            } else {
+              // Fallback to sigmoid for unknown profiles
+              const smoothOffset = smoothSigmoid(stripeProgress);
+              diagonalOffset = smoothOffset * halfWidth;
+
+              const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+              stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
+            }
 
             // Fade threshold: break segment cleanly when taper drops below threshold
             // This prevents tiny offset artifacts at stripe edges
@@ -2525,26 +2558,6 @@ function generateBarberPoleSmooth(pathData, options = {}) {
             }
 
             if (isVisible) {
-              // Calculate diagonal offset based on profile variant
-              let diagonalOffset;
-              if (profile === 'sigmoid') {
-                // Original sigmoid S-curve profile
-                const smoothOffset = smoothSigmoid(stripeProgress);
-                diagonalOffset = smoothOffset * halfWidth;
-              } else if (profile === 'flat-candy') {
-                // Linear/sinusoidal ramp for flat ribbon wrapping cylinder
-                // Use sine wave for smooth cylindrical wrapping effect
-                const normalizedPhase = phase / cycleWidth;
-                const sineOffset = Math.sin(normalizedPhase * 2 * Math.PI);
-                diagonalOffset = sineOffset * halfWidth;
-              } else if (profile === 'cylindrical') {
-                // Constant width band, no diagonal offset - pure visibility masking
-                diagonalOffset = 0;
-              } else {
-                // Fallback to sigmoid for unknown profiles
-                const smoothOffset = smoothSigmoid(stripeProgress);
-                diagonalOffset = smoothOffset * halfWidth;
-              }
 
               const perpOffset = linePositionInStripe * effectiveStripeHeight;
               const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
