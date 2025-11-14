@@ -473,7 +473,7 @@
 
                     <label id="edge-softness-label">
                       Edge Softness
-                      <input type="number" id="barber-pole-edge-softness" step="0.05" min="0" max="1.0" value="0.15" />
+                      <input type="number" id="barber-pole-edge-softness" step="0.05" min="0" max="1.0" value="0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Smoothness of stripe boundaries (0=hard, 1=very soft)</div>
                     </label>
 
@@ -498,7 +498,7 @@
                       <select id="occlusion-mode">
                         <option value="smooth">Smooth (gradual stripe shortening)</option>
                         <option value="hard">Hard (sharp visibility cutoff)</option>
-                        <option value="none">None (flat 2D spiral, no hiding)</option>
+                        <option value="none" selected>None (flat 2D spiral, no hiding)</option>
                       </select>
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How stripes hide when "wrapping to back"</div>
                     </label>
@@ -511,55 +511,55 @@
 
                     <label>
                       Max Width (mm)
-                      <input type="number" id="barber-pole-max-width" step="0.1" min="0.5" max="15" value="8.5" />
+                      <input type="number" id="barber-pole-max-width" step="0.1" min="0.5" max="15" value="2" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum ribbon width at widest envelope point</div>
                     </label>
 
                     <label>
                       Min Width (mm)
-                      <input type="number" id="barber-pole-min-width" step="0.1" min="0" max="5" value="0.0" />
+                      <input type="number" id="barber-pole-min-width" step="0.1" min="0" max="5" value="1" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum ribbon width at narrowest envelope point</div>
                     </label>
 
                     <label>
                       Stripe Height (mm)
-                      <input type="number" id="stripe-height" step="0.5" min="1" max="20" value="9" placeholder="Auto"/>
+                      <input type="number" id="stripe-height" step="0.5" min="1" max="20" value="5" placeholder="Auto"/>
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular thickness of stripe band (empty = auto-scale: 2-10mm). Use twist-frequency to control stripe stretch along path.</div>
                     </label>
 
                     <label>
                       Stripe/Gap Ratio
-                      <input type="number" id="stripe-gap-ratio" step="0.01" min="0.2" max="5" value="0.26" />
+                      <input type="number" id="stripe-gap-ratio" step="0.01" min="0.2" max="5" value="0.25" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Gap width relative to stripe (1.0 = equal, 0.5 = half, 2.0 = double)</div>
                     </label>
 
                     <label>
                       Line Spacing (mm)
-                      <input type="number" id="line-spacing" step="0.05" min="0.1" max="3" value="1.75" />
+                      <input type="number" id="line-spacing" step="0.05" min="0.1" max="3" value="1" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular distance between lines within each stripe</div>
                     </label>
 
                     <label>
                       Stripe Taper Edge Sharpness
-                      <input type="number" id="stripe-taper-edge-sharpness" step="0.1" min="0.1" max="5" value="0.8" />
+                      <input type="number" id="stripe-taper-edge-sharpness" step="0.1" min="0.1" max="5" value="1.0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls pointiness at stripe edges (1.0 = default, higher = sharper pinch)</div>
                     </label>
 
                     <label>
                       Stripe Taper Middle Angle
-                      <input type="number" id="stripe-taper-middle-angle" step="0.1" min="0.1" max="3" value="1.5" />
+                      <input type="number" id="stripe-taper-middle-angle" step="0.1" min="0.1" max="3" value="1.0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls diagonal slope in middle (1.0 = default, higher = steeper angle)</div>
                     </label>
 
                     <label>
                       Tip Angle
-                      <input type="number" id="tip-angle" step="0.5" min="-15" max="15" value="1.5" />
+                      <input type="number" id="tip-angle" step="0.5" min="-15" max="15" value="0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Rotation of stripe tips relative to flow (-15 to +15 degrees)</div>
                     </label>
 
                     <label>
                       Gap Phase Offset
-                      <input type="number" id="gap-phase-offset" step="0.01" min="0" max="1" value="1.0" />
+                      <input type="number" id="gap-phase-offset" step="0.01" min="0" max="1" value="0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls stripe overlap (0 = separated, 1 = braided rope effect)</div>
                     </label>
 
@@ -940,7 +940,7 @@
                 <!-- Outline Extraction -->
                 <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
                   <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" id="add-outline" style="margin-right: 0.5rem;" />
+                    <input type="checkbox" id="add-outline" checked style="margin-right: 0.5rem;" />
                     <span>Add Outline Strokes</span>
                   </label>
                   <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
@@ -948,7 +948,7 @@
                   </div>
 
                   <!-- Outline thickness controls (shown when outline is enabled) -->
-                  <div id="outline-thickness-controls" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                  <div id="outline-thickness-controls" style="display: block; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
                     <div style="margin-bottom: 0.5rem;">
                       <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
                         <span>Outline Offset (mm)</span>
@@ -979,7 +979,7 @@
                         <input
                           type="number"
                           id="outline-passes"
-                          value="1"
+                          value="2"
                           min="1"
                           max="10"
                           step="1"
@@ -1005,7 +1005,7 @@
                           <input
                             type="number"
                             id="outline-min-length"
-                            value=""
+                            value="5"
                             placeholder="No min"
                             min="0"
                             step="1"
