@@ -2463,43 +2463,55 @@ function generateBarberPoleSmooth(pathData, options = {}) {
           const extension = Math.abs(gapPhaseOffset) * gapWidthRadians;
           const extendedStripeWidth = stripeWidthRadians + extension;
 
-          // Calculate stripe progress for this phase position (-1 to 1 over extended width)
-          // This naturally fades to zero at stripe edges via the cosine taper
-          const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
+          // Gate: only process samples within this stripe's extended window
+          // This prevents polylines from continuing across gaps
+          const inStripeWindow = cyclePhase < extendedStripeWidth;
 
-          // Stripe ribbon taper - naturally goes to zero at edges (stripeProgress = ±1)
-          const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
-          const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
+          if (inStripeWindow) {
+            // Calculate stripe progress for this phase position (-1 to 1 over extended width)
+            const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
 
-          // Only emit points where stripe is visible (stripeWidthFactor provides natural fade)
-          // Small epsilon to avoid division by zero and filter out invisible points
-          const isVisible = Math.abs(stripeWidthFactor) > 0.001;
+            // Stripe ribbon taper - naturally goes to zero at edges (stripeProgress = ±1)
+            const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+            const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
 
-          if (isVisible) {
-            const smoothOffset = smoothSigmoid(stripeProgress);
-            let diagonalOffset = smoothOffset * halfWidth;
+            // Fade threshold: break segment cleanly when taper drops below threshold
+            // This prevents tiny offset artifacts at stripe edges
+            const fadeThreshold = 0.02;
+            const isVisible = Math.abs(stripeWidthFactor) > fadeThreshold;
 
-            const perpOffset = linePositionInStripe * effectiveStripeHeight;
-            const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
-            const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
+            if (isVisible) {
+              const smoothOffset = smoothSigmoid(stripeProgress);
+              let diagonalOffset = smoothOffset * halfWidth;
 
-            // Tip angle rotation
-            const tipRotationAmount = stripeProgress * tipAngleRad;
-            const cosTip = Math.cos(tipRotationAmount);
-            const sinTip = Math.sin(tipRotationAmount);
-            const tipAdjustedPerpOffset = fullyTaperedOffset * cosTip;
-            const tipAdjustedDiagOffset = diagonalOffset + fullyTaperedOffset * sinTip;
+              const perpOffset = linePositionInStripe * effectiveStripeHeight;
+              const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
+              const fullyTaperedOffset = ribbonTaperedOffset * envelopeTaper;
 
-            const totalOffset = tipAdjustedDiagOffset + tipAdjustedPerpOffset;
+              // Tip angle rotation
+              const tipRotationAmount = stripeProgress * tipAngleRad;
+              const cosTip = Math.cos(tipRotationAmount);
+              const sinTip = Math.sin(tipRotationAmount);
+              const tipAdjustedPerpOffset = fullyTaperedOffset * cosTip;
+              const tipAdjustedDiagOffset = diagonalOffset + fullyTaperedOffset * sinTip;
 
-            const point = {
-              x: centerPoint.x + centerPoint.nx * totalOffset,
-              y: centerPoint.y + centerPoint.ny * totalOffset
-            };
+              const totalOffset = tipAdjustedDiagOffset + tipAdjustedPerpOffset;
 
-            currentLineSegment.push(point);
+              const point = {
+                x: centerPoint.x + centerPoint.nx * totalOffset,
+                y: centerPoint.y + centerPoint.ny * totalOffset
+              };
+
+              currentLineSegment.push(point);
+            } else {
+              // Stripe taper faded below threshold - emit current segment
+              if (currentLineSegment.length > 2) {
+                outputArray.push(pointsToPath(currentLineSegment));
+              }
+              currentLineSegment = [];
+            }
           } else {
-            // Stripe faded to zero - emit current segment
+            // Outside stripe window - emit current segment and reset
             if (currentLineSegment.length > 2) {
               outputArray.push(pointsToPath(currentLineSegment));
             }
