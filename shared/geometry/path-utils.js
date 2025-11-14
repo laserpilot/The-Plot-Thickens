@@ -2459,20 +2459,25 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 
           // Calculate stripe width with overlap allowance
           // gapPhaseOffset controls how much the stripes extend into each other
-          const extension = Math.abs(gapPhaseOffset) * gapWidthRadians * 0.5; // Each stripe gets half the overlap
+          // At gapPhaseOffset = 1.0, stripes extend by full gap width to create perfect braid
+          const extension = Math.abs(gapPhaseOffset) * gapWidthRadians;
           const extendedStripeWidth = stripeWidthRadians + extension;
 
-          // Stripe is visible within its extended window
-          const inStripe = cyclePhase < extendedStripeWidth;
+          // Calculate stripe progress for this phase position (-1 to 1 over extended width)
+          // This naturally fades to zero at stripe edges via the cosine taper
+          const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
 
-          if (inStripe) {
-            const stripeProgress = (cyclePhase / extendedStripeWidth) * 2 - 1;
+          // Stripe ribbon taper - naturally goes to zero at edges (stripeProgress = ±1)
+          const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
+          const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
+
+          // Only emit points where stripe is visible (stripeWidthFactor provides natural fade)
+          // Small epsilon to avoid division by zero and filter out invisible points
+          const isVisible = Math.abs(stripeWidthFactor) > 0.001;
+
+          if (isVisible) {
             const smoothOffset = smoothSigmoid(stripeProgress);
             let diagonalOffset = smoothOffset * halfWidth;
-
-            // Stripe ribbon taper
-            const scaledProgress = Math.pow(Math.abs(stripeProgress), stripeTaperMiddleAngle) * Math.sign(stripeProgress);
-            const stripeWidthFactor = Math.pow(Math.cos(scaledProgress * Math.PI / 2), 1.0 / stripeTaperEdgeSharpness);
 
             const perpOffset = linePositionInStripe * effectiveStripeHeight;
             const ribbonTaperedOffset = perpOffset * stripeWidthFactor;
@@ -2494,7 +2499,7 @@ function generateBarberPoleSmooth(pathData, options = {}) {
 
             currentLineSegment.push(point);
           } else {
-            // Outside stripe window - emit current segment
+            // Stripe faded to zero - emit current segment
             if (currentLineSegment.length > 2) {
               outputArray.push(pointsToPath(currentLineSegment));
             }
@@ -2513,12 +2518,11 @@ function generateBarberPoleSmooth(pathData, options = {}) {
     generateStripeFamily(0, strokePaths);
 
     // Generate second stripe family (red/gap stripes) if requested
-    // Uses same code as first family but with phase offset to create interlocking effect
+    // Uses same code as first family but phase-shifted by half a cycle
     if (showGapOutlines) {
-      // Phase offset positions second family in the "gap" region
-      // At gapPhaseOffset = 0: full gap between families (traditional barber pole)
-      // At gapPhaseOffset = 1.0: families overlap completely (braided rope effect)
-      const secondFamilyPhaseOffset = stripeWidthRadians + gapWidthRadians * (1 - Math.abs(gapPhaseOffset));
+      // Second family is always at half-cycle offset (180° out of phase)
+      // This creates two independent, identical families that naturally interlock
+      const secondFamilyPhaseOffset = cycleWidth / 2;
       generateStripeFamily(secondFamilyPhaseOffset, gapOutlinePaths);
     }
 

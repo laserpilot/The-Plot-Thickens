@@ -478,15 +478,9 @@
                     </label>
 
                     <label>
-                      Stripe Count
-                      <input type="number" id="stripe-count" step="1" min="2" max="8" value="3" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Number of parallel spiral lanes (2-8)</div>
-                    </label>
-
-                    <label>
                       Twist Frequency
-                      <input type="number" id="twist-frequency" step="0.05" min="0.05" max="1.0" value="0.2" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Rotations per mm (0.2 = 1 rotation per 5mm)</div>
+                      <input type="number" id="twist-frequency" step="0.001" min="0.001" max="0.5" value="0.1" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Rotations per mm (0.1 = 1 rotation per 10mm)</div>
                     </label>
 
                     <label>
@@ -517,7 +511,7 @@
 
                     <label>
                       Max Width (mm)
-                      <input type="number" id="barber-pole-max-width" step="0.1" min="0.5" max="10" value="3.0" />
+                      <input type="number" id="barber-pole-max-width" step="0.1" min="0.5" max="15" value="8.5" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum ribbon width at widest envelope point</div>
                     </label>
 
@@ -529,38 +523,50 @@
 
                     <label>
                       Stripe Height (mm)
-                      <input type="number" id="stripe-height" step="0.5" min="1" max="20" value="" placeholder="Auto"/>
+                      <input type="number" id="stripe-height" step="0.5" min="1" max="20" value="9" placeholder="Auto"/>
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular thickness of stripe band (empty = auto-scale: 2-10mm). Use twist-frequency to control stripe stretch along path.</div>
                     </label>
 
                     <label>
                       Stripe/Gap Ratio
-                      <input type="number" id="stripe-gap-ratio" step="0.1" min="0.2" max="5" value="1.0" />
+                      <input type="number" id="stripe-gap-ratio" step="0.01" min="0.2" max="5" value="0.26" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Gap width relative to stripe (1.0 = equal, 0.5 = half, 2.0 = double)</div>
                     </label>
 
                     <label>
                       Line Spacing (mm)
-                      <input type="number" id="line-spacing" step="0.05" min="0.1" max="1" value="0.3" />
+                      <input type="number" id="line-spacing" step="0.05" min="0.1" max="3" value="1.75" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Perpendicular distance between lines within each stripe</div>
                     </label>
 
                     <label>
                       Stripe Taper Edge Sharpness
-                      <input type="number" id="stripe-taper-edge-sharpness" step="0.1" min="0.1" max="5" value="1.0" />
+                      <input type="number" id="stripe-taper-edge-sharpness" step="0.1" min="0.1" max="5" value="0.8" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls pointiness at stripe edges (1.0 = default, higher = sharper pinch)</div>
                     </label>
 
                     <label>
                       Stripe Taper Middle Angle
-                      <input type="number" id="stripe-taper-middle-angle" step="0.1" min="0.1" max="3" value="1.0" />
+                      <input type="number" id="stripe-taper-middle-angle" step="0.1" min="0.1" max="3" value="1.5" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls diagonal slope in middle (1.0 = default, higher = steeper angle)</div>
                     </label>
 
                     <label>
-                      <input type="checkbox" id="show-gap-outlines" />
+                      Tip Angle
+                      <input type="number" id="tip-angle" step="0.5" min="-15" max="15" value="1.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Rotation of stripe tips relative to flow (-15 to +15 degrees)</div>
+                    </label>
+
+                    <label>
+                      Gap Phase Offset
+                      <input type="number" id="gap-phase-offset" step="0.01" min="0" max="1" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Controls stripe overlap (0 = separated, 1 = braided rope effect)</div>
+                    </label>
+
+                    <label>
+                      <input type="checkbox" id="show-gap-outlines" checked/>
                       Show Gap Outlines
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Draw boundary lines at gap edges</div>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Draw second stripe family (red stripes)</div>
                     </label>
                   </div>
 

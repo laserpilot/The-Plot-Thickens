@@ -115,6 +115,8 @@ function buildCLICommand(config) {
     if (config.lineSpacing !== undefined && config.lineSpacing !== 0.3) parts.push(`--line-spacing ${config.lineSpacing}`);
     if (config.stripeTaperEdgeSharpness !== undefined && config.stripeTaperEdgeSharpness !== 1.0) parts.push(`--stripe-taper-edge-sharpness ${config.stripeTaperEdgeSharpness}`);
     if (config.stripeTaperMiddleAngle !== undefined && config.stripeTaperMiddleAngle !== 1.0) parts.push(`--stripe-taper-middle-angle ${config.stripeTaperMiddleAngle}`);
+    if (config.tipAngle !== undefined && config.tipAngle !== 0) parts.push(`--tip-angle ${config.tipAngle}`);
+    if (config.gapPhaseOffset !== undefined && config.gapPhaseOffset !== 0) parts.push(`--gap-phase-offset ${config.gapPhaseOffset}`);
     if (config.showGapOutlines) parts.push(`--show-gap-outlines`);
   } else if (config.fillMode === 'curly') {
     if (config.curlyLoopFrequency !== undefined && config.curlyLoopFrequency !== 1.0) parts.push(`--curly-loop-frequency ${config.curlyLoopFrequency}`);
@@ -570,6 +572,8 @@ export function initUI(store, renderer) {
     lineSpacing: document.getElementById('line-spacing'),
     stripeTaperEdgeSharpness: document.getElementById('stripe-taper-edge-sharpness'),
     stripeTaperMiddleAngle: document.getElementById('stripe-taper-middle-angle'),
+    tipAngle: document.getElementById('tip-angle'),
+    gapPhaseOffset: document.getElementById('gap-phase-offset'),
     showGapOutlines: document.getElementById('show-gap-outlines'),
     // Curly mode controls
     curlyLoopFrequency: document.getElementById('curly-loop-frequency'),
