@@ -174,10 +174,74 @@ The chevron V-shape appears where:
 
 This creates the classic braided appearance without needing discrete lane positions or opacity tricks.
 
+## Bundle Tightness Macro Control
+
+To simplify braid tuning, a **bundle tightness** macro (0-1) derives multiple parameters using linear interpolation:
+
+### Derivation Formulas
+
+```javascript
+// bundleTightness ∈ [0, 1] where:
+//   0 = loose bundle (wider gaps, earlier suppression)
+//   1 = tight bundle (narrow gaps, extended visibility)
+
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// Thickness multipliers
+leadThickness = lerp(0.8, 1.1, tight);        // 0.8 → 1.1
+middleThickness = lerp(0.4, 0.9, tight);      // 0.4 → 0.9
+occludedThickness = lerp(0.15, 0.05, tight);  // 0.15 → 0.05 (inverted!)
+
+// Occlusion zone geometry
+occludedZoneWidth = lerp(0.38, 0.22, tight);  // 0.38 → 0.22
+occludedZoneCenter = 0.5;                      // Always centered
+
+// Suppression cutoffs (when linkSuppression is enabled)
+middleSuppressionCutoff = lerp(0.55, 0.85, tight);      // 0.55 → 0.85
+occludedSuppressionCutoff = lerp(0.3, 0.55, tight);     // 0.3 → 0.55
+```
+
+### Implementation in Playground
+
+The `three-strand-braid-playground.html` implements this with:
+- **Bundle Tightness slider**: Primary macro control (0-1)
+- **Link suppression checkbox**: Derives cutoffs from tightness when checked
+- **Manual override**: Tweaking advanced controls sets `manualOverride = true`
+- **Reset button**: Clears override and re-derives from bundle tightness
+- **Bundle fill visualization**: Translucent gray overlay shows bundle shape
+
+### Validation Criteria
+
+Test at extremes to verify behavior:
+
+**bundleTightness = 0 (Loose)**:
+- Wider occluded zone (more hiding)
+- Thinner lead/middle strands
+- Middle strand suppresses earlier (cutoff 0.55)
+- Bundle overlay shows visible gaps
+- Chevron pattern still recognizable
+
+**bundleTightness = 1 (Tight)**:
+- Narrow occluded zone (less hiding)
+- Thicker lead/middle strands
+- Middle strand visible longer (cutoff 0.85)
+- Bundle overlay appears as single tight ribbon
+- Minimal gaps between crossings
+- Over/under sequence remains correct
+
+### Port to generateBarberPoleSmooth
+
+When integrating into production barber pole generator:
+1. Add `bundleTightness` parameter (default: 0.5)
+2. Derive thickness multipliers and zone width using above formulas
+3. Apply to existing `calculateThreeStrandVisibility()` logic
+4. Expose via CLI flag: `--bundle-tightness 0.0-1.0`
+5. Add to tuner UI as primary braid control
+
 ## Where This Goes Next
 
 - **Dial in the playground presets.** Use the new per-strand phase offsets, occluded-zone width sliders, and copy-to-clipboard debug output in `three-strand-braid-playground.html` to capture the exact deltas (phase trims, suppression cutoffs) that make the chevron weave look right at plotter scale.
 - **Port discrete states into the real generator.** In `generateBarberPoleSmooth` derive a shared lead/middle/occluded state from `accumulatedTwist`, gate each family with pen-up `null` breaks, and leave the existing sigmoid/flat/cylindrical geometry untouched except for a fixed width multiplier on the middle strand.
 - **Profile-specific tweaks.** Keep a small phase-bias map per profile (sigmoid vs flat-candy) so we can nudge the crossings without forking the occlusion logic; once tuned, expose those trims via CLI flags or advanced UI controls.
-- **Developer instrumentation.** Mirror the playground’s debug overlay inside the barber-pole tuner (state colors + suppression readouts) so we can verify braid ordering on real SVG paths before exposing the new controls to end users.
+- **Developer instrumentation.** Mirror the playground's debug overlay inside the barber-pole tuner (state colors + suppression readouts) so we can verify braid ordering on real SVG paths before exposing the new controls to end users.
 - **Expose braid tuning knobs.** After the defaults feel solid, surface the useful parameters—suppression thresholds, occluded-zone width, per-family phase trim—through CLI switches and the tuner sidebar so different plotter setups can fine-tune the braid look.

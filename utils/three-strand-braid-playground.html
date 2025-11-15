@@ -127,10 +127,28 @@
       </div>
 
       <div class="control-group">
+        <label for="bundleTightness">Bundle Tightness</label>
+        <input type="range" id="bundleTightness" min="0" max="1" step="0.01" value="0.5">
+        <div class="value-display"><span id="bundleTightnessValue">0.50</span></div>
+        <div class="help-text">Macro control: 0=loose strands, 1=tight bundle</div>
+        <div id="manualOverrideWarning" style="display:none; color:#ff9800; font-size:0.85em; margin-top:4px;">
+          ⚠ Manual tweaks active
+        </div>
+      </div>
+
+      <div class="control-group">
         <label for="occlusionThreshold">Back Strand Suppression</label>
         <input type="range" id="occlusionThreshold" min="0" max="0.9" step="0.01" value="0.0">
         <div class="value-display"><span id="occlusionThresholdValue">0.0</span></div>
         <div class="help-text">How much to hide the occluded strand (0=thin line, 0.9=hidden)</div>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="linkSuppression" checked>
+          Link suppression to bundle tightness
+        </label>
+        <div class="help-text">When checked, tighter bundles keep middle strand visible longer</div>
       </div>
 
       <div class="control-group">
@@ -148,9 +166,18 @@
         <div class="help-text">Display state visualization (green=lead, orange=middle, red=occluded)</div>
       </div>
 
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="showBundleFill" checked>
+          Show Bundle Fill
+        </label>
+        <div class="help-text">Display translucent bundle shape (gray overlay)</div>
+      </div>
+
       <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
 
-      <h2 style="font-size: 1.2em; margin-bottom: 15px; color: #555;">Advanced Tuning</h2>
+      <details id="advancedSection">
+        <summary style="cursor:pointer; font-weight:bold; font-size:1.2em; margin:10px 0; color:#555; list-style-position: outside;">Advanced Tuning</summary>
 
       <div class="control-group">
         <label for="phaseOffset">Shared Phase Offset</label>
@@ -226,6 +253,15 @@
         <div class="help-text">Fine-tune green strand alignment</div>
       </div>
 
+      <div class="control-group">
+        <button id="resetToMacro" style="width: 100%; padding: 10px; margin-top: 20px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+          Reset to Bundle Defaults
+        </button>
+        <div class="help-text" style="margin-top: 5px;">Clear manual overrides and use bundle tightness macro</div>
+      </div>
+
+      </details>
+
       <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
 
       <div class="control-group">
@@ -255,6 +291,24 @@
   </div>
 
   <script type="module">
+    // Manual override flag for advanced controls
+    let manualOverride = false;
+
+    // Derive bundle parameters from tightness macro (0-1)
+    function deriveBundleParams(tight, linkSuppression) {
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      return {
+        leadThickness: lerp(0.8, 1.1, tight),
+        middleThickness: lerp(0.4, 0.9, tight),
+        occludedThickness: lerp(0.15, 0.05, tight),
+        occludedZoneWidth: lerp(0.38, 0.22, tight),
+        occludedZoneCenter: 0.5, // Keep centered
+        middleSuppressionCutoff: linkSuppression ? lerp(0.55, 0.85, tight) : null,
+        occludedSuppressionCutoff: linkSuppression ? lerp(0.3, 0.55, tight) : null
+      };
+    }
+
     // Simple path generators
     function generateStraightPath() {
       const points = [];
@@ -370,7 +424,11 @@
           const strandPhase = (phase + strandIdx / numStrands) % 1.0;
 
           // Determine if this strand should be drawn (discrete visibility)
-          const shouldDraw = isVisible(state, occlusionThreshold);
+          const derivedCutoffs = params.middleSuppressionCutoff !== undefined ? {
+            middleSuppressionCutoff: params.middleSuppressionCutoff,
+            occludedSuppressionCutoff: params.occludedSuppressionCutoff
+          } : null;
+          const shouldDraw = isVisible(state, occlusionThreshold, derivedCutoffs);
 
           if (!shouldDraw) {
             // Lift pen - break the polyline
@@ -450,10 +508,15 @@
 
     // Determine if a strand should be visible based on its state and suppression level
     // Returns true/false for discrete pen up/down
-    function isVisible(state, suppression) {
+    function isVisible(state, suppression, derivedCutoffs = null) {
       if (state === 'lead') return true;
-      if (state === 'middle') return suppression < 0.75;
-      if (state === 'occluded') return suppression < 0.5;
+
+      const middleCutoff = derivedCutoffs?.middleSuppressionCutoff ?? 0.75;
+      const occludedCutoff = derivedCutoffs?.occludedSuppressionCutoff ?? 0.5;
+
+      if (state === 'middle') return suppression < middleCutoff;
+      if (state === 'occluded') return suppression < occludedCutoff;
+
       return false;
     }
 
@@ -552,7 +615,28 @@
       const strandThickness = parseFloat(document.getElementById('strandThickness').value);
       const occlusionThreshold = parseFloat(document.getElementById('occlusionThreshold').value);
 
-      // Get advanced tuning parameters
+      // Apply bundle tightness derivation if not in manual override mode
+      if (!manualOverride) {
+        const tight = parseFloat(document.getElementById('bundleTightness').value);
+        const linkSuppression = document.getElementById('linkSuppression').checked;
+        const derived = deriveBundleParams(tight, linkSuppression);
+
+        // Update UI sliders to reflect derived values
+        document.getElementById('leadThickness').value = derived.leadThickness;
+        document.getElementById('middleThickness').value = derived.middleThickness;
+        document.getElementById('occludedThickness').value = derived.occludedThickness;
+        document.getElementById('occludedZoneWidth').value = derived.occludedZoneWidth;
+        document.getElementById('occludedZoneCenter').value = derived.occludedZoneCenter;
+
+        // Update value displays
+        document.getElementById('leadThicknessValue').textContent = derived.leadThickness.toFixed(1);
+        document.getElementById('middleThicknessValue').textContent = derived.middleThickness.toFixed(1);
+        document.getElementById('occludedThicknessValue').textContent = derived.occludedThickness.toFixed(1);
+        document.getElementById('occludedZoneWidthValue').textContent = derived.occludedZoneWidth.toFixed(3);
+        document.getElementById('occludedZoneCenterValue').textContent = derived.occludedZoneCenter.toFixed(3);
+      }
+
+      // Get advanced tuning parameters (now potentially derived from bundleTightness)
       const params = {
         phaseOffset: parseFloat(document.getElementById('phaseOffset').value),
         occludedZoneWidth: parseFloat(document.getElementById('occludedZoneWidth').value),
@@ -567,6 +651,15 @@
           parseFloat(document.getElementById('greenPhaseNudge').value)
         ]
       };
+
+      // Add derived suppression cutoffs if link is enabled
+      const linkSuppression = document.getElementById('linkSuppression').checked;
+      if (linkSuppression && !manualOverride) {
+        const tight = parseFloat(document.getElementById('bundleTightness').value);
+        const derived = deriveBundleParams(tight, linkSuppression);
+        params.middleSuppressionCutoff = derived.middleSuppressionCutoff;
+        params.occludedSuppressionCutoff = derived.occludedSuppressionCutoff;
+      }
 
       // Update debug state display
       updateDebugState(pathType, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params);
@@ -598,6 +691,64 @@
         drawPolyline(ctx, strand.center);
       });
 
+      // Draw translucent bundle overlay if enabled
+      if (document.getElementById('showBundleFill').checked) {
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = 'rgb(200, 200, 200)';
+
+        strands.forEach((strand, strandIdx) => {
+          // Build path from visible (lead/middle) segments
+          let segments = [];
+          let currentSegment = [];
+
+          for (let i = 0; i < strand.left.length; i++) {
+            const leftPt = strand.left[i];
+            const rightPt = strand.right[i];
+            const centerPt = strand.center[i];
+
+            // Skip if point is null (pen up) or occluded state
+            if (!leftPt || !rightPt || !centerPt || centerPt.state === 'occluded') {
+              if (currentSegment.length > 0) {
+                segments.push(currentSegment);
+                currentSegment = [];
+              }
+              continue;
+            }
+
+            // Add this point to current segment
+            currentSegment.push({ left: leftPt, right: rightPt });
+          }
+
+          // Don't forget the last segment
+          if (currentSegment.length > 0) {
+            segments.push(currentSegment);
+          }
+
+          // Draw each segment as a filled polygon
+          segments.forEach(segment => {
+            if (segment.length < 2) return; // Need at least 2 points to make a quad
+
+            ctx.beginPath();
+
+            // Draw along left boundary
+            ctx.moveTo(segment[0].left.x, segment[0].left.y);
+            for (let i = 1; i < segment.length; i++) {
+              ctx.lineTo(segment[i].left.x, segment[i].left.y);
+            }
+
+            // Draw along right boundary (reverse direction)
+            for (let i = segment.length - 1; i >= 0; i--) {
+              ctx.lineTo(segment[i].right.x, segment[i].right.y);
+            }
+
+            ctx.closePath();
+            ctx.fill();
+          });
+        });
+
+        ctx.globalAlpha = 1.0;
+      }
+
       // Render debug overlay if enabled
       if (document.getElementById('showDebug').checked) {
         renderDebugOverlay(strands);
@@ -611,11 +762,19 @@
 
     // Update debug state display
     function updateDebugState(pathType, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params) {
+      const bundleTightness = parseFloat(document.getElementById('bundleTightness').value);
+      const linkSuppression = document.getElementById('linkSuppression').checked;
+      const showBundleFill = document.getElementById('showBundleFill').checked;
+
       const debugState = `pathType=${pathType}
 twistFrequency=${twistFrequency}
 strandWidth=${strandWidth}
 strandThickness=${strandThickness}
 occlusionThreshold=${occlusionThreshold}
+bundleTightness=${bundleTightness}
+linkSuppression=${linkSuppression}
+manualOverride=${manualOverride}
+showBundleFill=${showBundleFill}
 phaseOffset=${params.phaseOffset}
 occludedZoneWidth=${params.occludedZoneWidth}
 occludedZoneCenter=${params.occludedZoneCenter}
@@ -625,7 +784,9 @@ occludedThickness=${params.occludedThickness}
 epsilon=${params.epsilon}
 redPhaseNudge=${params.strandPhaseNudges[0]}
 bluePhaseNudge=${params.strandPhaseNudges[1]}
-greenPhaseNudge=${params.strandPhaseNudges[2]}`;
+greenPhaseNudge=${params.strandPhaseNudges[2]}${params.middleSuppressionCutoff !== undefined ? `
+middleSuppressionCutoff=${params.middleSuppressionCutoff}
+occludedSuppressionCutoff=${params.occludedSuppressionCutoff}` : ''}`;
 
       document.getElementById('debugStateDisplay').value = debugState;
     }
@@ -653,12 +814,42 @@ greenPhaseNudge=${params.strandPhaseNudges[2]}`;
 
     // Set up event listeners
     function setupControls() {
-      const controls = [
+      // Basic controls (don't trigger manual override)
+      const basicControls = [
         'pathType',
         'twistFrequency',
         'strandWidth',
         'strandThickness',
-        'occlusionThreshold',
+        'occlusionThreshold'
+      ];
+
+      basicControls.forEach(id => {
+        const element = document.getElementById(id);
+        element.addEventListener('input', () => {
+          const valueDisplay = document.getElementById(id + 'Value');
+          if (valueDisplay) {
+            valueDisplay.textContent = element.value;
+          }
+          render();
+        });
+      });
+
+      // Bundle tightness and link suppression (don't trigger manual override)
+      document.getElementById('bundleTightness').addEventListener('input', (e) => {
+        const valueDisplay = document.getElementById('bundleTightnessValue');
+        const value = parseFloat(e.target.value);
+        if (!manualOverride) {
+          valueDisplay.textContent = value.toFixed(2);
+        } else {
+          valueDisplay.textContent = value.toFixed(2) + ' (custom)';
+        }
+        render();
+      });
+
+      document.getElementById('linkSuppression').addEventListener('change', render);
+
+      // Advanced controls that trigger manual override
+      const advancedControls = [
         'phaseOffset',
         'occludedZoneWidth',
         'occludedZoneCenter',
@@ -671,9 +862,15 @@ greenPhaseNudge=${params.strandPhaseNudges[2]}`;
         'greenPhaseNudge'
       ];
 
-      controls.forEach(id => {
+      advancedControls.forEach(id => {
         const element = document.getElementById(id);
         element.addEventListener('input', () => {
+          // Trigger manual override
+          manualOverride = true;
+          document.getElementById('manualOverrideWarning').style.display = 'block';
+          const bundleValue = parseFloat(document.getElementById('bundleTightness').value);
+          document.getElementById('bundleTightnessValue').textContent = bundleValue.toFixed(2) + ' (custom)';
+
           // Update value display
           const valueDisplay = document.getElementById(id + 'Value');
           if (valueDisplay) {
@@ -689,8 +886,18 @@ greenPhaseNudge=${params.strandPhaseNudges[2]}`;
         });
       });
 
-      // Add listener for debug checkbox
+      // Add listener for debug and bundle fill checkboxes
       document.getElementById('showDebug').addEventListener('change', render);
+      document.getElementById('showBundleFill').addEventListener('change', render);
+
+      // Add listener for reset button
+      document.getElementById('resetToMacro').addEventListener('click', () => {
+        manualOverride = false;
+        document.getElementById('manualOverrideWarning').style.display = 'none';
+        const bundleValue = parseFloat(document.getElementById('bundleTightness').value);
+        document.getElementById('bundleTightnessValue').textContent = bundleValue.toFixed(2);
+        render(); // Will re-derive from bundleTightness
+      });
 
       // Add listener for copy button
       document.getElementById('copyDebugState').addEventListener('click', copyDebugState);
