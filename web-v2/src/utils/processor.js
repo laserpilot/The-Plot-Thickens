@@ -269,7 +269,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           stripeIndex,
           fill: 'none',
           stroke: 'black',
-          strokeWidth: 0.1
+          strokeWidth: 0.1,
+          family: 'black'
         });
       });
 
@@ -282,7 +283,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           stripeIndex: gapIndex,
           fill: 'none',
           stroke: 'red',
-          strokeWidth: 0.1
+          strokeWidth: 0.1,
+          family: 'red'
         });
       });
 
@@ -295,7 +297,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           stripeIndex: family3Index,
           fill: 'none',
           stroke: 'blue',
-          strokeWidth: 0.1
+          strokeWidth: 0.1,
+          family: 'blue'
         });
       });
 

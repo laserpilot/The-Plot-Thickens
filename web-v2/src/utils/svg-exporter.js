@@ -76,23 +76,63 @@ export function buildSVG(paths, bounds, metadata = {}, enableBinning = false, bi
   const fillPaths = paths.filter(p => !p.isOutline);
   const outlinePaths = paths.filter(p => p.isOutline);
 
+  // Check if we have family-based grouping (barber pole mode)
+  const hasFamilies = fillPaths.some(p => p.family);
+
   // Group for fill paths
   if (fillPaths.length > 0) {
-    parts.push('  <g id="fill-paths">');
-    fillPaths.forEach((path, index) => {
-      if (!path.d || typeof path.d !== 'string') {
-        console.warn(`Path ${index}: invalid d attribute, skipping`);
-        return;
-      }
+    if (hasFamilies) {
+      // Group by family/color for barber pole mode
+      const familyGroups = {};
+      fillPaths.forEach(path => {
+        const family = path.family || 'default';
+        if (!familyGroups[family]) {
+          familyGroups[family] = [];
+        }
+        familyGroups[family].push(path);
+      });
 
-      const escapedD = escapeXML(path.d);
-      const fill = path.fill || 'none';
-      const stroke = path.stroke || 'black';
-      const strokeWidth = path.strokeWidth || 0.1;
+      // Output each family as a separate group
+      Object.keys(familyGroups).sort().forEach(family => {
+        const familyPaths = familyGroups[family];
+        const stroke = familyPaths[0]?.stroke || family;
 
-      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
-    });
-    parts.push('  </g>');
+        parts.push(`  <g id="family-${family}" stroke="${stroke}">`);
+        parts.push(`    <!-- ${family} stripes (${familyPaths.length} paths) -->`);
+
+        familyPaths.forEach((path, index) => {
+          if (!path.d || typeof path.d !== 'string') {
+            console.warn(`Path ${index}: invalid d attribute, skipping`);
+            return;
+          }
+
+          const escapedD = escapeXML(path.d);
+          const fill = path.fill || 'none';
+          const strokeWidth = path.strokeWidth || 0.1;
+
+          parts.push(`    <path d="${escapedD}" fill="${fill}" stroke-width="${strokeWidth}" />`);
+        });
+
+        parts.push('  </g>');
+      });
+    } else {
+      // Original non-grouped output
+      parts.push('  <g id="fill-paths">');
+      fillPaths.forEach((path, index) => {
+        if (!path.d || typeof path.d !== 'string') {
+          console.warn(`Path ${index}: invalid d attribute, skipping`);
+          return;
+        }
+
+        const escapedD = escapeXML(path.d);
+        const fill = path.fill || 'none';
+        const stroke = path.stroke || 'black';
+        const strokeWidth = path.strokeWidth || 0.1;
+
+        parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+      });
+      parts.push('  </g>');
+    }
   }
 
   // Group for outlines
@@ -224,30 +264,96 @@ function buildBinnedSVG(paths, bounds, metadata, binCount, originalPaths, origin
     allOutlines.push(...outlines);
   });
 
-  // Write each bin as a group
-  bins.forEach((bin, binIndex) => {
-    const fillPaths = bin.filter(p => !p.isOutline);
-    if (fillPaths.length === 0) return;
+  // Check if we have family-based grouping (barber pole mode)
+  const hasFamilies = paths.some(p => p.family);
 
-    const binMin = boundaries[binIndex].toFixed(2);
-    const binMax = boundaries[binIndex + 1].toFixed(2);
-
-    parts.push(`  <g id="bin-${binIndex}" data-length-range="${binMin}-${binMax}mm">`);
-    parts.push(`    <!-- Bin ${binIndex + 1}/${binCount}: ${binMin}-${binMax}mm (${fillPaths.length} paths) -->`);
-
-    fillPaths.forEach(path => {
-      if (!path.d || typeof path.d !== 'string') return;
-
-      const escapedD = escapeXML(path.d);
-      const fill = path.fill || 'none';
-      const stroke = path.stroke || 'black';
-      const strokeWidth = path.strokeWidth || 0.1;
-
-      parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+  if (hasFamilies) {
+    // Family-first grouping with length binning inside each family
+    const familyGroups = {};
+    paths.filter(p => !p.isOutline).forEach(path => {
+      const family = path.family || 'default';
+      if (!familyGroups[family]) {
+        familyGroups[family] = [];
+      }
+      familyGroups[family].push(path);
     });
 
-    parts.push('  </g>');
-  });
+    // Output each family with sub-bins
+    Object.keys(familyGroups).sort().forEach(family => {
+      const familyPaths = familyGroups[family];
+      const stroke = familyPaths[0]?.stroke || family;
+
+      parts.push(`  <g id="family-${family}" stroke="${stroke}">`);
+      parts.push(`    <!-- ${family} stripes (${familyPaths.length} paths total) -->`);
+
+      // Bin this family's paths
+      const familyBins = Array.from({ length: binCount }, () => []);
+      familyPaths.forEach(path => {
+        const sourceLength = path.originalIndex !== undefined && originalPaths[path.originalIndex]
+          ? (originalPaths[path.originalIndex].length || 0)
+          : 0;
+
+        let binIndex = binCount - 1;
+        for (let i = 0; i < boundaries.length - 1; i++) {
+          if (sourceLength >= boundaries[i] && sourceLength <= boundaries[i + 1]) {
+            binIndex = i;
+            break;
+          }
+        }
+        familyBins[binIndex].push(path);
+      });
+
+      // Write each bin for this family
+      familyBins.forEach((bin, binIndex) => {
+        if (bin.length === 0) return;
+
+        const binMin = boundaries[binIndex].toFixed(2);
+        const binMax = boundaries[binIndex + 1].toFixed(2);
+
+        parts.push(`    <g id="family-${family}-bin-${binIndex}" data-length-range="${binMin}-${binMax}mm">`);
+        parts.push(`      <!-- Bin ${binIndex + 1}/${binCount}: ${binMin}-${binMax}mm (${bin.length} paths) -->`);
+
+        bin.forEach(path => {
+          if (!path.d || typeof path.d !== 'string') return;
+
+          const escapedD = escapeXML(path.d);
+          const fill = path.fill || 'none';
+          const strokeWidth = path.strokeWidth || 0.1;
+
+          parts.push(`      <path d="${escapedD}" fill="${fill}" stroke-width="${strokeWidth}" />`);
+        });
+
+        parts.push('    </g>');
+      });
+
+      parts.push('  </g>');
+    });
+  } else {
+    // Original binning (no family grouping)
+    bins.forEach((bin, binIndex) => {
+      const fillPaths = bin.filter(p => !p.isOutline);
+      if (fillPaths.length === 0) return;
+
+      const binMin = boundaries[binIndex].toFixed(2);
+      const binMax = boundaries[binIndex + 1].toFixed(2);
+
+      parts.push(`  <g id="bin-${binIndex}" data-length-range="${binMin}-${binMax}mm">`);
+      parts.push(`    <!-- Bin ${binIndex + 1}/${binCount}: ${binMin}-${binMax}mm (${fillPaths.length} paths) -->`);
+
+      fillPaths.forEach(path => {
+        if (!path.d || typeof path.d !== 'string') return;
+
+        const escapedD = escapeXML(path.d);
+        const fill = path.fill || 'none';
+        const stroke = path.stroke || 'black';
+        const strokeWidth = path.strokeWidth || 0.1;
+
+        parts.push(`    <path d="${escapedD}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`);
+      });
+
+      parts.push('  </g>');
+    });
+  }
 
   // Add outlines in separate group
   if (allOutlines.length > 0) {
