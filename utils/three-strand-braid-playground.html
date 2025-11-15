@@ -114,7 +114,7 @@
 
       <div class="control-group">
         <label for="twistFrequency">Twist Frequency</label>
-        <input type="range" id="twistFrequency" min="0.5" max="5" step="0.1" value="2">
+        <input type="range" id="twistFrequency" min="0.5" max="10" step="0.1" value="2">
         <div class="value-display"><span id="twistFrequencyValue">2.0</span> cycles</div>
         <div class="help-text">How many times the braid twists along the path</div>
       </div>
@@ -135,7 +135,7 @@
 
       <div class="control-group">
         <label for="strandThickness">Strand Thickness</label>
-        <input type="range" id="strandThickness" min="1" max="10" step="0.5" value="3">
+        <input type="range" id="strandThickness" min="1" max="20" step="0.5" value="3">
         <div class="value-display"><span id="strandThicknessValue">3</span> pixels</div>
         <div class="help-text">Thickness of each individual strand ribbon</div>
       </div>
@@ -146,6 +146,98 @@
           Show Debug Overlay
         </label>
         <div class="help-text">Display state visualization (green=lead, orange=middle, red=occluded)</div>
+      </div>
+
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+      <h2 style="font-size: 1.2em; margin-bottom: 15px; color: #555;">Advanced Tuning</h2>
+
+      <div class="control-group">
+        <label for="phaseOffset">Shared Phase Offset</label>
+        <input type="range" id="phaseOffset" min="-1" max="1" step="0.001" value="0">
+        <div class="value-display"><span id="phaseOffsetValue">0.000</span></div>
+        <div class="help-text">Nudge the entire braid ordering forward/backward</div>
+      </div>
+
+      <div class="control-group">
+        <label for="occludedZoneWidth">Occluded Zone Width</label>
+        <input type="range" id="occludedZoneWidth" min="0.1" max="0.5" step="0.001" value="0.28">
+        <div class="value-display"><span id="occludedZoneWidthValue">0.280</span></div>
+        <div class="help-text">How much of each cycle the occluded state occupies</div>
+      </div>
+
+      <div class="control-group">
+        <label for="occludedZoneCenter">Occluded Zone Center</label>
+        <input type="range" id="occludedZoneCenter" min="0.3" max="0.7" step="0.001" value="0.5">
+        <div class="value-display"><span id="occludedZoneCenterValue">0.500</span></div>
+        <div class="help-text">Position of occluded window within each zone</div>
+      </div>
+
+      <div class="control-group">
+        <label for="leadThickness">Lead Thickness Multiplier</label>
+        <input type="range" id="leadThickness" min="0.5" max="1.5" step="0.1" value="1.0">
+        <div class="value-display"><span id="leadThicknessValue">1.0</span></div>
+        <div class="help-text">Thickness of lead (front) strand</div>
+      </div>
+
+      <div class="control-group">
+        <label for="middleThickness">Middle Thickness Multiplier</label>
+        <input type="range" id="middleThickness" min="0.3" max="1.0" step="0.1" value="0.6">
+        <div class="value-display"><span id="middleThicknessValue">0.6</span></div>
+        <div class="help-text">Thickness of middle strand</div>
+      </div>
+
+      <div class="control-group">
+        <label for="occludedThickness">Occluded Thickness Multiplier</label>
+        <input type="range" id="occludedThickness" min="0.3" max="1.0" step="0.1" value="1.0">
+        <div class="value-display"><span id="occludedThicknessValue">1.0</span></div>
+        <div class="help-text">Thickness of occluded (back) strand</div>
+      </div>
+
+      <div class="control-group">
+        <label for="epsilon">Zone Epsilon (Smoothing)</label>
+        <input type="range" id="epsilon" min="0.001" max="0.1" step="0.001" value="0.02">
+        <div class="value-display"><span id="epsilonValue">0.020</span></div>
+        <div class="help-text">Boundary stabilization (low=flicker, high=extended middle)</div>
+      </div>
+
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+      <h3 style="font-size: 1.1em; margin-bottom: 10px; color: #666;">Per-Strand Phase Nudge</h3>
+
+      <div class="control-group">
+        <label for="redPhaseNudge" style="color: #ff4444;">Red Strand Phase</label>
+        <input type="range" id="redPhaseNudge" min="-1" max="1" step="0.001" value="0">
+        <div class="value-display"><span id="redPhaseNudgeValue">0.000</span> cycles</div>
+        <div class="help-text">Fine-tune red strand alignment</div>
+      </div>
+
+      <div class="control-group">
+        <label for="bluePhaseNudge" style="color: #4444ff;">Blue Strand Phase</label>
+        <input type="range" id="bluePhaseNudge" min="-1" max="1" step="0.001" value="0">
+        <div class="value-display"><span id="bluePhaseNudgeValue">0.000</span> cycles</div>
+        <div class="help-text">Fine-tune blue strand alignment</div>
+      </div>
+
+      <div class="control-group">
+        <label for="greenPhaseNudge" style="color: #44ff44;">Green Strand Phase</label>
+        <input type="range" id="greenPhaseNudge" min="-1" max="1" step="0.001" value="0">
+        <div class="value-display"><span id="greenPhaseNudgeValue">0.000</span> cycles</div>
+        <div class="help-text">Fine-tune green strand alignment</div>
+      </div>
+
+      <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+      <div class="control-group">
+        <button id="copyDebugState" style="width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+          Copy Debug State
+        </button>
+        <div class="help-text" style="margin-top: 5px;">Copy current settings to clipboard</div>
+      </div>
+
+      <div class="control-group">
+        <label for="debugStateDisplay">Debug State</label>
+        <textarea id="debugStateDisplay" readonly style="width: 100%; height: 120px; font-family: 'Courier New', monospace; font-size: 0.75em; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
       </div>
 
     </div>
@@ -214,7 +306,7 @@
     }
 
     // Main braid generation function
-    function generateThreeStrandBraid(centerline, twistFrequency, strandWidth, strandThickness, occlusionThreshold) {
+    function generateThreeStrandBraid(centerline, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params) {
       const numStrands = 3;
       // Each strand now has left and right boundary curves
       const strands = [
@@ -252,18 +344,32 @@
 
         // Calculate phase based on actual path length
         const lengthT = pathLengths[i] / totalLength;
-        const phase = (lengthT * twistFrequency) % 1.0;
+        const basePhase = (lengthT * twistFrequency) % 1.0;
+
+        // Apply phase offset from tuning parameter
+        const phase = (basePhase + params.phaseOffset) % 1.0;
 
         for (let strandIdx = 0; strandIdx < numStrands; strandIdx++) {
+          // Apply per-strand phase nudge to shift occlusion timing independently
+          const strandNudge = params.strandPhaseNudges[strandIdx];
+          const nudgedPhase = (phase + strandNudge) % 1.0;
+
+          // Calculate discrete state using nudged phase for this strand
+          // This lets you shift where each strand enters lead/middle/occluded states
+          const state = calculateStrandState(
+            nudgedPhase,
+            strandIdx,
+            numStrands,
+            params.epsilon,
+            params.occludedZoneWidth,
+            params.occludedZoneCenter
+          );
+
           // Sinusoidal path with phase offset (classic braid geometry)
-          // Each strand gets 1/3 phase offset (0, 1/3, 2/3)
+          // Each strand gets 1/3 phase offset (0, 1/3, 2/3) for POSITIONING only
           const strandPhase = (phase + strandIdx / numStrands) % 1.0;
 
-          // Calculate discrete state using BASE phase (not strand-shifted phase)
-          // All strands share the same zone, only their positions differ
-          const state = calculateStrandState(phase, strandIdx, numStrands);
-
-          // Determine if this strand should be drawn
+          // Determine if this strand should be drawn (discrete visibility)
           const shouldDraw = isVisible(state, occlusionThreshold);
 
           if (!shouldDraw) {
@@ -280,8 +386,12 @@
           // Position is INDEPENDENT of visibility - strands always cross full width
           const centerOffset = halfWidth * Math.sin(strandPhase * 2 * Math.PI);
 
-          // Optional: make middle strand slightly narrower
-          const thicknessMultiplier = (state === 'middle') ? 0.6 : 1.0;
+          // Thickness based on state using tunable multipliers
+          let thicknessMultiplier = 1.0;
+          if (state === 'lead') thicknessMultiplier = params.leadThickness;
+          else if (state === 'middle') thicknessMultiplier = params.middleThickness;
+          else if (state === 'occluded') thicknessMultiplier = params.occludedThickness;
+
           const actualHalfThickness = (strandThickness * thicknessMultiplier) / 2;
 
           // Calculate center point (with state metadata)
@@ -309,12 +419,10 @@
     // Calculate discrete strand state using zone-based family ordering
     // Implements proper over/under weave: 0>1, 1>2, 2>0
     // Returns: 'lead', 'middle', or 'occluded'
-    function calculateStrandState(phase, familyIdx, familyCount) {
+    function calculateStrandState(phase, familyIdx, familyCount, epsilon, occludedZoneWidth, occludedZoneCenter) {
       // Normalize phase to [0, 1)
       const normalizedPhase = ((phase % 1.0) + 1.0) % 1.0;
 
-      // Scale epsilon proportionally to zone size to prevent drift on longer paths
-      const epsilon = 0.02 / familyCount;
       const zoneIndex = Math.floor((normalizedPhase + epsilon) * familyCount) % familyCount;
 
       // The lead family for this zone
@@ -323,31 +431,29 @@
       // The family that is occluded (directly behind the lead)
       const occludedFamily = (leadFamily + 1) % familyCount;
 
+      // Calculate progress within the current zone [0, 1)
+      const zoneProgress = ((normalizedPhase + epsilon) * familyCount) % 1.0;
+
+      // Calculate occluded zone boundaries using tunable center and width
+      const occludedZoneStart = occludedZoneCenter - occludedZoneWidth / 2;
+      const occludedZoneEnd = occludedZoneCenter + occludedZoneWidth / 2;
+
       if (familyIdx === leadFamily) return 'lead';
-      if (familyIdx === occludedFamily) return 'occluded';
+
+      // Check if this family is occluded AND we're in the occluded portion of the zone
+      if (familyIdx === occludedFamily && zoneProgress >= occludedZoneStart && zoneProgress <= occludedZoneEnd) {
+        return 'occluded';
+      }
+
       return 'middle';
     }
 
     // Determine if a strand should be visible based on its state and suppression level
-    // Maps suppression slider to dynamic thresholds for smooth control
+    // Returns true/false for discrete pen up/down
     function isVisible(state, suppression) {
       if (state === 'lead') return true;
-
-      // Map suppression to two progressive thresholds:
-      // - Occluded disappears when suppression > ~0.5
-      // - Middle disappears when suppression > ~0.9
-      // This gives smooth control: 0.0 = all visible, 0.5 = hide occluded, 0.9 = only lead
-
-      if (state === 'occluded') {
-        // Occluded strand fades out between 0.0 and 0.5
-        return suppression < 0.5;
-      }
-
-      if (state === 'middle') {
-        // Middle strand stays until higher suppression (0.9)
-        return suppression < 0.9;
-      }
-
+      if (state === 'middle') return suppression < 0.75;
+      if (state === 'occluded') return suppression < 0.5;
       return false;
     }
 
@@ -439,18 +545,37 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Get parameters
+      // Get basic parameters
       const pathType = document.getElementById('pathType').value;
       const twistFrequency = parseFloat(document.getElementById('twistFrequency').value);
       const strandWidth = parseFloat(document.getElementById('strandWidth').value);
       const strandThickness = parseFloat(document.getElementById('strandThickness').value);
       const occlusionThreshold = parseFloat(document.getElementById('occlusionThreshold').value);
 
+      // Get advanced tuning parameters
+      const params = {
+        phaseOffset: parseFloat(document.getElementById('phaseOffset').value),
+        occludedZoneWidth: parseFloat(document.getElementById('occludedZoneWidth').value),
+        occludedZoneCenter: parseFloat(document.getElementById('occludedZoneCenter').value),
+        leadThickness: parseFloat(document.getElementById('leadThickness').value),
+        middleThickness: parseFloat(document.getElementById('middleThickness').value),
+        occludedThickness: parseFloat(document.getElementById('occludedThickness').value),
+        epsilon: parseFloat(document.getElementById('epsilon').value),
+        strandPhaseNudges: [
+          parseFloat(document.getElementById('redPhaseNudge').value),
+          parseFloat(document.getElementById('bluePhaseNudge').value),
+          parseFloat(document.getElementById('greenPhaseNudge').value)
+        ]
+      };
+
+      // Update debug state display
+      updateDebugState(pathType, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params);
+
       // Generate centerline
       const centerline = getCenterlinePath(pathType);
 
       // Generate braid
-      const strands = generateThreeStrandBraid(centerline, twistFrequency, strandWidth, strandThickness, occlusionThreshold);
+      const strands = generateThreeStrandBraid(centerline, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params);
 
       // Draw each strand with boundary curves
       const colors = ['#ff4444', '#4444ff', '#44ff44'];
@@ -484,9 +609,67 @@
       }
     }
 
+    // Update debug state display
+    function updateDebugState(pathType, twistFrequency, strandWidth, strandThickness, occlusionThreshold, params) {
+      const debugState = `pathType=${pathType}
+twistFrequency=${twistFrequency}
+strandWidth=${strandWidth}
+strandThickness=${strandThickness}
+occlusionThreshold=${occlusionThreshold}
+phaseOffset=${params.phaseOffset}
+occludedZoneWidth=${params.occludedZoneWidth}
+occludedZoneCenter=${params.occludedZoneCenter}
+leadThickness=${params.leadThickness}
+middleThickness=${params.middleThickness}
+occludedThickness=${params.occludedThickness}
+epsilon=${params.epsilon}
+redPhaseNudge=${params.strandPhaseNudges[0]}
+bluePhaseNudge=${params.strandPhaseNudges[1]}
+greenPhaseNudge=${params.strandPhaseNudges[2]}`;
+
+      document.getElementById('debugStateDisplay').value = debugState;
+    }
+
+    // Copy debug state to clipboard
+    function copyDebugState() {
+      const textarea = document.getElementById('debugStateDisplay');
+      textarea.select();
+
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const button = document.getElementById('copyDebugState');
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.style.background = '#2196F3';
+
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.background = '#4CAF50';
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard. Please copy manually from the text area below.');
+      });
+    }
+
     // Set up event listeners
     function setupControls() {
-      const controls = ['pathType', 'twistFrequency', 'strandWidth', 'strandThickness', 'occlusionThreshold'];
+      const controls = [
+        'pathType',
+        'twistFrequency',
+        'strandWidth',
+        'strandThickness',
+        'occlusionThreshold',
+        'phaseOffset',
+        'occludedZoneWidth',
+        'occludedZoneCenter',
+        'leadThickness',
+        'middleThickness',
+        'occludedThickness',
+        'epsilon',
+        'redPhaseNudge',
+        'bluePhaseNudge',
+        'greenPhaseNudge'
+      ];
 
       controls.forEach(id => {
         const element = document.getElementById(id);
@@ -494,7 +677,13 @@
           // Update value display
           const valueDisplay = document.getElementById(id + 'Value');
           if (valueDisplay) {
-            valueDisplay.textContent = element.value;
+            // Format with 3 decimal places for fine-tuning controls
+            if (id === 'epsilon' || id === 'phaseOffset' || id === 'occludedZoneCenter' ||
+                id === 'occludedZoneWidth' || id.includes('PhaseNudge')) {
+              valueDisplay.textContent = parseFloat(element.value).toFixed(3);
+            } else {
+              valueDisplay.textContent = element.value;
+            }
           }
           render();
         });
@@ -502,6 +691,9 @@
 
       // Add listener for debug checkbox
       document.getElementById('showDebug').addEventListener('change', render);
+
+      // Add listener for copy button
+      document.getElementById('copyDebugState').addEventListener('click', copyDebugState);
 
       // Initial render
       render();

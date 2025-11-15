@@ -161,6 +161,14 @@ Advantages:
 - Attractor integration (local twist modulation)
 - Custom twist curves (Bezier editor)
 
+## Braid Occlusion Next Steps
+
+- **Finalize playground tuning.** Keep iterating in `utils/three-strand-braid-playground.html` with the new per-strand phase offsets, occluded-zone width controls, and copy-to-clipboard debug output so we can lock down the numeric deltas that make the chevron weave read correctly.
+- **Promote discrete strand states.** Port the playground logic into `generateBarberPoleSmooth`: derive a single lead/middle/occluded state from the accumulated twist, gate rendering with `null` breaks instead of continuous weights, and keep the existing profile geometry untouched.
+- **Per-profile phase trims.** Introduce optional phase bias multipliers for each profile (`sigmoid`, `flat-candy`, `cylindrical`) so we can compensate for their different diagonal offsets without forking the occlusion math.
+- **Developer instrumentation.** Mirror the playground’s debug overlay (state-color preview, suppression diagnostics) inside the barber-pole tuner so we can visually confirm state transitions on real paths before exposing the controls in the main UI/CLI.
+- **Expose tuning parameters.** Surface the useful knobs (suppression thresholds, occluded-zone width, per-family phase trim) through CLI flags and the tuner UI once the defaults feel solid so the braid variant can be dialed in for different plotter scales.
+
 ## Success Criteria
 
 - [ ] Stripes spiral convincingly around ribbon
