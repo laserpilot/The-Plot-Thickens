@@ -165,6 +165,28 @@
       </p>
       <div class="controls">
         <div class="control-group">
+          <label for="pathType">Path Type</label>
+          <select id="pathType">
+            <option value="straight">Straight</option>
+            <option value="wavy" selected>Wavy</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>Path Amplitude (px)
+            <span class="value" id="pathAmplitudeValue">120</span>
+          </label>
+          <input type="range" id="pathAmplitude" min="0" max="200" step="5" value="120">
+        </div>
+
+        <div class="control-group">
+          <label>Backbone Frequency
+            <span class="value" id="pathFrequencyValue">2.00</span>
+          </label>
+          <input type="range" id="pathFrequency" min="0.2" max="5" step="0.1" value="2">
+        </div>
+
+        <div class="control-group">
           <label>Frequency (cycles)
             <span class="value" id="freqValue">1.75</span>
           </label>
@@ -206,26 +228,33 @@
           <input type="range" id="wallBounce" min="0.2" max="3" step="0.05" value="1.7">
         </div>
 
+        <div class="control-group">
+          <label>Tip Taper Amount
+            <span class="value" id="tipTaperValue">0.70</span>
+          </label>
+          <input type="range" id="tipTaper" min="0" max="1" step="0.05" value="0.7">
+        </div>
+
 
         <div class="control-group">
           <label>Zigzag Phase (°)
-            <span class="value" id="zigzagPhaseValue">-110°</span>
+            <span class="value" id="zigzagPhaseValue">-155°</span>
           </label>
-          <input type="range" id="zigzagPhase" min="-180" max="180" step="5" value="-155">
+          <input type="range" id="zigzagPhase" min="-180" max="180" step="1" value="-155">
         </div>
 
         <div class="control-group">
           <label>Left Wall Phase (°)
-            <span class="value" id="leftWallPhaseValue">-35°</span>
+            <span class="value" id="leftWallPhaseValue">-10°</span>
           </label>
-          <input type="range" id="leftWallPhase" min="-180" max="180" step="5" value="-35">
+          <input type="range" id="leftWallPhase" min="-180" max="180" step="1" value="-10">
         </div>
 
         <div class="control-group">
           <label>Right Wall Phase (°)
             <span class="value" id="rightWallPhaseValue">70°</span>
           </label>
-          <input type="range" id="rightWallPhase" min="-180" max="180" step="5" value="70">
+          <input type="range" id="rightWallPhase" min="-180" max="180" step="1" value="70">
         </div>
 
         <div class="control-group">
@@ -255,6 +284,34 @@
           </label>
           <input type="range" id="curveBias" min="0" max="1" step="0.05" value="0.4">
         </div>
+
+        <div class="control-group">
+          <label>Continuation Length (px)
+            <span class="value" id="continuationLengthValue">20</span>
+          </label>
+          <input type="range" id="continuationLength" min="5" max="200" step="5" value="20">
+        </div>
+
+        <div class="control-group">
+          <label>Continuation Bias
+            <span class="value" id="continuationBiasValue">0.70</span>
+          </label>
+          <input type="range" id="continuationBias" min="0" max="1" step="0.05" value="0.7">
+        </div>
+
+        <div class="control-group">
+          <label>Fiber Spacing (px)
+            <span class="value" id="fiberSpacingValue">8</span>
+          </label>
+          <input type="range" id="fiberSpacing" min="2" max="30" step="1" value="8">
+        </div>
+
+        <div class="control-group">
+          <label>Fiber Bias
+            <span class="value" id="fiberBiasValue">0.60</span>
+          </label>
+          <input type="range" id="fiberBias" min="0" max="1" step="0.05" value="0.6">
+        </div>
       </div>
 
       <div class="toggle-row">
@@ -271,6 +328,14 @@
           Show orange diagonals
         </label>
         <label>
+          <input type="checkbox" id="showContinuations" checked>
+          Wall continuation curves
+        </label>
+        <label>
+          <input type="checkbox" id="showFibers" checked>
+          Fiber fill lines
+        </label>
+        <label>
           <input type="checkbox" id="showOverlay" checked>
           Reference overlay
         </label>
@@ -280,9 +345,9 @@
         <div class="section-title">Reference Overlay Controls</div>
         <div class="control-group">
           <label>Overlay Opacity
-            <span class="value" id="overlayOpacityValue">0.45</span>
+            <span class="value" id="overlayOpacityValue">0.00</span>
           </label>
-          <input type="range" id="overlayOpacity" min="0" max="1" step="0.05" value="0.45">
+          <input type="range" id="overlayOpacity" min="0" max="1" step="0.05" value="0">
         </div>
         <div class="control-group">
           <label>Overlay Scale
@@ -350,34 +415,48 @@
       left: '#44d7f4',
       right: '#ff6ad5',
       diagonal: '#ff914d',
-      diagFill: 'rgba(255,145,77,0.12)'
+      diagFill: 'rgba(255,145,77,0.12)',
+      continuation: '#ffaa44',
+      fiber: 'rgba(255,255,255,0.4)'
     };
 
     const state = {
       params: {
+        pathType: 'wavy',
+        pathAmplitude: 120,
+        pathFrequency: 2,
         frequency: 1.75,
         braidLength: 400,
         zigzagScale: 0.15,
         wallScale: 0.17,
         wallSeparation: 75,
-        zigzagPhase: -110,
-        leftWallPhase: -35,
+        zigzagPhase: -155,
+        leftWallPhase: -10,
         rightWallPhase: 70,
         diagonalSearchWindow: 70,
         sampleSpacing: 6,
         diagonalCurveStrength: 60,
+        continuationLength: 20,
+        continuationBias: 0.7,
         wallBounceFactor: 1.7,
-        diagonalCurveBias: 0.4
+        tipTaper: 0.7,
+        fiberSpacing: 8,
+        fiberBias: 0.6,
+        diagonalCurveBias: 0.4,
+        showContinuations: true
       },
       geometry: null,
+      backbone: null,
       visualization: {
         showBoundaries: true,
         showExtrema: true,
-        showDiagonals: false
+        showDiagonals: false,
+        showContinuations: true,
+        showFibers: true
       },
       overlay: {
         enabled: true,
-        opacity: 0.45,
+        opacity: 0,
         scale: 2.55,
         offsetX: 130,
         offsetY: -25,
@@ -400,6 +479,14 @@
       console.warn('Failed to load overlay reference image', err);
     };
 
+    function getTipTaperScale(y, params) {
+      const { braidLength, tipTaper = 0 } = params;
+      if (tipTaper <= 0) return 1;
+      const t = Math.min(Math.max(y / braidLength, 0), 1);
+      const mid = Math.sin(t * Math.PI); // 0 at ends, 1 at middle
+      return 1 - tipTaper * (1 - mid);
+    }
+
     function generateCenterX(y, params) {
       const { frequency, braidLength, zigzagScale, zigzagPhase } = params;
       const totalAngle = frequency * 2 * Math.PI;
@@ -407,7 +494,8 @@
       const phase = (zigzagPhase * Math.PI) / 180;
       const triangleWave = Math.asin(Math.sin(angle * 3 + phase)) / (Math.PI / 2);
       const amplitude = BASE_CENTER_WIDTH * zigzagScale;
-      return triangleWave * amplitude;
+      const taper = getTipTaperScale(y, params);
+      return triangleWave * amplitude * taper;
     }
 
     function bounceWave(angle, phase, frequencyMultiplier = 1.5) {
@@ -426,7 +514,9 @@
       const amplitude = BASE_WALL_WIDTH * wallScale;
       const translationSign = side === 'left' ? -1 : 1;
       const translation = translationSign * wallSeparation * 0.5;
-      return translationSign * envelope * amplitude + translation;
+      const base = translationSign * envelope * amplitude + translation;
+      const taper = getTipTaperScale(y, params);
+      return base * taper;
     }
 
     function sampleBoundary(generator, params) {
@@ -438,6 +528,26 @@
         samples.push({ x: generator(y, params), y, index: i });
       }
       return samples;
+    }
+
+    function interpolateSamplesAt(samples, targetY) {
+      if (!samples || samples.length === 0) return { x: 0, y: targetY };
+      if (targetY <= samples[0].y) return { x: samples[0].x, y: targetY };
+      if (targetY >= samples[samples.length - 1].y) {
+        return { x: samples[samples.length - 1].x, y: targetY };
+      }
+      for (let i = 0; i < samples.length - 1; i++) {
+        const a = samples[i];
+        const b = samples[i + 1];
+        if (targetY >= a.y && targetY <= b.y) {
+          const t = (targetY - a.y) / (b.y - a.y);
+          return {
+            x: a.x + (b.x - a.x) * t,
+            y: targetY
+          };
+        }
+      }
+      return { x: samples[0].x, y: targetY };
     }
 
     function detectExtrema(samples) {
@@ -513,6 +623,146 @@
       }, null);
     }
 
+    function isWallTrough(ext, side) {
+      if (side === 'left') {
+        return ext.type === 'peak';
+      }
+      return ext.type === 'trough';
+    }
+
+    function filterZigzagTips(centerExtrema, side) {
+      return centerExtrema
+        .filter(ext => side === 'left' ? ext.x < 0 : ext.x > 0)
+        .sort((a, b) => a.y - b.y);
+    }
+
+    function buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema) {
+      const leftPairs = pairWallContinuations('left', leftSamples, leftExtrema, centerSamples, centerExtrema);
+      const rightPairs = pairWallContinuations('right', rightSamples, rightExtrema, centerSamples, centerExtrema);
+      return [...leftPairs, ...rightPairs];
+    }
+
+    function pairWallContinuations(side, wallSamples, wallExtrema, centerSamples, centerExtrema) {
+      let troughs = wallExtrema.filter(ext => isWallTrough(ext, side));
+      if (troughs.length === 0) {
+        troughs = wallExtrema.slice();
+      }
+      troughs.sort((a, b) => a.y - b.y);
+      const tips = filterZigzagTips(centerExtrema, side);
+      const pairs = [];
+      let tipIndex = 0;
+      troughs.forEach(trough => {
+        while (tipIndex < tips.length && tips[tipIndex].y <= trough.y) {
+          tipIndex++;
+        }
+        if (tipIndex >= tips.length) return;
+        const tip = tips[tipIndex];
+        const wallTangent = estimateTangent(wallSamples, trough.index);
+        const centerTangent = estimateTangent(centerSamples, tip.index);
+        const segmentCount = Math.max(4, Math.ceil((tip.y - trough.y) / 8));
+        const wallRail = [];
+        const centerRail = [];
+        for (let i = 0; i <= segmentCount; i++) {
+          const ty = trough.y + (tip.y - trough.y) * (i / segmentCount);
+          wallRail.push(interpolateSamplesAt(wallSamples, ty));
+          centerRail.push(interpolateSamplesAt(centerSamples, ty));
+        }
+        pairs.push({
+          side,
+          wall: trough,
+          center: tip,
+          wallRail,
+          centerRail,
+          tangents: {
+            wall: wallTangent,
+            center: centerTangent
+          }
+        });
+        tipIndex++;
+      });
+      return pairs;
+    }
+
+    function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params) {
+      const curves = [];
+      const spacing = Math.max(1, params.fiberSpacing || 8);
+      const bias = Math.min(Math.max(params.fiberBias || 0, 0), 1);
+      continuationPairs.forEach(pair => {
+        const startY = pair.wall.y;
+        const endY = pair.center.y;
+        const height = Math.max(0, endY - startY);
+        if (height < spacing) return;
+        const steps = Math.max(1, Math.floor(height / spacing));
+        for (let i = 0; i < steps; i++) {
+          let t = (i + 1) / (steps + 1);
+          const sineEase = 0.5 - 0.5 * Math.cos(Math.PI * t);
+          t = t + (sineEase - t) * bias;
+          const samplesCount = pair.wallRail.length;
+          const railPos = (samplesCount - 1) * t;
+          const idx = Math.floor(railPos);
+          const localT = railPos - idx;
+          const w0 = pair.wallRail[Math.max(0, idx)];
+          const w1 = pair.wallRail[Math.min(samplesCount - 1, idx + 1)];
+          const c0 = pair.centerRail[Math.max(0, idx)];
+          const c1 = pair.centerRail[Math.min(samplesCount - 1, idx + 1)];
+          const wallPoint = {
+            x: w0.x + (w1.x - w0.x) * localT,
+            y: w0.y + (w1.y - w0.y) * localT
+          };
+          const centerPoint = {
+            x: c0.x + (c1.x - c0.x) * localT,
+            y: c0.y + (c1.y - c0.y) * localT
+          };
+          curves.push({
+            side: pair.side,
+            start: wallPoint,
+            end: centerPoint
+          });
+        }
+      });
+      return curves;
+    }
+
+    function createBackbone(params) {
+      if (params.pathType !== 'wavy' || params.pathAmplitude <= 0) {
+        return null;
+      }
+      const amplitude = params.pathAmplitude;
+      const cycles = params.pathFrequency || 2;
+      return {
+        getPointAt(t) {
+          const y = t * params.braidLength;
+          const x = amplitude * Math.sin(t * Math.PI * cycles);
+          return { x, y };
+        },
+        getTangentAt(t) {
+          const delta = 0.001;
+          const t0 = Math.max(0, t - delta);
+          const t1 = Math.min(1, t + delta);
+          const p0 = this.getPointAt(t0);
+          const p1 = this.getPointAt(t1);
+          const dx = p1.x - p0.x;
+          const dy = p1.y - p0.y;
+          const len = Math.hypot(dx, dy) || 1;
+          return { x: dx / len, y: dy / len };
+        }
+      };
+    }
+
+    function warpPoint(point) {
+      const backbone = state.backbone;
+      if (!backbone) return point;
+      const { braidLength } = state.params;
+      const t = Math.min(Math.max(point.y / braidLength, 0), 1);
+      const base = backbone.getPointAt(t);
+      const tangent = backbone.getTangentAt(t);
+      const normal = { x: -tangent.y, y: tangent.x };
+      return {
+        x: base.x + point.x * normal.x,
+        y: base.y + point.x * normal.y
+      };
+    }
+
     function buildGeometry() {
       const centerSamples = sampleBoundary(generateCenterX, state.params);
       const leftSamples = sampleBoundary((y, params) => generateWallX(y, 'left', params), state.params);
@@ -546,6 +796,9 @@
         }
       });
 
+      const continuationPairs = buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema);
+      const fiberCurves = buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, state.params);
+
       state.geometry = {
         centerSamples,
         leftSamples,
@@ -553,8 +806,11 @@
         centerExtrema,
         leftExtrema,
         rightExtrema,
-        diagonalPairs
+        diagonalPairs,
+        continuationPairs,
+        fiberCurves
       };
+      state.backbone = createBackbone(state.params);
 
       updateStats();
       render();
@@ -588,8 +844,14 @@
         centerExtrema,
         leftExtrema,
         rightExtrema,
-        diagonalPairs
+        diagonalPairs,
+        continuationPairs
       } = state.geometry;
+
+      const warpSamplesArray = (samples) => samples.map(p => warpPoint(p));
+      const leftDraw = warpSamplesArray(leftSamples);
+      const rightDraw = warpSamplesArray(rightSamples);
+      const centerDraw = warpSamplesArray(centerSamples);
 
       const drawCurve = (samples, color) => {
         ctx.beginPath();
@@ -603,17 +865,18 @@
       };
 
       if (state.visualization.showBoundaries) {
-        drawCurve(leftSamples, STRAND_COLORS.left);
-        drawCurve(centerSamples, STRAND_COLORS.center);
-        drawCurve(rightSamples, STRAND_COLORS.right);
+        drawCurve(leftDraw, STRAND_COLORS.left);
+        drawCurve(centerDraw, STRAND_COLORS.center);
+        drawCurve(rightDraw, STRAND_COLORS.right);
       }
 
       if (state.visualization.showExtrema) {
         const drawDots = (samples, color) => {
           ctx.fillStyle = color;
           samples.forEach(p => {
+            const warped = warpPoint(p);
             ctx.beginPath();
-            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
             ctx.fill();
           });
         };
@@ -650,25 +913,83 @@
             y: wall.y + wallExitDir.y * curveStrength
           };
 
+          const warpedCenter = warpPoint(center);
+          const warpedWall = warpPoint(wall);
+          const warpedHandle1 = warpPoint(handle1);
+          const warpedHandle2 = warpPoint(handle2);
+
           ctx.strokeStyle = STRAND_COLORS.diagonal;
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(center.x, center.y);
+          ctx.moveTo(warpedCenter.x, warpedCenter.y);
           if (curveStrength > 0.01) {
-            ctx.bezierCurveTo(handle1.x, handle1.y, handle2.x, handle2.y, wall.x, wall.y);
+            ctx.bezierCurveTo(warpedHandle1.x, warpedHandle1.y, warpedHandle2.x, warpedHandle2.y, warpedWall.x, warpedWall.y);
           } else {
-            ctx.lineTo(wall.x, wall.y);
+            ctx.lineTo(warpedWall.x, warpedWall.y);
           }
           ctx.stroke();
 
           ctx.fillStyle = STRAND_COLORS.diagFill;
           ctx.beginPath();
-          ctx.arc(center.x, center.y, 4, 0, Math.PI * 2);
+          ctx.arc(warpedCenter.x, warpedCenter.y, 4, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(wall.x, wall.y, 4, 0, Math.PI * 2);
+          ctx.arc(warpedWall.x, warpedWall.y, 4, 0, Math.PI * 2);
           ctx.fill();
+        });
+      }
+
+      if (state.visualization.showContinuations && continuationPairs) {
+        const contLength = state.params.continuationLength || 80;
+        const contBias = Math.min(Math.max(state.params.continuationBias ?? 0.4, 0), 1);
+        continuationPairs.forEach(pair => {
+          const wallPoint = pair.wall;
+          const centerPoint = pair.center;
+
+          const toCenter = normalizeVector({
+            x: centerPoint.x - wallPoint.x,
+            y: centerPoint.y - wallPoint.y
+          });
+
+          let wallDir = normalizeVector(pair.tangents.wall || { x: 0, y: 1 });
+          if (wallDir.x * toCenter.x + wallDir.y * toCenter.y < 0) {
+            wallDir = { x: -wallDir.x, y: -wallDir.y };
+          }
+
+          const blendDir = normalizeVector({
+            x: wallDir.x * (1 - contBias) + toCenter.x * contBias,
+            y: wallDir.y * (1 - contBias) + toCenter.y * contBias
+          });
+
+          const controlPoint = {
+            x: wallPoint.x + blendDir.x * contLength,
+            y: wallPoint.y + blendDir.y * contLength
+          };
+
+          const warpedWall = warpPoint(wallPoint);
+          const warpedCenter = warpPoint(centerPoint);
+          const warpedControl = warpPoint(controlPoint);
+
+          ctx.strokeStyle = STRAND_COLORS.continuation;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(warpedWall.x, warpedWall.y);
+          ctx.quadraticCurveTo(warpedControl.x, warpedControl.y, warpedCenter.x, warpedCenter.y);
+          ctx.stroke();
+        });
+      }
+
+      if (state.visualization.showFibers && state.geometry.fiberCurves) {
+        ctx.strokeStyle = STRAND_COLORS.fiber;
+        ctx.lineWidth = 1;
+        state.geometry.fiberCurves.forEach(curve => {
+          const warpedStart = warpPoint(curve.start);
+          const warpedEnd = warpPoint(curve.end);
+          ctx.beginPath();
+          ctx.moveTo(warpedStart.x, warpedStart.y);
+          ctx.lineTo(warpedEnd.x, warpedEnd.y);
+          ctx.stroke();
         });
       }
 
@@ -712,6 +1033,14 @@
       state.visualization[key] = el.checked;
     }
 
+    const pathTypeSelect = document.getElementById('pathType');
+    pathTypeSelect.addEventListener('change', (e) => {
+      state.params.pathType = e.target.value;
+      buildGeometry();
+    });
+
+    attachControl('pathAmplitude', v => v.toFixed(0), v => state.params.pathAmplitude = v);
+    attachControl('pathFrequency', v => v.toFixed(2), v => state.params.pathFrequency = v);
     attachControl('freq', v => v.toFixed(2), v => state.params.frequency = v);
     attachControl('length', v => v.toFixed(0), v => state.params.braidLength = v);
     attachControl('zigzag', v => `${v.toFixed(2)}×`, v => state.params.zigzagScale = v);
@@ -721,10 +1050,15 @@
     attachControl('leftWallPhase', v => `${v.toFixed(0)}°`, v => state.params.leftWallPhase = v);
     attachControl('rightWallPhase', v => `${v.toFixed(0)}°`, v => state.params.rightWallPhase = v);
     attachControl('wallBounce', v => v.toFixed(2), v => state.params.wallBounceFactor = v);
+    attachControl('tipTaper', v => v.toFixed(2), v => state.params.tipTaper = v);
     attachControl('searchWindow', v => v.toFixed(0), v => state.params.diagonalSearchWindow = v);
     attachControl('sampleSpacing', v => v.toFixed(0), v => state.params.sampleSpacing = v);
     attachControl('curveStrength', v => v.toFixed(0), v => state.params.diagonalCurveStrength = v);
     attachControl('curveBias', v => v.toFixed(2), v => state.params.diagonalCurveBias = v);
+    attachControl('continuationLength', v => v.toFixed(0), v => state.params.continuationLength = v);
+    attachControl('continuationBias', v => v.toFixed(2), v => state.params.continuationBias = v);
+    attachControl('fiberSpacing', v => v.toFixed(0), v => state.params.fiberSpacing = v);
+    attachControl('fiberBias', v => v.toFixed(2), v => state.params.fiberBias = v);
     attachControl('overlayOpacity', v => v.toFixed(2), v => state.overlay.opacity = v, { refresh: 'render' });
     attachControl('overlayScale', v => `${v.toFixed(2)}×`, v => state.overlay.scale = v, { refresh: 'render' });
     attachControl('overlayOffsetX', v => v.toFixed(0), v => state.overlay.offsetX = v, { refresh: 'render' });
@@ -733,6 +1067,8 @@
     attachToggle('showBoundaries', 'showBoundaries');
     attachToggle('showExtrema', 'showExtrema');
     attachToggle('showDiagonals', 'showDiagonals');
+    attachToggle('showContinuations', 'showContinuations');
+    attachToggle('showFibers', 'showFibers');
 
     const overlayToggle = document.getElementById('showOverlay');
     overlayToggle.addEventListener('change', (e) => {
