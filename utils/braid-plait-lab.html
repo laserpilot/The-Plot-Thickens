@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Braid Plait Lab</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #101014;
+      color: #f4f4f6;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #1c1c22;
+      border: 1px solid #2b2b33;
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      background: #050506;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    .description {
+      font-size: 0.9rem;
+      color: #999;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .overlay-controls {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid #2b2b33;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 0.85rem;
+      color: #c8c8d8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-group .value {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      color: #74c0ff;
+      font-size: 0.8rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      border-top: 1px solid #2b2b33;
+      padding-top: 14px;
+      margin-top: 6px;
+    }
+
+    .toggle-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #c8c8d8;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.85rem;
+      margin-top: 12px;
+      color: #ccc;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-swatch {
+      width: 20px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #d0d0dd;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <div class="panel">
+      <h1>Braid Plait Lab</h1>
+      <p class="description">
+        Minimal sandbox for exploring a rhombus-based plait. We sample a center zigzag, two outer walls,
+        compute extrema globally, then connect them with predictive diagonals.
+      </p>
+      <div class="controls">
+        <div class="control-group">
+          <label>Frequency (cycles)
+            <span class="value" id="freqValue">1.75</span>
+          </label>
+          <input type="range" id="freq" min="0.5" max="3" step="0.05" value="1.75">
+        </div>
+
+        <div class="control-group">
+          <label>Braid Length (px)
+            <span class="value" id="lengthValue">400</span>
+          </label>
+          <input type="range" id="length" min="200" max="900" step="50" value="400">
+        </div>
+
+        <div class="control-group">
+          <label>Zigzag Scale
+            <span class="value" id="zigzagValue">0.15×</span>
+          </label>
+          <input type="range" id="zigzag" min="0.01" max="1.4" step="0.01" value="0.15">
+        </div>
+
+        <div class="control-group">
+          <label>Wall Scale
+            <span class="value" id="wallScaleValue">0.17×</span>
+          </label>
+          <input type="range" id="wallScale" min="0.01" max="1.4" step="0.01" value="0.17">
+        </div>
+
+        <div class="control-group">
+          <label>Wall Separation (px)
+            <span class="value" id="wallSepValue">75</span>
+          </label>
+          <input type="range" id="wallSep" min="0" max="200" step="5" value="75">
+        </div>
+
+        <div class="control-group">
+          <label>Wall Bounce Factor
+            <span class="value" id="wallBounceValue">1.70</span>
+          </label>
+          <input type="range" id="wallBounce" min="0.2" max="3" step="0.05" value="1.7">
+        </div>
+
+
+        <div class="control-group">
+          <label>Zigzag Phase (°)
+            <span class="value" id="zigzagPhaseValue">-110°</span>
+          </label>
+          <input type="range" id="zigzagPhase" min="-180" max="180" step="5" value="-155">
+        </div>
+
+        <div class="control-group">
+          <label>Left Wall Phase (°)
+            <span class="value" id="leftWallPhaseValue">-35°</span>
+          </label>
+          <input type="range" id="leftWallPhase" min="-180" max="180" step="5" value="-35">
+        </div>
+
+        <div class="control-group">
+          <label>Right Wall Phase (°)
+            <span class="value" id="rightWallPhaseValue">70°</span>
+          </label>
+          <input type="range" id="rightWallPhase" min="-180" max="180" step="5" value="70">
+        </div>
+
+        <div class="control-group">
+          <label>Diagonal Search Window (px)
+            <span class="value" id="searchWindowValue">70</span>
+          </label>
+          <input type="range" id="searchWindow" min="20" max="200" step="5" value="70">
+        </div>
+
+        <div class="control-group">
+          <label>Sample Spacing (px)
+            <span class="value" id="sampleValue">6</span>
+          </label>
+          <input type="range" id="sampleSpacing" min="3" max="15" step="1" value="6">
+        </div>
+
+        <div class="control-group">
+          <label>Diagonal Curve Strength (px)
+            <span class="value" id="curveStrengthValue">60</span>
+          </label>
+          <input type="range" id="curveStrength" min="0" max="150" step="5" value="60">
+        </div>
+
+        <div class="control-group">
+          <label>Diagonal Curve Bias
+            <span class="value" id="curveBiasValue">0.40</span>
+          </label>
+          <input type="range" id="curveBias" min="0" max="1" step="0.05" value="0.4">
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label>
+          <input type="checkbox" id="showBoundaries" checked>
+          Boundary curves
+        </label>
+        <label>
+          <input type="checkbox" id="showExtrema" checked>
+          Extrema markers
+        </label>
+        <label>
+          <input type="checkbox" id="showDiagonals">
+          Show orange diagonals
+        </label>
+        <label>
+          <input type="checkbox" id="showOverlay" checked>
+          Reference overlay
+        </label>
+      </div>
+
+      <div class="overlay-controls">
+        <div class="section-title">Reference Overlay Controls</div>
+        <div class="control-group">
+          <label>Overlay Opacity
+            <span class="value" id="overlayOpacityValue">0.45</span>
+          </label>
+          <input type="range" id="overlayOpacity" min="0" max="1" step="0.05" value="0.45">
+        </div>
+        <div class="control-group">
+          <label>Overlay Scale
+            <span class="value" id="overlayScaleValue">2.55×</span>
+          </label>
+          <input type="range" id="overlayScale" min="0.2" max="3" step="0.05" value="2.55">
+        </div>
+        <div class="control-group">
+          <label>Overlay Offset X
+            <span class="value" id="overlayOffsetXValue">130</span>
+          </label>
+          <input type="range" id="overlayOffsetX" min="-400" max="400" step="5" value="130">
+        </div>
+        <div class="control-group">
+          <label>Overlay Offset Y
+            <span class="value" id="overlayOffsetYValue">-25</span>
+          </label>
+          <input type="range" id="overlayOffsetY" min="-400" max="400" step="5" value="-25">
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#f5cd4f"></span>
+          Center zigzag
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#44d7f4"></span>
+          Left wall
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#ff6ad5"></span>
+          Right wall
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#ff914d"></span>
+          Diagonals
+        </div>
+      </div>
+
+      <div class="stats">
+        <div>
+          Center extrema:
+          <span id="centerExtremaStat">0</span>
+        </div>
+        <div>
+          Wall extrema:
+          <span id="wallExtremaStat">0</span>
+        </div>
+        <div>
+          Diagonal matches:
+          <span id="pairingStat">0 / 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="display:flex;align-items:center;justify-content:center;">
+      <canvas id="plaitCanvas" width="900" height="700"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const STRAND_COLORS = {
+      center: '#f5cd4f',
+      left: '#44d7f4',
+      right: '#ff6ad5',
+      diagonal: '#ff914d',
+      diagFill: 'rgba(255,145,77,0.12)'
+    };
+
+    const state = {
+      params: {
+        frequency: 1.75,
+        braidLength: 400,
+        zigzagScale: 0.15,
+        wallScale: 0.17,
+        wallSeparation: 75,
+        zigzagPhase: -110,
+        leftWallPhase: -35,
+        rightWallPhase: 70,
+        diagonalSearchWindow: 70,
+        sampleSpacing: 6,
+        diagonalCurveStrength: 60,
+        wallBounceFactor: 1.7,
+        diagonalCurveBias: 0.4
+      },
+      geometry: null,
+      visualization: {
+        showBoundaries: true,
+        showExtrema: true,
+        showDiagonals: false
+      },
+      overlay: {
+        enabled: true,
+        opacity: 0.45,
+        scale: 2.55,
+        offsetX: 130,
+        offsetY: -25,
+        image: null,
+        imageLoaded: false
+      }
+    };
+
+    const BASE_CENTER_WIDTH = 80;
+    const BASE_WALL_WIDTH = 110;
+
+    const overlayImage = new Image();
+    overlayImage.src = 'braid_example.png';
+    overlayImage.onload = () => {
+      state.overlay.image = overlayImage;
+      state.overlay.imageLoaded = true;
+      render();
+    };
+    overlayImage.onerror = (err) => {
+      console.warn('Failed to load overlay reference image', err);
+    };
+
+    function generateCenterX(y, params) {
+      const { frequency, braidLength, zigzagScale, zigzagPhase } = params;
+      const totalAngle = frequency * 2 * Math.PI;
+      const angle = (y / braidLength) * totalAngle;
+      const phase = (zigzagPhase * Math.PI) / 180;
+      const triangleWave = Math.asin(Math.sin(angle * 3 + phase)) / (Math.PI / 2);
+      const amplitude = BASE_CENTER_WIDTH * zigzagScale;
+      return triangleWave * amplitude;
+    }
+
+    function bounceWave(angle, phase, frequencyMultiplier = 1.5) {
+      const s = Math.sin(angle * frequencyMultiplier + phase);
+      return Math.abs(s);
+    }
+
+    function generateWallX(y, side, params) {
+      const { frequency, braidLength, wallScale, wallSeparation, leftWallPhase, rightWallPhase } = params;
+      const totalAngle = frequency * 2 * Math.PI;
+      const angle = (y / braidLength) * totalAngle;
+      const phaseDeg = side === 'left' ? leftWallPhase : rightWallPhase;
+      const phase = (phaseDeg * Math.PI) / 180;
+      const bounceFreq = params.wallBounceFactor || 1.5;
+      const envelope = bounceWave(angle, phase, bounceFreq);
+      const amplitude = BASE_WALL_WIDTH * wallScale;
+      const translationSign = side === 'left' ? -1 : 1;
+      const translation = translationSign * wallSeparation * 0.5;
+      return translationSign * envelope * amplitude + translation;
+    }
+
+    function sampleBoundary(generator, params) {
+      const samples = [];
+      const { braidLength, sampleSpacing } = params;
+      const count = Math.max(5, Math.ceil(braidLength / sampleSpacing));
+      for (let i = 0; i <= count; i++) {
+        const y = (i / count) * braidLength;
+        samples.push({ x: generator(y, params), y, index: i });
+      }
+      return samples;
+    }
+
+    function detectExtrema(samples) {
+      const extrema = [];
+      for (let i = 1; i < samples.length - 1; i++) {
+        const prevDx = samples[i].x - samples[i - 1].x;
+        const nextDx = samples[i + 1].x - samples[i].x;
+        if (prevDx === 0 || nextDx === 0) continue;
+        if (prevDx * nextDx < 0) {
+          extrema.push({
+            ...samples[i],
+            type: prevDx > 0 ? 'peak' : 'trough'
+          });
+        }
+      }
+      return extrema;
+    }
+
+    function estimateTangent(samples, index) {
+      const prev = samples[Math.max(0, index - 1)];
+      const next = samples[Math.min(samples.length - 1, index + 1)];
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      return {
+        x: dx / len,
+        y: dy / len
+      };
+    }
+
+    function normalizeVector(vec) {
+      const len = Math.hypot(vec.x, vec.y) || 1;
+      return { x: vec.x / len, y: vec.y / len };
+    }
+
+    function blendDirection(sourceDir, targetDir, bias) {
+      const mixed = {
+        x: sourceDir.x * (1 - bias) + targetDir.x * bias,
+        y: sourceDir.y * (1 - bias) + targetDir.y * bias
+      };
+      return normalizeVector(mixed);
+    }
+
+    function findWallPartner(zigzagExt, wallExtrema, params) {
+      if (!wallExtrema || wallExtrema.length === 0) return null;
+      const maxDelta = params.diagonalSearchWindow;
+      let best = null;
+      let bestScore = Infinity;
+      wallExtrema.forEach(candidate => {
+        if (candidate.claimed) return;
+        const dy = Math.abs(candidate.y - zigzagExt.y);
+        if (dy > maxDelta) return;
+        const isDownward = candidate.y > zigzagExt.y;
+        const directionPenalty = isDownward ? 0 : 1000;
+        const typeScore = zigzagExt.type === 'peak'
+          ? (candidate.type === 'trough' ? 0 : 1)
+          : (candidate.type === 'peak' ? 0 : 1);
+        const score = dy + typeScore * 200 + directionPenalty;
+        if (score < bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      });
+      if (best) return best;
+      // Fallback: nearest in y even if outside window (still skip claimed)
+      return wallExtrema.reduce((nearest, candidate) => {
+        if (candidate.claimed) {
+          return nearest;
+        }
+        const dy = Math.abs(candidate.y - zigzagExt.y);
+        if (!nearest || dy < Math.abs(nearest.y - zigzagExt.y)) return candidate;
+        return nearest;
+      }, null);
+    }
+
+    function buildGeometry() {
+      const centerSamples = sampleBoundary(generateCenterX, state.params);
+      const leftSamples = sampleBoundary((y, params) => generateWallX(y, 'left', params), state.params);
+      const rightSamples = sampleBoundary((y, params) => generateWallX(y, 'right', params), state.params);
+
+      const centerExtrema = detectExtrema(centerSamples).map(ext => ({ ...ext, paired: false }));
+      const leftExtrema = detectExtrema(leftSamples).map(ext => ({ ...ext, claimed: false }));
+      const rightExtrema = detectExtrema(rightSamples).map(ext => ({ ...ext, claimed: false }));
+
+      const diagonalPairs = [];
+      centerExtrema.forEach(ext => {
+        if (ext.paired) return;
+        const side = ext.x >= 0 ? 'right' : 'left';
+        const wallList = side === 'left' ? leftExtrema : rightExtrema;
+        const partner = findWallPartner(ext, wallList, state.params);
+        if (partner) {
+          partner.claimed = true;
+          ext.paired = true;
+          const centerTangent = estimateTangent(centerSamples, ext.index);
+          const wallSamplesForSide = side === 'left' ? leftSamples : rightSamples;
+          const wallTangent = estimateTangent(wallSamplesForSide, partner.index);
+          diagonalPairs.push({
+            center: ext,
+            wall: partner,
+            side,
+            tangents: {
+              center: centerTangent,
+              wall: wallTangent
+            }
+          });
+        }
+      });
+
+      state.geometry = {
+        centerSamples,
+        leftSamples,
+        rightSamples,
+        centerExtrema,
+        leftExtrema,
+        rightExtrema,
+        diagonalPairs
+      };
+
+      updateStats();
+      render();
+    }
+
+    function updateStats() {
+      const { centerExtrema, leftExtrema, rightExtrema, diagonalPairs } = state.geometry || {};
+      document.getElementById('centerExtremaStat').textContent = centerExtrema?.length || 0;
+      document.getElementById('wallExtremaStat').textContent =
+        (leftExtrema?.length || 0) + (rightExtrema?.length || 0);
+      document.getElementById('pairingStat').textContent =
+        `${diagonalPairs?.length || 0} / ${centerExtrema?.length || 0}`;
+    }
+
+    function render() {
+      const canvas = document.getElementById('plaitCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width / 2, 40);
+
+      if (!state.geometry) {
+        ctx.restore();
+        return;
+      }
+
+      const {
+        centerSamples,
+        leftSamples,
+        rightSamples,
+        centerExtrema,
+        leftExtrema,
+        rightExtrema,
+        diagonalPairs
+      } = state.geometry;
+
+      const drawCurve = (samples, color) => {
+        ctx.beginPath();
+        samples.forEach((p, idx) => {
+          if (idx === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      };
+
+      if (state.visualization.showBoundaries) {
+        drawCurve(leftSamples, STRAND_COLORS.left);
+        drawCurve(centerSamples, STRAND_COLORS.center);
+        drawCurve(rightSamples, STRAND_COLORS.right);
+      }
+
+      if (state.visualization.showExtrema) {
+        const drawDots = (samples, color) => {
+          ctx.fillStyle = color;
+          samples.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        };
+        drawDots(centerExtrema, '#ff3b3b');
+        drawDots(leftExtrema, '#4af2ff');
+        drawDots(rightExtrema, '#ff7dd4');
+      }
+
+      if (state.visualization.showDiagonals) {
+        const curveStrength = state.params.diagonalCurveStrength || 0;
+        const curveBias = Math.min(Math.max(state.params.diagonalCurveBias || 0, 0), 1);
+        diagonalPairs.forEach(pair => {
+          const center = pair.center;
+          const wall = pair.wall;
+          const baseCenterTan = pair.tangents?.center || { x: 0, y: 1 };
+          const baseWallTan = pair.tangents?.wall || { x: 0, y: -1 };
+          const diagVec = normalizeVector({
+            x: wall.x - center.x,
+            y: wall.y - center.y
+          });
+          const centerDir = blendDirection(baseCenterTan, diagVec, curveBias);
+          const wallExitDir = blendDirection(
+            { x: -baseWallTan.x, y: -baseWallTan.y },
+            { x: -diagVec.x, y: -diagVec.y },
+            curveBias
+          );
+
+          const handle1 = {
+            x: center.x + centerDir.x * curveStrength,
+            y: center.y + centerDir.y * curveStrength
+          };
+          const handle2 = {
+            x: wall.x + wallExitDir.x * curveStrength,
+            y: wall.y + wallExitDir.y * curveStrength
+          };
+
+          ctx.strokeStyle = STRAND_COLORS.diagonal;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(center.x, center.y);
+          if (curveStrength > 0.01) {
+            ctx.bezierCurveTo(handle1.x, handle1.y, handle2.x, handle2.y, wall.x, wall.y);
+          } else {
+            ctx.lineTo(wall.x, wall.y);
+          }
+          ctx.stroke();
+
+          ctx.fillStyle = STRAND_COLORS.diagFill;
+          ctx.beginPath();
+          ctx.arc(center.x, center.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(wall.x, wall.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      if (state.overlay.enabled && state.overlay.imageLoaded && state.overlay.image) {
+        ctx.save();
+        ctx.globalAlpha = state.overlay.opacity;
+        ctx.translate(state.overlay.offsetX, state.overlay.offsetY);
+        ctx.scale(state.overlay.scale, state.overlay.scale);
+        const img = state.overlay.image;
+        ctx.drawImage(img, -img.width / 2, 0);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function attachControl(id, formatter, callback, options = {}) {
+      const refreshMode = options.refresh ?? 'geometry';
+      const el = document.getElementById(id);
+      const valueEl = document.getElementById(`${id}Value`);
+      const handler = (e) => {
+        const val = parseFloat(e.target.value);
+        callback(val);
+        if (valueEl) valueEl.textContent = formatter(val);
+        if (refreshMode === 'geometry') {
+          buildGeometry();
+        } else {
+          render();
+        }
+      };
+      el.addEventListener('input', handler);
+      handler({ target: el });
+    }
+
+    function attachToggle(id, key) {
+      const el = document.getElementById(id);
+      el.addEventListener('change', (e) => {
+        state.visualization[key] = e.target.checked;
+        render();
+      });
+      state.visualization[key] = el.checked;
+    }
+
+    attachControl('freq', v => v.toFixed(2), v => state.params.frequency = v);
+    attachControl('length', v => v.toFixed(0), v => state.params.braidLength = v);
+    attachControl('zigzag', v => `${v.toFixed(2)}×`, v => state.params.zigzagScale = v);
+    attachControl('wallScale', v => `${v.toFixed(2)}×`, v => state.params.wallScale = v);
+    attachControl('wallSep', v => v.toFixed(0), v => state.params.wallSeparation = v);
+    attachControl('zigzagPhase', v => `${v.toFixed(0)}°`, v => state.params.zigzagPhase = v);
+    attachControl('leftWallPhase', v => `${v.toFixed(0)}°`, v => state.params.leftWallPhase = v);
+    attachControl('rightWallPhase', v => `${v.toFixed(0)}°`, v => state.params.rightWallPhase = v);
+    attachControl('wallBounce', v => v.toFixed(2), v => state.params.wallBounceFactor = v);
+    attachControl('searchWindow', v => v.toFixed(0), v => state.params.diagonalSearchWindow = v);
+    attachControl('sampleSpacing', v => v.toFixed(0), v => state.params.sampleSpacing = v);
+    attachControl('curveStrength', v => v.toFixed(0), v => state.params.diagonalCurveStrength = v);
+    attachControl('curveBias', v => v.toFixed(2), v => state.params.diagonalCurveBias = v);
+    attachControl('overlayOpacity', v => v.toFixed(2), v => state.overlay.opacity = v, { refresh: 'render' });
+    attachControl('overlayScale', v => `${v.toFixed(2)}×`, v => state.overlay.scale = v, { refresh: 'render' });
+    attachControl('overlayOffsetX', v => v.toFixed(0), v => state.overlay.offsetX = v, { refresh: 'render' });
+    attachControl('overlayOffsetY', v => v.toFixed(0), v => state.overlay.offsetY = v, { refresh: 'render' });
+
+    attachToggle('showBoundaries', 'showBoundaries');
+    attachToggle('showExtrema', 'showExtrema');
+    attachToggle('showDiagonals', 'showDiagonals');
+
+    const overlayToggle = document.getElementById('showOverlay');
+    overlayToggle.addEventListener('change', (e) => {
+      state.overlay.enabled = e.target.checked;
+      render();
+    });
+    state.overlay.enabled = overlayToggle.checked;
+
+    buildGeometry();
+  </script>
+</body>
+
+</html>

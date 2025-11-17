@@ -115,6 +115,9 @@ Legend: 🟥 critical, 🟧 high, 🟨 medium, 🟩 optional, ⬜ evaluate/remov
 - [ ] Remove redundant legacy files once parity verified.
 - [ ] Enable linting, formatting, and automated tests in CI (local script ok).
 - [ ] Update documentation + screenshots for new UI.
+- [ ] Investigate implementing a sort of curly-cue/spring texture to follow along the paths
+- [ ] 
+- [ ] Explore a refactor of the path-utils to make it more maintainable than a single long monolithic file
 
 ---
 
