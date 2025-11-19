@@ -36,6 +36,12 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     }
 
+    .panel.controls-panel {
+      max-height: 90vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
     canvas {
       width: 100%;
       height: 100%;
@@ -157,7 +163,7 @@
 
 <body>
   <div class="shell">
-    <div class="panel">
+    <div class="panel controls-panel">
       <h1>Braid Plait Lab</h1>
       <p class="description">
         Minimal sandbox for exploring a rhombus-based plait. We sample a center zigzag, two outer walls,
@@ -307,31 +313,52 @@
         </div>
 
         <div class="control-group">
-          <label>Fiber Spacing (px)
-            <span class="value" id="fiberSpacingValue">8</span>
+          <label>Fiber Count
+            <span class="value" id="fiberCountValue">10</span>
           </label>
-          <input type="range" id="fiberSpacing" min="2" max="30" step="1" value="8">
+          <input type="range" id="fiberCount" min="1" max="25" step="1" value="10">
         </div>
 
         <div class="control-group">
           <label>Fiber Bias
-            <span class="value" id="fiberBiasValue">0.60</span>
+            <span class="value" id="fiberBiasValue">0.50</span>
           </label>
-          <input type="range" id="fiberBias" min="0" max="1" step="0.05" value="0.6">
+          <input type="range" id="fiberBias" min="0" max="1" step="0.05" value="0.5">
         </div>
 
         <div class="control-group">
           <label>Fiber Landing Offset
-            <span class="value" id="fiberLandingValue">0.30</span>
+            <span class="value" id="fiberLandingValue">0.00</span>
           </label>
-          <input type="range" id="fiberLanding" min="0" max="1" step="0.05" value="0.3">
+          <input type="range" id="fiberLanding" min="0" max="1" step="0.05" value="0">
         </div>
 
         <div class="control-group">
           <label>Fiber Curvature Bias
-            <span class="value" id="fiberCurvatureValue">0.60</span>
+            <span class="value" id="fiberCurvatureValue">0.70</span>
           </label>
-          <input type="range" id="fiberCurvature" min="0" max="1" step="0.05" value="0.6">
+          <input type="range" id="fiberCurvature" min="0" max="1" step="0.05" value="0.7">
+        </div>
+
+        <div class="control-group">
+          <label>Fiber Bow Strength
+            <span class="value" id="fiberBowValue">0.50</span>
+          </label>
+          <input type="range" id="fiberBow" min="0" max="1" step="0.05" value="0.5">
+        </div>
+
+        <div class="control-group">
+          <label>Wall Influence
+            <span class="value" id="wallInfluenceValue">0.60</span>
+          </label>
+          <input type="range" id="wallInfluence" min="0" max="1" step="0.05" value="0.6">
+        </div>
+
+        <div class="control-group">
+          <label>Landing Spread
+            <span class="value" id="landingSpreadValue">1.00</span>
+          </label>
+          <input type="range" id="landingSpread" min="0.1" max="1.0" step="0.05" value="1.0">
         </div>
       </div>
 
@@ -360,9 +387,33 @@
           <input type="checkbox" id="showOverlay" checked>
           Reference overlay
         </label>
+        <label>
+          <input type="checkbox" id="showConnectionLabels" checked>
+          Connection labels
+        </label>
       </div>
 
       <div class="overlay-controls">
+        <div class="section-title">Canvas Zoom & Pan</div>
+        <div class="control-group">
+          <label>Zoom
+            <span class="value" id="canvasZoomValue">1.00×</span>
+          </label>
+          <input type="range" id="canvasZoom" min="0.5" max="3" step="0.1" value="1.0">
+        </div>
+        <div class="control-group">
+          <label>Pan X
+            <span class="value" id="canvasPanXValue">0</span>
+          </label>
+          <input type="range" id="canvasPanX" min="-500" max="500" step="10" value="0">
+        </div>
+        <div class="control-group">
+          <label>Pan Y
+            <span class="value" id="canvasPanYValue">0</span>
+          </label>
+          <input type="range" id="canvasPanY" min="-500" max="500" step="10" value="0">
+        </div>
+
         <div class="section-title">Reference Overlay Controls</div>
         <div class="control-group">
           <label>Overlay Opacity
@@ -425,8 +476,8 @@
       </div>
     </div>
 
-    <div class="panel" style="display:flex;align-items:center;justify-content:center;">
-      <canvas id="plaitCanvas" width="900" height="700"></canvas>
+    <div class="panel" style="display:flex;align-items:center;justify-content:center;min-height:90vh;">
+      <canvas id="plaitCanvas" style="width:100%;height:100%;min-height:800px;"></canvas>
     </div>
   </div>
 
@@ -443,29 +494,33 @@
 
     const state = {
       params: {
-        pathType: 'wavy',
+        pathType: 'straight',
         pathAmplitude: 120,
         pathFrequency: 2,
-        frequency: 1.75,
-        cycleJitter: 0.03,
-        braidLength: 400,
-        zigzagScale: 0.15,
+        frequency: 2.25,
+        cycleJitter: 0.0,
+        braidLength: 500,
+        zigzagScale: 0.14,
         wallScale: 0.17,
-        wallSeparation: 75,
+        wallSeparation: 90,
         zigzagPhase: -155,
-        leftWallPhase: -10,
-        rightWallPhase: 70,
+        leftWallPhase: 20,
+        rightWallPhase: 104,
         diagonalSearchWindow: 70,
         sampleSpacing: 6,
         diagonalCurveStrength: 60,
         continuationLength: 20,
         continuationBias: 0.7,
-        wallBounceFactor: 1.7,
-        tipTaper: 0.7,
-        fiberSpacing: 8,
-        fiberBias: 0.6,
-        fiberLanding: 0.3,
-        fiberCurvature: 0.6,
+        wallBounceFactor: 1.5,
+        tipTaper: 0.0,
+        fiberSpacing: 3,
+        fiberCount: 10,
+        fiberBias: 0.5,
+        fiberLanding: 0.0,
+        fiberCurvature: 0.7,
+        fiberBow: 0.5,
+        wallInfluence: 0.6,
+        landingSpread: 1.0,
         diagonalCurveBias: 0.4,
         showContinuations: true
       },
@@ -476,7 +531,8 @@
         showExtrema: true,
         showDiagonals: false,
         showContinuations: true,
-        showFibers: true
+        showFibers: true,
+        showConnectionLabels: true
       },
       overlay: {
         enabled: true,
@@ -486,6 +542,11 @@
         offsetY: -25,
         image: null,
         imageLoaded: false
+      },
+      canvas: {
+        zoom: 1.0,
+        panX: 0,
+        panY: 0
       }
     };
 
@@ -591,6 +652,23 @@
       };
     }
 
+    function warpRailPoint(rail, t) {
+      if (!rail || rail.length === 0) return null;
+      const base = sampleRailNormalized(rail, t);
+      return base ? warpPoint(base) : null;
+    }
+
+    function drawDebugLabel(ctx, text, rail, t, color, offset = { x: 8, y: 0 }) {
+      const point = warpRailPoint(rail, t);
+      if (!point) return;
+      ctx.font = 'bold 8px monospace';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillStyle = color;
+      ctx.strokeText(text, point.x + offset.x, point.y + offset.y);
+      ctx.fillText(text, point.x + offset.x, point.y + offset.y);
+    }
+
     function sampleRailByLength(rail, lengths, targetLength) {
       if (!rail || rail.length === 0) {
         return { point: { x: 0, y: 0 }, param: 0, tangent: { x: 0, y: 1 } };
@@ -682,6 +760,56 @@
       return clamp(t, 0, 1);
     }
 
+    function sampleCurveByArcLength(points, lengths, normalizedT) {
+      if (!points || points.length === 0) return { x: 0, y: 0 };
+      if (points.length === 1) return points[0];
+      if (!lengths || lengths.length !== points.length) {
+        // Fallback to normalized parametric sampling
+        const idx = clamp(normalizedT, 0, 1) * (points.length - 1);
+        const i = Math.floor(idx);
+        const t = idx - i;
+        const a = points[Math.min(i, points.length - 1)];
+        const b = points[Math.min(i + 1, points.length - 1)];
+        return {
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t
+        };
+      }
+      const totalLength = lengths[lengths.length - 1];
+      if (totalLength === 0) return points[0];
+      const targetLength = clamp(normalizedT, 0, 1) * totalLength;
+      let segment = 0;
+      while (segment < lengths.length - 1 && lengths[segment + 1] < targetLength) {
+        segment++;
+      }
+      const lenA = lengths[segment];
+      const lenB = lengths[segment + 1];
+      const span = lenB - lenA || 1;
+      const t = (targetLength - lenA) / span;
+      const a = points[segment];
+      const b = points[segment + 1];
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t
+      };
+    }
+
+    function getTangentAt(points, lengths, normalizedT) {
+      if (!points || points.length < 2) return { x: 0, y: 1 };
+      const epsilon = 0.001;
+      const t1 = Math.max(0, normalizedT - epsilon);
+      const t2 = Math.min(1, normalizedT + epsilon);
+      const p1 = sampleCurveByArcLength(points, lengths, t1);
+      const p2 = sampleCurveByArcLength(points, lengths, t2);
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy) || 1;
+      return {
+        x: dx / len,
+        y: dy / len
+      };
+    }
+
     function findWallPartner(zigzagExt, wallExtrema, params) {
       if (!wallExtrema || wallExtrema.length === 0) return null;
       const maxDelta = params.diagonalSearchWindow;
@@ -727,10 +855,37 @@
         .sort((a, b) => a.y - b.y);
     }
 
+    function assignSideOrdering(pairs) {
+      const left = pairs.filter(p => p.side === 'left').sort((a, b) => a.wall.y - b.wall.y);
+      const right = pairs.filter(p => p.side === 'right').sort((a, b) => a.wall.y - b.wall.y);
+      left.forEach((pair, idx) => { pair.sideIndex = idx; });
+      right.forEach((pair, idx) => { pair.sideIndex = idx; });
+      const leftCount = left.length;
+      const rightCount = right.length;
+      for (let i = 0; i < leftCount; i++) {
+        const targetIdx = Math.min(rightCount - 1, i + 1);
+        if (right[targetIdx]) {
+          left[i].oppositeLandingRail = right[targetIdx].landingRail;
+          left[i].oppositeLandingLengths = right[targetIdx].landingLengths;
+          left[i].oppositeIndex = right[targetIdx].sideIndex;
+        }
+      }
+      for (let i = 0; i < rightCount; i++) {
+        const targetIdx = Math.min(leftCount - 1, i);
+        if (left[targetIdx]) {
+          right[i].oppositeLandingRail = left[targetIdx].landingRail;
+          right[i].oppositeLandingLengths = left[targetIdx].landingLengths;
+          right[i].oppositeIndex = left[targetIdx].sideIndex;
+        }
+      }
+    }
+
     function buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema, params) {
       const leftPairs = pairWallContinuations('left', leftSamples, leftExtrema, centerSamples, centerExtrema, params);
       const rightPairs = pairWallContinuations('right', rightSamples, rightExtrema, centerSamples, centerExtrema, params);
-      return [...leftPairs, ...rightPairs];
+      const all = [...leftPairs, ...rightPairs];
+      assignSideOrdering(all);
+      return all;
     }
 
     function pairWallContinuations(side, wallSamples, wallExtrema, centerSamples, centerExtrema, params) {
@@ -759,24 +914,70 @@
           wallRail.push(interpolateSamplesAt(wallSamples, ty));
           centerRail.push(interpolateSamplesAt(centerSamples, ty));
         }
+
+        // Compute arc-lengths for wallRail
+        const wallLengths = [0];
+        for (let i = 1; i < wallRail.length; i++) {
+          const dx = wallRail[i].x - wallRail[i - 1].x;
+          const dy = wallRail[i].y - wallRail[i - 1].y;
+          wallLengths.push(wallLengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
+
+        // Compute arc-lengths for centerRail
+        const centerLengths = [0];
+        for (let i = 1; i < centerRail.length; i++) {
+          const dx = centerRail[i].x - centerRail[i - 1].x;
+          const dy = centerRail[i].y - centerRail[i - 1].y;
+          centerLengths.push(centerLengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
         const continuationGeo = buildContinuationGeometry(trough, tip, wallTangent, centerTangent, params, segmentCount);
-        const landingEndY = nextTip ? nextTip.y : tip.y + Math.max(20, tip.y - trough.y);
-        const landingSpan = Math.max(landingEndY - tip.y, Math.max(20, tip.y - trough.y));
-        const landingSegments = Math.max(4, Math.ceil(landingSpan / 8));
+
+        const tipType = tip.type;
+        const landingStartY = tip.y;
+        let landingEndY;
+        let nextOppositeIndex = -1;
+        for (let i = 0; i < centerExtrema.length; i++) {
+          if (centerExtrema[i].y > tip.y && centerExtrema[i].type !== tipType) {
+            nextOppositeIndex = i;
+            break;
+          }
+        }
+        if (nextOppositeIndex >= 0) {
+          landingEndY = centerExtrema[nextOppositeIndex].y;
+        } else {
+          const diagLength = tip.y - trough.y;
+          landingEndY = landingStartY + diagLength * 1.5;
+        }
+
+        const landingSpan = landingEndY - landingStartY;
+        const landingSegments = Math.max(8, Math.ceil(landingSpan / 6));
         const landingRail = [];
         for (let i = 0; i <= landingSegments; i++) {
-          const ty = tip.y + landingSpan * (i / landingSegments);
+          const ty = landingStartY + landingSpan * (i / landingSegments);
           landingRail.push(interpolateSamplesAt(centerSamples, ty));
         }
+
+        // Compute arc-lengths for landingRail
+        const landingLengths = [0];
+        for (let i = 1; i < landingRail.length; i++) {
+          const dx = landingRail[i].x - landingRail[i - 1].x;
+          const dy = landingRail[i].y - landingRail[i - 1].y;
+          landingLengths.push(landingLengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
+
         pairs.push({
           side,
           wall: trough,
           center: tip,
+          tipIndex: tip.index, // Use the tip's index from centerSamples as stable ID
           wallRail,
+          wallLengths,
           centerRail,
+          centerLengths,
           diagRail: continuationGeo.rail,
           diagLengths: continuationGeo.lengths,
           landingRail,
+          landingLengths,
           tangents: {
             wall: wallTangent,
             center: centerTangent
@@ -840,54 +1041,86 @@
     function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params) {
       const curves = [];
       const spacing = Math.max(1, params.fiberSpacing || 8);
+      const totalFibers = params.fiberCount
+        ? Math.max(1, Math.round(params.fiberCount))
+        : Math.max(3, Math.floor(spacing));
       const bias = clamp(params.fiberBias || 0, 0, 1);
-      const landingOffset = clamp(params.fiberLanding ?? 0.3, 0, 1);
+      const landingOffset = clamp(params.fiberLanding ?? 0.0, 0, 1);
+      const landingSpread = clamp(params.landingSpread ?? 1.0, 0.1, 1);
+      const wallInfluence = clamp(params.wallInfluence ?? 0.6, 0, 1);
+      const curvatureBias = clamp(params.fiberCurvature ?? 0.7, 0, 1);
+      const bowStrength = clamp(params.fiberBow ?? 0.5, 0, 1);
+
       continuationPairs.forEach(pair => {
         const diagRail = pair.diagRail || [];
         const diagLengths = pair.diagLengths || [];
-        if (!diagRail.length || !diagLengths.length) return;
-        const totalLength = diagLengths[diagLengths.length - 1];
-        if (totalLength < spacing) return;
-        const landingRail = pair.landingRail && pair.landingRail.length ? pair.landingRail : pair.centerRail;
-        const curvatureBias = clamp(params.fiberCurvature ?? 0.6, 0, 1);
-        const fiberCount = Math.max(1, Math.floor(totalLength / spacing));
-        for (let i = 0; i < fiberCount; i++) {
-          let weight = (i + 1) / (fiberCount + 1);
-          const ease = 0.5 - 0.5 * Math.cos(Math.PI * weight);
-          weight = weight + (ease - weight) * bias;
-          const offsetAmount = spacing * (i + 1) * 0.4;
-          const points = [];
-          const sampleCount = diagRail.length;
-          for (let j = 0; j < sampleCount; j++) {
-            const t = sampleCount <= 1 ? 0 : j / (sampleCount - 1);
-            const diagPoint = diagRail[j];
-            const landingPoint = sampleRailNormalized(landingRail, clamp(t + landingOffset, 0, 1));
-            const prev = diagRail[Math.max(0, j - 1)];
-            const next = diagRail[Math.min(sampleCount - 1, j + 1)];
-            const tangent = normalizeVector({ x: next.x - prev.x, y: next.y - prev.y });
-            let normal = { x: -tangent.y, y: tangent.x };
-            const toLanding = { x: landingPoint.x - diagPoint.x, y: landingPoint.y - diagPoint.y };
-            if (normal.x * toLanding.x + normal.y * toLanding.y < 0) {
-              normal = { x: -normal.x, y: -normal.y };
-            }
-            const offsetPoint = {
-              x: diagPoint.x + normal.x * offsetAmount,
-              y: diagPoint.y + normal.y * offsetAmount
-            };
-            let blend;
-            if (t <= curvatureBias) blend = 0;
-            else {
-              const u = clamp((t - curvatureBias) / (1 - curvatureBias), 0, 1);
-              blend = u * u * (3 - 2 * u);
-            }
-            points.push({
-              x: offsetPoint.x + (landingPoint.x - offsetPoint.x) * blend,
-              y: offsetPoint.y + (landingPoint.y - offsetPoint.y) * blend
-            });
+        const wallRail = pair.wallRail || [];
+        const wallLengths = pair.wallLengths || [];
+        const landingRail = (pair.oppositeLandingRail && pair.oppositeLandingRail.length)
+          ? pair.oppositeLandingRail
+          : (pair.landingRail && pair.landingRail.length ? pair.landingRail : pair.centerRail);
+        const landingLengths = pair.oppositeLandingLengths || pair.landingLengths || pair.centerLengths;
+
+        if (!diagRail.length || !diagLengths.length || !landingRail?.length || !landingLengths?.length) {
+          return;
+        }
+
+        for (let i = 0; i < totalFibers; i++) {
+          let fiberParam = (i + 1) / (totalFibers + 1);
+          const ease = 0.5 - 0.5 * Math.cos(Math.PI * fiberParam);
+          fiberParam = fiberParam + (ease - fiberParam) * (bias - 0.5) * 2;
+
+          const originParam = fiberParam;
+          const landingDirection = pair.side === 'left'
+            ? (1 - fiberParam)
+            : (1 - fiberParam);
+          const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
+
+          const originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
+          const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
+          const wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
+          let outward = normalizeVector({
+            x: wallPoint.x - originPoint.x,
+            y: wallPoint.y - originPoint.y
+          });
+          if (!isFinite(outward.x) || !isFinite(outward.y)) {
+            outward = { x: 0, y: 0 };
           }
+
+          const points = [];
+          const segmentCount = 24;
+          for (let j = 0; j <= segmentCount; j++) {
+            const t = j / segmentCount;
+            const directPoint = {
+              x: originPoint.x + (landingPoint.x - originPoint.x) * t,
+              y: originPoint.y + (landingPoint.y - originPoint.y) * t
+            };
+            let influenceFactor = 0;
+            if (t >= curvatureBias) {
+              const u = (t - curvatureBias) / (1 - curvatureBias);
+              influenceFactor = u * u * (3 - 2 * u);
+            } else {
+              influenceFactor = (t / Math.max(curvatureBias, 0.0001)) * 0.25;
+            }
+            const bowFactor = bowStrength * Math.max(0, 1 - Math.abs(t - 0.5) / 0.5);
+            let finalPoint = {
+              x: directPoint.x + outward.x * spacing * bowFactor,
+              y: directPoint.y + outward.y * spacing * bowFactor
+            };
+            const wallBlend = wallInfluence * (1 - t) * influenceFactor;
+            finalPoint = {
+              x: finalPoint.x + (wallPoint.x - finalPoint.x) * wallBlend,
+              y: finalPoint.y + (wallPoint.y - finalPoint.y) * wallBlend
+            };
+            points.push(finalPoint);
+          }
+
           curves.push({
             side: pair.side,
-            points
+            points,
+            pairIndex: pair.sideIndex ?? 0,
+            targetPairIndex: pair.oppositeIndex ?? pair.sideIndex,
+            fiberIndex: i
           });
         }
       });
@@ -999,9 +1232,20 @@
     function render() {
       const canvas = document.getElementById('plaitCanvas');
       const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Fix pixelation with DPI scaling
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      ctx.clearRect(0, 0, rect.width, rect.height);
       ctx.save();
-      ctx.translate(canvas.width / 2, 40);
+
+      // Apply zoom and pan
+      ctx.translate(rect.width / 2 + state.canvas.panX, 40 + state.canvas.panY);
+      ctx.scale(state.canvas.zoom, state.canvas.zoom);
 
       if (!state.geometry) {
         ctx.restore();
@@ -1041,20 +1285,7 @@
         drawCurve(rightDraw, STRAND_COLORS.right);
       }
 
-      if (state.visualization.showExtrema) {
-        const drawDots = (samples, color) => {
-          ctx.fillStyle = color;
-          samples.forEach(p => {
-            const warped = warpPoint(p);
-            ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
-            ctx.fill();
-          });
-        };
-        drawDots(centerExtrema, '#ff3b3b');
-        drawDots(leftExtrema, '#4af2ff');
-        drawDots(rightExtrema, '#ff7dd4');
-      }
+      // Removed individual extrema point markers - no longer needed
 
       if (state.visualization.showDiagonals) {
         const curveStrength = state.params.diagonalCurveStrength || 0;
@@ -1109,11 +1340,38 @@
           ctx.arc(warpedWall.x, warpedWall.y, 4, 0, Math.PI * 2);
           ctx.fill();
         });
+
+        // Label orange diagonal curves at their midpoints
+        const leftPairs = diagonalPairs.filter(p => p.side === 'left').sort((a, b) => a.tipIndex - b.tipIndex);
+        const rightPairs = diagonalPairs.filter(p => p.side === 'right').sort((a, b) => a.tipIndex - b.tipIndex);
+
+        diagonalPairs.forEach(pair => {
+          const sidePairs = pair.side === 'left' ? leftPairs : rightPairs;
+          const positionInSide = sidePairs.findIndex(p => p === pair);
+          const sidePrefix = pair.side === 'left' ? 'L' : 'R';
+
+          // Calculate midpoint of diagonal curve
+          const midPoint = {
+            x: (pair.center.x + pair.wall.x) / 2,
+            y: (pair.center.y + pair.wall.y) / 2
+          };
+          const warpedMid = warpPoint(midPoint);
+
+          // Draw orange diagonal curve label
+          ctx.fillStyle = '#ff914d';
+          ctx.font = 'bold 8px monospace';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.lineWidth = 3;
+          const label = `${sidePrefix}${positionInSide}`;
+          ctx.strokeText(label, warpedMid.x + 10, warpedMid.y);
+          ctx.fillText(label, warpedMid.x + 10, warpedMid.y);
+        });
       }
 
       if (state.visualization.showContinuations && continuationPairs) {
         const contLength = state.params.continuationLength || 80;
         const contBias = Math.min(Math.max(state.params.continuationBias ?? 0.4, 0), 1);
+
         continuationPairs.forEach(pair => {
           const wallPoint = pair.wall;
           const centerPoint = pair.center;
@@ -1151,9 +1409,27 @@
         });
       }
 
+      if (state.visualization.showConnectionLabels && continuationPairs) {
+        const diagTs = [0.05, 0.25, 0.45, 0.65, 0.85];
+        const landingTs = [0, 0.25, 0.5, 0.75, 0.95];
+        continuationPairs.forEach(pair => {
+          const prefix = pair.side === 'left' ? 'L' : 'R';
+          const idx = pair.sideIndex ?? 0;
+          diagTs.forEach((t, labelIdx) => {
+            drawDebugLabel(ctx, `${prefix}${idx}-O${labelIdx}`, pair.diagRail, t, '#ff914d');
+          });
+          const landingRail = pair.landingRail && pair.landingRail.length ? pair.landingRail : pair.centerRail;
+          landingTs.forEach((t, labelIdx) => {
+            drawDebugLabel(ctx, `${prefix}${idx}-L${labelIdx}`, landingRail, t, '#f5cd4f', { x: 12, y: -12 });
+          });
+        });
+      }
+
       if (state.visualization.showFibers && state.geometry.fiberCurves) {
         state.geometry.fiberCurves.forEach(curve => {
           if (!curve.points || curve.points.length < 2) return;
+
+          // Draw the fiber curve
           ctx.strokeStyle = STRAND_COLORS.fiber;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -1232,20 +1508,28 @@
     attachControl('curveBias', v => v.toFixed(2), v => state.params.diagonalCurveBias = v);
     attachControl('continuationLength', v => v.toFixed(0), v => state.params.continuationLength = v);
     attachControl('continuationBias', v => v.toFixed(2), v => state.params.continuationBias = v);
-    attachControl('fiberSpacing', v => v.toFixed(0), v => state.params.fiberSpacing = v);
+    attachControl('fiberCount', v => Math.round(v), v => state.params.fiberCount = Math.round(v));
     attachControl('fiberBias', v => v.toFixed(2), v => state.params.fiberBias = v);
     attachControl('fiberLanding', v => v.toFixed(2), v => state.params.fiberLanding = v);
     attachControl('fiberCurvature', v => v.toFixed(2), v => state.params.fiberCurvature = v);
+    attachControl('fiberBow', v => v.toFixed(2), v => state.params.fiberBow = v);
+    attachControl('wallInfluence', v => v.toFixed(2), v => state.params.wallInfluence = v);
+    attachControl('landingSpread', v => v.toFixed(2), v => state.params.landingSpread = v);
     attachControl('overlayOpacity', v => v.toFixed(2), v => state.overlay.opacity = v, { refresh: 'render' });
     attachControl('overlayScale', v => `${v.toFixed(2)}×`, v => state.overlay.scale = v, { refresh: 'render' });
     attachControl('overlayOffsetX', v => v.toFixed(0), v => state.overlay.offsetX = v, { refresh: 'render' });
     attachControl('overlayOffsetY', v => v.toFixed(0), v => state.overlay.offsetY = v, { refresh: 'render' });
+
+    attachControl('canvasZoom', v => `${v.toFixed(2)}×`, v => state.canvas.zoom = v, { refresh: 'render' });
+    attachControl('canvasPanX', v => v.toFixed(0), v => state.canvas.panX = v, { refresh: 'render' });
+    attachControl('canvasPanY', v => v.toFixed(0), v => state.canvas.panY = v, { refresh: 'render' });
 
     attachToggle('showBoundaries', 'showBoundaries');
     attachToggle('showExtrema', 'showExtrema');
     attachToggle('showDiagonals', 'showDiagonals');
     attachToggle('showContinuations', 'showContinuations');
     attachToggle('showFibers', 'showFibers');
+    attachToggle('showConnectionLabels', 'showConnectionLabels');
 
     const overlayToggle = document.getElementById('showOverlay');
     overlayToggle.addEventListener('change', (e) => {
