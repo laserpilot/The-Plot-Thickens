@@ -334,13 +334,6 @@
         </div>
 
         <div class="control-group">
-          <label>Fiber Curvature Bias
-            <span class="value" id="fiberCurvatureValue">0.70</span>
-          </label>
-          <input type="range" id="fiberCurvature" min="0" max="1" step="0.05" value="0.7">
-        </div>
-
-        <div class="control-group">
           <label>Fiber Bow Strength
             <span class="value" id="fiberBowValue">0.50</span>
           </label>
@@ -348,10 +341,10 @@
         </div>
 
         <div class="control-group">
-          <label>Wall Influence
-            <span class="value" id="wallInfluenceValue">0.60</span>
+          <label>Bow Gradient Power
+            <span class="value" id="bowGradientValue">2.00</span>
           </label>
-          <input type="range" id="wallInfluence" min="0" max="1" step="0.05" value="0.6">
+          <input type="range" id="bowGradient" min="0.5" max="4" step="0.1" value="2.0">
         </div>
 
         <div class="control-group">
@@ -517,9 +510,8 @@
         fiberCount: 10,
         fiberBias: 0.5,
         fiberLanding: 0.0,
-        fiberCurvature: 0.7,
         fiberBow: 0.5,
-        wallInfluence: 0.6,
+        bowGradient: 2.0,
         landingSpread: 1.0,
         diagonalCurveBias: 0.4,
         showContinuations: true
@@ -1047,8 +1039,6 @@
       const bias = clamp(params.fiberBias || 0, 0, 1);
       const landingOffset = clamp(params.fiberLanding ?? 0.0, 0, 1);
       const landingSpread = clamp(params.landingSpread ?? 1.0, 0.1, 1);
-      const wallInfluence = clamp(params.wallInfluence ?? 0.6, 0, 1);
-      const curvatureBias = clamp(params.fiberCurvature ?? 0.7, 0, 1);
       const bowStrength = clamp(params.fiberBow ?? 0.5, 0, 1);
 
       continuationPairs.forEach(pair => {
@@ -1079,40 +1069,51 @@
           const originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
           const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
           const wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
-          let outward = normalizeVector({
+
+          // Calculate how far this fiber is from center (0 = innermost, 1 = outermost)
+          // INVERTED: outer fibers (closer to wall) should curve MORE
+          const outernessFactor = 1 - fiberParam;
+
+          // Direction toward wall from origin point
+          let toWall = normalizeVector({
             x: wallPoint.x - originPoint.x,
             y: wallPoint.y - originPoint.y
           });
-          if (!isFinite(outward.x) || !isFinite(outward.y)) {
-            outward = { x: 0, y: 0 };
+          if (!isFinite(toWall.x) || !isFinite(toWall.y)) {
+            toWall = { x: 0, y: 0 };
           }
 
+          // Apply gradient power curve to shape the transition
+          // Higher power = sharper transition (outer fibers curve more aggressively)
+          // Lower power = gentler transition (more even distribution)
+          const gradientPower = clamp(params.bowGradient ?? 2.0, 0.5, 4);
+          const shapedFactor = Math.pow(outernessFactor, gradientPower);
+
+          // Control point distance: outer fibers get stronger pull toward wall
+          // Inner fibers have control point close to straight line (minimal curve)
+          // Outer fibers have control point far toward wall (strong curve)
+          const controlPointDistance = bowStrength * shapedFactor * 100;
+
+          // Place control point at midpoint of the fiber, offset toward wall
+          const midT = 0.5;
+          const midStraight = {
+            x: originPoint.x + (landingPoint.x - originPoint.x) * midT,
+            y: originPoint.y + (landingPoint.y - originPoint.y) * midT
+          };
+
+          const controlPoint = {
+            x: midStraight.x + toWall.x * controlPointDistance,
+            y: midStraight.y + toWall.y * controlPointDistance
+          };
+
+          // Generate bezier curve points
           const points = [];
           const segmentCount = 24;
           for (let j = 0; j <= segmentCount; j++) {
             const t = j / segmentCount;
-            const directPoint = {
-              x: originPoint.x + (landingPoint.x - originPoint.x) * t,
-              y: originPoint.y + (landingPoint.y - originPoint.y) * t
-            };
-            let influenceFactor = 0;
-            if (t >= curvatureBias) {
-              const u = (t - curvatureBias) / (1 - curvatureBias);
-              influenceFactor = u * u * (3 - 2 * u);
-            } else {
-              influenceFactor = (t / Math.max(curvatureBias, 0.0001)) * 0.25;
-            }
-            const bowFactor = bowStrength * Math.max(0, 1 - Math.abs(t - 0.5) / 0.5);
-            let finalPoint = {
-              x: directPoint.x + outward.x * spacing * bowFactor,
-              y: directPoint.y + outward.y * spacing * bowFactor
-            };
-            const wallBlend = wallInfluence * (1 - t) * influenceFactor;
-            finalPoint = {
-              x: finalPoint.x + (wallPoint.x - finalPoint.x) * wallBlend,
-              y: finalPoint.y + (wallPoint.y - finalPoint.y) * wallBlend
-            };
-            points.push(finalPoint);
+            // Quadratic bezier: P(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+            const point = quadraticPoint(originPoint, controlPoint, landingPoint, t);
+            points.push(point);
           }
 
           curves.push({
@@ -1511,9 +1512,8 @@
     attachControl('fiberCount', v => Math.round(v), v => state.params.fiberCount = Math.round(v));
     attachControl('fiberBias', v => v.toFixed(2), v => state.params.fiberBias = v);
     attachControl('fiberLanding', v => v.toFixed(2), v => state.params.fiberLanding = v);
-    attachControl('fiberCurvature', v => v.toFixed(2), v => state.params.fiberCurvature = v);
     attachControl('fiberBow', v => v.toFixed(2), v => state.params.fiberBow = v);
-    attachControl('wallInfluence', v => v.toFixed(2), v => state.params.wallInfluence = v);
+    attachControl('bowGradient', v => v.toFixed(2), v => state.params.bowGradient = v);
     attachControl('landingSpread', v => v.toFixed(2), v => state.params.landingSpread = v);
     attachControl('overlayOpacity', v => v.toFixed(2), v => state.overlay.opacity = v, { refresh: 'render' });
     attachControl('overlayScale', v => `${v.toFixed(2)}×`, v => state.overlay.scale = v, { refresh: 'render' });
