@@ -831,3 +831,188 @@ Once prototype is validated:
 4. **Performance tuning** - Profile and optimize hot paths
 5. **Integrate into web-v2** - Port to production barber pole generator
 6. **Document lessons learned** - Update this section with findings
+
+---
+
+## Rhombus Braid Fiber Fill Implementation
+
+### Overview
+
+The `braid-plait-lab.html` implements a rhombus-based plait pattern with fiber fill curves connecting diagonal continuation curves to opposite landing zones. This section documents the fiber curvature approach validated in the lab.
+
+### Architecture
+
+**Core Pattern:**
+1. Center zigzag (yellow) with detected extrema
+2. Left/right wall curves (cyan/magenta) with detected troughs
+3. Continuation curves (orange) connecting wall troughs to center tips
+4. Fiber curves (white) filling the rhombus shapes
+
+**Connection Logic:**
+- Left side: L0 connects to R1, L1 connects to R2, etc. (connects to next wrung down)
+- Right side: R0 connects to L0, R1 connects to L1, etc. (connects to same wrung)
+- Landing rails are pre-computed for each continuation pair
+
+### Fiber Curvature System
+
+**Problem:** Original bow+blend system produced confusing visual effects with multiple overlapping parameters (`fiberCurvatureBias`, `wallInfluence`, `fiberBow`).
+
+**Solution:** Distance-based bezier curves with gradient control.
+
+#### Implementation
+
+**Key Principle:** Outer fibers (closer to wall) should curve MORE toward the wall, inner fibers (closer to center) should be nearly straight.
+
+**Algorithm:**
+```javascript
+// In buildFiberCurves():
+
+// 1. Calculate outernessFactor (0 = innermost, 1 = outermost)
+const outernessFactor = 1 - fiberParam;  // INVERTED for correct gradient
+
+// 2. Apply power curve to shape transition
+const gradientPower = clamp(params.bowGradient ?? 2.0, 0.5, 4);
+const shapedFactor = Math.pow(outernessFactor, gradientPower);
+
+// 3. Calculate control point distance
+const controlPointDistance = bowStrength * shapedFactor * 100;
+
+// 4. Direction toward same-side wall
+const toWall = normalizeVector({
+  x: wallPoint.x - originPoint.x,
+  y: wallPoint.y - originPoint.y
+});
+
+// 5. Place control point at midpoint, offset toward wall
+const midStraight = {
+  x: originPoint.x + (landingPoint.x - originPoint.x) * 0.5,
+  y: originPoint.y + (landingPoint.y - originPoint.y) * 0.5
+};
+
+const controlPoint = {
+  x: midStraight.x + toWall.x * controlPointDistance,
+  y: midStraight.y + toWall.y * controlPointDistance
+};
+
+// 6. Generate quadratic bezier curve
+for (let t = 0; t <= 1; t += 1/24) {
+  const point = quadraticPoint(originPoint, controlPoint, landingPoint, t);
+  points.push(point);
+}
+```
+
+#### Parameters
+
+**Fiber Bow Strength** (`fiberBow`): 0-1
+- Master control for overall curvature intensity
+- 0 = all fibers straight
+- 1 = maximum curve toward walls
+
+**Bow Gradient Power** (`bowGradient`): 0.5-4.0
+- Controls how curvature distributes from inner to outer fibers
+- Lower values (0.5-1.0): Gentler transition, more even distribution
+- Higher values (2.0-4.0): Sharper transition, outer fibers curve much more aggressively
+- Uses power curve: `shapedFactor = pow(outernessFactor, gradientPower)`
+
+#### Visual Characteristics
+
+**At bowGradient = 0.5 (gentle):**
+- Nearly linear gradient from inner to outer
+- Middle fibers have moderate curve
+- Smooth, even appearance
+
+**At bowGradient = 2.0 (balanced, default):**
+- Quadratic gradient
+- Inner fibers stay quite straight
+- Outer fibers curve noticeably more
+- Good balance for most patterns
+
+**At bowGradient = 4.0 (aggressive):**
+- Very sharp gradient
+- Inner fibers almost perfectly straight
+- Outer fibers curve strongly toward wall
+- High contrast between inner/outer behavior
+
+#### Key Design Decisions
+
+**Why quadratic bezier (not cubic)?**
+- Simpler control: single control point
+- Sufficient for smooth curve toward wall
+- More predictable behavior
+
+**Why control point at midpoint?**
+- Creates symmetric curve shape
+- Bow happens in the middle of fiber travel
+- Natural appearance for woven patterns
+
+**Why power curve for gradient?**
+- Allows tuning transition sharpness
+- Linear (power=1) to exponential (power=4)
+- Single parameter controls entire distribution
+
+**Why invert outernessFactor?**
+- `fiberParam` goes from 0 (inner) to 1 (outer)
+- We want outer = stronger curve
+- Inversion: `outernessFactor = 1 - fiberParam`
+- Result: outer fibers get factor closer to 1
+
+#### Removed Parameters
+
+**Fiber Curvature Bias** (removed)
+- Previously controlled when wall influence kicked in
+- Created confusing visual artifacts
+- Redundant with gradient power control
+
+**Wall Influence** (removed)
+- Previously blended fiber toward wall point
+- Conflated with bow strength
+- Bezier control point approach is cleaner
+
+#### Integration Notes
+
+When porting to other braid implementations:
+1. Sample origin point on continuation curve
+2. Sample landing point on opposite landing rail
+3. Sample wall point at same param as origin (for direction)
+4. Calculate `outernessFactor` from fiber's position (0-1 range)
+5. Apply gradient power curve
+6. Place control point at midpoint + (toWall * distance)
+7. Generate quadratic bezier curve
+8. Warp all points through backbone transform if needed
+
+#### Performance Considerations
+
+- Bezier generation is O(n) per fiber
+- 24 segments per fiber is sufficient for smooth appearance
+- No clipping or complex operations needed
+- Suitable for real-time parameter tuning
+
+### Connection Pairing Algorithm
+
+The `assignSideOrdering` function establishes which landing rails fibers connect to:
+
+```javascript
+// Left side: connects to next wrung down on right
+for (let i = 0; i < leftCount; i++) {
+  const targetIdx = Math.min(rightCount - 1, i + 1);
+  left[i].oppositeLandingRail = right[targetIdx].landingRail;
+}
+
+// Right side: connects to same wrung on left
+for (let i = 0; i < rightCount; i++) {
+  const targetIdx = Math.min(leftCount - 1, i);
+  right[i].oppositeLandingRail = left[targetIdx].landingRail;
+}
+```
+
+This creates the proper weaving pattern where fibers cross between wrungs.
+
+### Validation
+
+Tested and validated in `braid-plait-lab.html`:
+- ✅ Outer fibers curve strongly toward walls
+- ✅ Inner fibers stay nearly straight
+- ✅ Smooth gradient controlled by power parameter
+- ✅ Connection logic correct for both left/right sides
+- ✅ Real-time parameter adjustment responsive
+- ✅ No visual artifacts or confusing overlaps

@@ -962,6 +962,8 @@
           wall: trough,
           center: tip,
           tipIndex: tip.index, // Use the tip's index from centerSamples as stable ID
+          yStart: trough.y,  // Valid window start
+          yEnd: tip.y,       // Valid window end
           wallRail,
           wallLengths,
           centerRail,
@@ -1051,24 +1053,63 @@
           : (pair.landingRail && pair.landingRail.length ? pair.landingRail : pair.centerRail);
         const landingLengths = pair.oppositeLandingLengths || pair.landingLengths || pair.centerLengths;
 
+        // Guard against degenerate rails (collapsed by tip taper)
         if (!diagRail.length || !diagLengths.length || !landingRail?.length || !landingLengths?.length) {
           return;
         }
 
-        for (let i = 0; i < totalFibers; i++) {
-          let fiberParam = (i + 1) / (totalFibers + 1);
+        // Get total arc-length of diagonal rail
+        const diagTotalLength = diagLengths[diagLengths.length - 1] || 0;
+        const landingTotalLength = landingLengths[landingLengths.length - 1] || 0;
+
+        // Detect very short pairs that need tip-to-wall fallback
+        // Only use for extremely collapsed pairs (below minLength would be skipped entirely)
+        const tipFallbackThreshold = spacing * 3; // 9px with default spacing
+        const useTipFallback = diagTotalLength < tipFallbackThreshold;
+
+        // Skip completely degenerate rails
+        const minLength = spacing * 2;
+        if (diagTotalLength < minLength || landingTotalLength < minLength) {
+          return;
+        }
+
+        // For very short pairs, use tip-to-wall fallback with fewer fibers
+        let effectiveFiberCount;
+        if (useTipFallback) {
+          effectiveFiberCount = Math.min(3, totalFibers); // Max 3 fibers for tip fallback
+        } else {
+          // Calculate proportional fiber count based on available length
+          const maxFibersByLength = Math.floor(diagTotalLength / spacing);
+          effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+        }
+
+        for (let i = 0; i < effectiveFiberCount; i++) {
+          let fiberParam = (i + 1) / (effectiveFiberCount + 1);
           const ease = 0.5 - 0.5 * Math.cos(Math.PI * fiberParam);
           fiberParam = fiberParam + (ease - fiberParam) * (bias - 0.5) * 2;
 
-          const originParam = fiberParam;
-          const landingDirection = pair.side === 'left'
-            ? (1 - fiberParam)
-            : (1 - fiberParam);
-          const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
+          let originPoint, landingPoint, wallPoint;
 
-          const originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
-          const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
-          const wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
+          if (useTipFallback) {
+            // Tip fallback mode: connect directly from wall trough to center tip
+            // Distribute fibers along the diagonal continuation curve
+            const originParam = fiberParam;
+            originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
+            // Landing point is directly at the center tip (end of diagonal)
+            landingPoint = pair.center; // The zigzag tip
+            wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
+          } else {
+            // Normal mode: connect from diagonal to opposite landing rail
+            const originParam = fiberParam;
+            const landingDirection = pair.side === 'left'
+              ? (1 - fiberParam)
+              : (1 - fiberParam);
+            const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
+
+            originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
+            landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
+            wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
+          }
 
           // Calculate how far this fiber is from center (0 = innermost, 1 = outermost)
           // INVERTED: outer fibers (closer to wall) should curve MORE
