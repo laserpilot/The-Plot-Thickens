@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Braid Plait Lab</title>
+  <!-- SVG Path Commander for robust path parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/svg-path-commander@2.0.7/dist/svg-path-commander.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -176,6 +178,13 @@
             <option value="straight">Straight</option>
             <option value="wavy" selected>Wavy</option>
           </select>
+        </div>
+
+        <div class="control-group">
+          <label>Load SVG Backbone
+            <span class="value" id="svgFileInfo" style="font-size: 0.85em; color: #888;">No file loaded</span>
+          </label>
+          <input type="file" id="svgFileInput" accept=".svg" style="width: 100%; margin-top: 5px;">
         </div>
 
         <div class="control-group">
@@ -1043,6 +1052,100 @@
       const landingSpread = clamp(params.landingSpread ?? 1.0, 0.1, 1);
       const bowStrength = clamp(params.fiberBow ?? 0.5, 0, 1);
 
+      // DISABLED: Starter fibers from Y=0 wall positions to landing rails
+      // TODO: Re-enable and fix behavior
+      /*
+      const leftPairs = continuationPairs.filter(p => p.side === 'left').sort((a, b) => a.wall.y - b.wall.y);
+      const rightPairs = continuationPairs.filter(p => p.side === 'right').sort((a, b) => a.wall.y - b.wall.y);
+
+      const generateStarterFibers = (wallSamples, landingRail, landingLengths, side) => {
+        if (!wallSamples.length || !landingRail || !landingRail.length) return;
+
+        const wallStart = wallSamples[0]; // Y=0 position on wall
+
+        // Calculate proportional fiber count based on available length
+        const landingTotalLength = landingLengths[landingLengths.length - 1] || 0;
+        const maxFibersByLength = Math.floor(landingTotalLength / spacing);
+        const starterFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+
+        for (let i = 0; i < starterFiberCount; i++) {
+          let fiberParam = (i + 1) / (starterFiberCount + 1);
+          const ease = 0.5 - 0.5 * Math.cos(Math.PI * fiberParam);
+          fiberParam = fiberParam + (ease - fiberParam) * (bias - 0.5) * 2;
+
+          // Sample landing point on the landing rail
+          const landingParam = fiberParam;
+          const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
+
+          // Direction toward wall for bow calculation (horizontal toward same-side wall)
+          const outernessFactor = 1 - fiberParam;
+          const gradientPower = clamp(params.bowGradient ?? 2.0, 0.5, 4);
+          const shapedFactor = Math.pow(outernessFactor, gradientPower);
+
+          // Horizontal direction toward wall
+          const toWall = side === 'left' ? {x: -1, y: 0} : {x: 1, y: 0};
+
+          const controlPointDistance = bowStrength * shapedFactor * 100;
+          const midStraight = {
+            x: wallStart.x + (landingPoint.x - wallStart.x) * 0.5,
+            y: wallStart.y + (landingPoint.y - wallStart.y) * 0.5
+          };
+
+          const controlPoint = {
+            x: midStraight.x + toWall.x * controlPointDistance,
+            y: midStraight.y + toWall.y * controlPointDistance
+          };
+
+          // Generate bezier curve from wall start to landing point
+          const points = [];
+          const segmentCount = 24;
+          for (let j = 0; j <= segmentCount; j++) {
+            const t = j / segmentCount;
+            const point = quadraticPoint(wallStart, controlPoint, landingPoint, t);
+            points.push(point);
+          }
+
+          curves.push({
+            side,
+            points,
+            pairIndex: -1, // Special marker for starter fibers
+            targetPairIndex: 0,
+            fiberIndex: i
+          });
+        }
+      };
+
+      // Left side: create landing rail from Y=0 to first tip
+      if (leftPairs.length > 0 && centerSamples.length > 0) {
+        const firstTip = leftPairs[0].center;
+        const centerStart = centerSamples[0]; // Y=0 on center
+
+        // Build landing rail from center start to first tip
+        const landingSpan = firstTip.y - centerStart.y;
+        const landingSegments = Math.max(8, Math.ceil(landingSpan / 6));
+        const leftStarterLandingRail = [];
+        for (let i = 0; i <= landingSegments; i++) {
+          const ty = centerStart.y + landingSpan * (i / landingSegments);
+          leftStarterLandingRail.push(interpolateSamplesAt(centerSamples, ty));
+        }
+
+        // Compute arc-lengths
+        const leftStarterLandingLengths = [0];
+        for (let i = 1; i < leftStarterLandingRail.length; i++) {
+          const dx = leftStarterLandingRail[i].x - leftStarterLandingRail[i - 1].x;
+          const dy = leftStarterLandingRail[i].y - leftStarterLandingRail[i - 1].y;
+          leftStarterLandingLengths.push(leftStarterLandingLengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+        }
+
+        generateStarterFibers(leftSamples, leftStarterLandingRail, leftStarterLandingLengths, 'left');
+      }
+
+      // Right side: use first pair's landing rail (one rail up from before)
+      if (rightPairs.length > 0) {
+        generateStarterFibers(rightSamples, rightPairs[0].landingRail, rightPairs[0].landingLengths, 'right');
+      }
+      */
+
       continuationPairs.forEach(pair => {
         const diagRail = pair.diagRail || [];
         const diagLengths = pair.diagLengths || [];
@@ -1062,54 +1165,31 @@
         const diagTotalLength = diagLengths[diagLengths.length - 1] || 0;
         const landingTotalLength = landingLengths[landingLengths.length - 1] || 0;
 
-        // Detect very short pairs that need tip-to-wall fallback
-        // Only use for extremely collapsed pairs (below minLength would be skipped entirely)
-        const tipFallbackThreshold = spacing * 3; // 9px with default spacing
-        const useTipFallback = diagTotalLength < tipFallbackThreshold;
-
         // Skip completely degenerate rails
         const minLength = spacing * 2;
         if (diagTotalLength < minLength || landingTotalLength < minLength) {
           return;
         }
 
-        // For very short pairs, use tip-to-wall fallback with fewer fibers
-        let effectiveFiberCount;
-        if (useTipFallback) {
-          effectiveFiberCount = Math.min(3, totalFibers); // Max 3 fibers for tip fallback
-        } else {
-          // Calculate proportional fiber count based on available length
-          const maxFibersByLength = Math.floor(diagTotalLength / spacing);
-          effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
-        }
+        // Calculate proportional fiber count based on available length
+        const maxFibersByLength = Math.floor(diagTotalLength / spacing);
+        const effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
 
         for (let i = 0; i < effectiveFiberCount; i++) {
           let fiberParam = (i + 1) / (effectiveFiberCount + 1);
           const ease = 0.5 - 0.5 * Math.cos(Math.PI * fiberParam);
           fiberParam = fiberParam + (ease - fiberParam) * (bias - 0.5) * 2;
 
-          let originPoint, landingPoint, wallPoint;
+          // Normal mode: connect from diagonal to opposite landing rail
+          const originParam = fiberParam;
+          const landingDirection = pair.side === 'left'
+            ? (1 - fiberParam)
+            : (1 - fiberParam);
+          const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
 
-          if (useTipFallback) {
-            // Tip fallback mode: connect directly from wall trough to center tip
-            // Distribute fibers along the diagonal continuation curve
-            const originParam = fiberParam;
-            originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
-            // Landing point is directly at the center tip (end of diagonal)
-            landingPoint = pair.center; // The zigzag tip
-            wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
-          } else {
-            // Normal mode: connect from diagonal to opposite landing rail
-            const originParam = fiberParam;
-            const landingDirection = pair.side === 'left'
-              ? (1 - fiberParam)
-              : (1 - fiberParam);
-            const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
-
-            originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
-            landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
-            wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
-          }
+          const originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
+          const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
+          const wallPoint = sampleCurveByArcLength(wallRail, wallLengths, originParam);
 
           // Calculate how far this fiber is from center (0 = innermost, 1 = outermost)
           // INVERTED: outer fibers (closer to wall) should curve MORE
@@ -1170,6 +1250,31 @@
     }
 
     function createBackbone(params) {
+      // Handle custom loaded path
+      if (params.pathType === 'custom' && state.loadedPath) {
+        const points = state.loadedPath;
+        const pathLength = calculatePathLength(points);
+
+        return {
+          getPointAt(t) {
+            const targetLength = t * pathLength;
+            return getPointAtLength(points, targetLength);
+          },
+          getTangentAt(t) {
+            const delta = 0.001;
+            const t0 = Math.max(0, t - delta);
+            const t1 = Math.min(1, t + delta);
+            const p0 = this.getPointAt(t0);
+            const p1 = this.getPointAt(t1);
+            const dx = p1.x - p0.x;
+            const dy = p1.y - p0.y;
+            const len = Math.hypot(dx, dy) || 1;
+            return { x: dx / len, y: dy / len };
+          }
+        };
+      }
+
+      // Handle wavy path
       if (params.pathType !== 'wavy' || params.pathAmplitude <= 0) {
         return null;
       }
@@ -1193,6 +1298,46 @@
           return { x: dx / len, y: dy / len };
         }
       };
+    }
+
+    // Calculate total arc length of a polyline
+    function calculatePathLength(points) {
+      let length = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const dx = points[i + 1].x - points[i].x;
+        const dy = points[i + 1].y - points[i].y;
+        length += Math.hypot(dx, dy);
+      }
+      return length;
+    }
+
+    // Get point at specific arc length along polyline
+    function getPointAtLength(points, targetLength) {
+      if (points.length === 0) return { x: 0, y: 0 };
+      if (points.length === 1) return { ...points[0] };
+
+      let accumulatedLength = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i];
+        const p1 = points[i + 1];
+        const dx = p1.x - p0.x;
+        const dy = p1.y - p0.y;
+        const segmentLength = Math.hypot(dx, dy);
+
+        if (accumulatedLength + segmentLength >= targetLength) {
+          // Target is in this segment
+          const t = (targetLength - accumulatedLength) / segmentLength;
+          return {
+            x: p0.x + dx * t,
+            y: p0.y + dy * t
+          };
+        }
+
+        accumulatedLength += segmentLength;
+      }
+
+      // Target is beyond the path, return last point
+      return { ...points[points.length - 1] };
     }
 
     function warpPoint(point) {
@@ -1578,6 +1723,103 @@
       render();
     });
     state.overlay.enabled = overlayToggle.checked;
+
+    // SVG File Loading Handler
+    const svgFileInput = document.getElementById('svgFileInput');
+    const svgFileInfo = document.getElementById('svgFileInfo');
+
+    svgFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        svgFileInfo.textContent = 'Loading...';
+
+        // Read the SVG file
+        const text = await file.text();
+
+        // Parse SVG using DOMParser
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'image/svg+xml');
+
+        // Check for parsing errors
+        const parserError = doc.querySelector('parsererror');
+        if (parserError) {
+          throw new Error('Invalid SVG file');
+        }
+
+        // Find the first path element
+        const pathElement = doc.querySelector('path');
+        if (!pathElement) {
+          throw new Error('No path found in SVG');
+        }
+
+        const pathData = pathElement.getAttribute('d');
+        if (!pathData) {
+          throw new Error('Path has no d attribute');
+        }
+
+        // Convert path to points using arc-length sampling
+        const points = pathToPointsArcLength(pathData);
+
+        if (!points || points.length < 2) {
+          throw new Error('Path conversion failed');
+        }
+
+        // Store the loaded path points in state
+        state.loadedPath = points;
+
+        // Update state to use custom path type
+        state.params.pathType = 'custom';
+
+        // Update file info
+        svgFileInfo.textContent = `${file.name} (${points.length} points)`;
+        svgFileInfo.style.color = '#4a4';
+
+        // Rebuild geometry with the new path
+        buildGeometry();
+
+      } catch (err) {
+        console.error('SVG load error:', err);
+        svgFileInfo.textContent = `Error: ${err.message}`;
+        svgFileInfo.style.color = '#d44';
+      }
+    });
+
+    // Path-to-points conversion using arc-length sampling
+    function pathToPointsArcLength(pathData) {
+      try {
+        // Convert to absolute coordinates
+        const absolutePath = SVGPathCommander.pathToAbsolute(pathData);
+        const totalLength = SVGPathCommander.getTotalLength(absolutePath);
+
+        if (totalLength === 0 || isNaN(totalLength)) {
+          console.warn('Path has zero or invalid length');
+          return null;
+        }
+
+        // Adaptive sampling based on path length
+        // Use 4px spacing as recommended in the integration plan
+        const spacing = 4;
+        const numSamples = Math.max(50, Math.min(500, Math.ceil(totalLength / spacing)));
+
+        const points = [];
+        for (let i = 0; i <= numSamples; i++) {
+          const t = (i / numSamples) * totalLength;
+          const pt = SVGPathCommander.getPointAtLength(absolutePath, t);
+
+          if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
+            points.push({ x: pt.x, y: pt.y });
+          }
+        }
+
+        return points.length > 0 ? points : null;
+
+      } catch (error) {
+        console.error('Arc-length sampling failed:', error);
+        return null;
+      }
+    }
 
     buildGeometry();
   </script>
