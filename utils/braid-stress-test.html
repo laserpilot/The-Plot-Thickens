@@ -124,6 +124,10 @@
       <input type="range" id="tipTaper" value="0" min="0" max="1" step="0.05">
     </div>
     <div class="control-group">
+      <label>Taper Length <span id="tipTaperLengthVal">50</span></label>
+      <input type="range" id="tipTaperLength" value="50" min="10" max="200" step="5">
+    </div>
+    <div class="control-group">
       <label>Redistribution <span id="redistributionFactorVal">0.5</span></label>
       <input type="range" id="redistributionFactor" value="0.5" min="0" max="2" step="0.1">
     </div>
@@ -167,6 +171,41 @@
       <label>View Scale <span id="scaleVal">1</span></label>
       <input type="range" id="scale" value="1" min="0.25" max="1" step="0.05">
     </div>
+    <details open style="background: #0f3460; padding: 10px; border-radius: 4px;">
+      <summary style="cursor: pointer; font-weight: bold; color: #e94560;">End Caps & Spouts</summary>
+      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+        <div class="control-group">
+          <label><input type="checkbox" id="enableCaps" checked> Enable Caps</label>
+        </div>
+        <div class="control-group">
+          <label>Cap Count <span id="capFiberCountVal">8</span></label>
+          <input type="range" id="capFiberCount" value="8" min="1" max="20" step="1">
+        </div>
+        <div class="control-group">
+          <label>Cap Gather <span id="capGatherLengthVal">10</span></label>
+          <input type="range" id="capGatherLength" value="10" min="5" max="50" step="1">
+        </div>
+        <div class="control-group">
+          <label>Spout Count <span id="spoutFiberCountVal">5</span></label>
+          <input type="range" id="spoutFiberCount" value="5" min="0" max="15" step="1">
+        </div>
+        <div class="control-group">
+          <label>Spout Length <span id="spoutLengthVal">50</span></label>
+          <input type="range" id="spoutLength" value="50" min="10" max="150" step="5">
+        </div>
+        <div class="control-group">
+          <label>Spout Spread <span id="spoutSpreadVal">30</span>°</label>
+          <input type="range" id="spoutSpread" value="30" min="0" max="90" step="5">
+        </div>
+        <div class="control-group">
+          <label>Spout Gravity <span id="spoutGravityVal">0.3</span></label>
+          <input type="range" id="spoutGravity" value="0.3" min="0" max="1" step="0.1">
+        </div>
+        <div class="control-group">
+          <label><input type="checkbox" id="spoutAtStart"> Spout at Start</label>
+        </div>
+      </div>
+    </details>
     <button id="exportSvg" style="background: #0f3460;">Export SVG</button>
     <div class="stats" id="stats">Ready</div>
   </div>
@@ -189,6 +228,23 @@
     function normalizeVector(vec) {
       const len = Math.hypot(vec.x, vec.y) || 1;
       return { x: vec.x / len, y: vec.y / len };
+    }
+
+    function lerpVector(v1, v2, t) {
+      return {
+        x: v1.x + (v2.x - v1.x) * t,
+        y: v1.y + (v2.y - v1.y) * t
+      };
+    }
+
+    function rotateVector(v, angleDegrees) {
+      const rad = angleDegrees * Math.PI / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      return {
+        x: v.x * cos - v.y * sin,
+        y: v.x * sin + v.y * cos
+      };
     }
 
     function blendDirection(sourceDir, targetDir, bias) {
@@ -296,29 +352,52 @@
       return Math.abs(Math.sin(modulatedAngle));
     }
 
-    function getTipTaperScale(y, params) {
-      const { braidLength, tipTaper } = params;
-      if (tipTaper === 0) return 1;
-      const period = braidLength / params.frequency;
-      const localY = y % period;
-      const halfPeriod = period / 2;
-      const distFromPeak = Math.abs(localY - halfPeriod);
-      const t = distFromPeak / halfPeriod;
-      return 1 - tipTaper * (1 - t);
+    /**
+     * Smoothstep easing function for smooth transitions
+     */
+    function smoothstep(t) {
+      const clamped = clamp(t, 0, 1);
+      return clamped * clamped * (3 - 2 * clamped);
     }
 
-    function generateCenterX(y, params) {
-      const wave = zigzagWave(y, params);
+    /**
+     * Calculate global taper scale for braid ends
+     * Tapers smoothly from 0 at the ends to 1 at tipTaperLength distance from ends
+     */
+    function getBraidTaperScale(y, params) {
+      const { braidLength, tipTaper, tipTaperLength = 50 } = params;
+      if (tipTaper === 0 || tipTaperLength <= 0) return 1;
+
+      // Guard against very small taper lengths
+      const safeTaperLength = Math.max(1, tipTaperLength);
+
+      // Calculate distance from nearest end
+      const distFromStart = y;
+      const distFromEnd = braidLength - y;
+      const distFromNearestEnd = Math.min(distFromStart, distFromEnd);
+
+      // Normalized progress from end (0 at end, 1 at full distance)
+      const t = clamp(distFromNearestEnd / safeTaperLength, 0, 1);
+
+      // Apply smoothstep easing for smooth transition
+      const easedT = smoothstep(t);
+
+      // Scale: 0 at end (when tipTaper=1), 1 at full distance
+      return 1 - tipTaper * (1 - easedT);
+    }
+
+    function generateCenterX(phaseY, actualY, params) {
+      const wave = zigzagWave(phaseY, params);
       const amplitude = BASE_ZIGZAG_AMPLITUDE * (params.zigzagScale || 1);
-      const taper = getTipTaperScale(y, params);
+      const taper = getBraidTaperScale(actualY, params);
       return wave * amplitude * taper;
     }
 
-    function generateWallX(y, side, params) {
+    function generateWallX(phaseY, actualY, side, params) {
       const { leftWallPhase = 0, rightWallPhase = 0, wallScale, wallSeparation = 100, wallFrequency, frequency } = params;
       // Wall uses its own frequency, independent of zigzag
       const wFreq = wallFrequency ?? frequency;
-      const angle = (y / params.braidLength) * wFreq * Math.PI;
+      const angle = (phaseY / params.braidLength) * wFreq * Math.PI;
       const sidePhase = side === 'left' ? leftWallPhase : rightWallPhase;
       const phase = (sidePhase * Math.PI) / 180;
       // bounceFreq=1 since we now have explicit wall frequency control
@@ -326,9 +405,14 @@
       const amplitude = BASE_WALL_WIDTH * wallScale;
       const translationSign = side === 'left' ? -1 : 1;
       const translation = translationSign * wallSeparation * 0.5;
-      const base = translationSign * envelope * amplitude + translation;
-      const taper = getTipTaperScale(y, params);
-      return base * taper;
+
+      // Apply taper to both amplitude AND translation separately
+      // This makes walls collapse toward center at the braid ends
+      const taper = getBraidTaperScale(actualY, params);
+      const taperedAmplitude = translationSign * envelope * amplitude * taper;
+      const taperedTranslation = translation * taper;
+
+      return taperedAmplitude + taperedTranslation;
     }
 
     function sampleBoundary(generator, params) {
@@ -336,12 +420,13 @@
       const { braidLength, sampleSpacing, arcLengths } = params;
       const count = Math.max(5, Math.ceil(braidLength / sampleSpacing));
       for (let i = 0; i <= count; i++) {
-        const y = (i / count) * braidLength;
+        const physicalY = (i / count) * braidLength;
         // Use arc-length adjusted Y for wave generation if backbone is curved
-        const adjustedY = arcLengths
-          ? getFrequencyAdjustedY(y, braidLength, arcLengths)
-          : y;
-        samples.push({ x: generator(adjustedY, params), y, index: i });
+        const phaseY = arcLengths
+          ? getFrequencyAdjustedY(physicalY, braidLength, arcLengths)
+          : physicalY;
+        // Pass both phaseY (for waves) and physicalY (for taper)
+        samples.push({ x: generator(phaseY, physicalY, params), y: physicalY, index: i });
       }
       return samples;
     }
@@ -728,6 +813,185 @@
       return curves;
     }
 
+    // ========================================================================
+    // End Cap and Spout Fiber Generation
+    // ========================================================================
+
+    function buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, params, warpPoint) {
+      const fibers = [];
+      const { capFiberCount = 8, capGatherLength = 10, braidLength } = params;
+      const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
+
+      const leftTrough = leftExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
+      const rightTrough = rightExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
+
+      const gatherStart = { x: centerSamples[0].x, y: 0 };
+      const gatherEnd = interpolateSamplesAt(centerSamples, Math.min(capGatherLength, braidLength * 0.1));
+
+      if (leftTrough) {
+        for (let i = 0; i < fibersPerSide; i++) {
+          const t = (i + 0.5) / fibersPerSide;
+          const originY = leftTrough.y * (1 - t * 0.3);
+          const originPoint = interpolateSamplesAt(leftSamples, originY);
+          const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+          const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+          const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
+          const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+
+          const points = [];
+          for (let j = 0; j <= 24; j++) {
+            const pt = j / 24;
+            points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+          }
+          fibers.push({ type: 'cap', side: 'left', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+        }
+      }
+
+      if (rightTrough) {
+        for (let i = 0; i < fibersPerSide; i++) {
+          const t = (i + 0.5) / fibersPerSide;
+          const originY = rightTrough.y * (1 - t * 0.3);
+          const originPoint = interpolateSamplesAt(rightSamples, originY);
+          const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+          const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+          const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
+          const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+
+          const points = [];
+          for (let j = 0; j <= 24; j++) {
+            const pt = j / 24;
+            points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+          }
+          fibers.push({ type: 'cap', side: 'right', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+        }
+      }
+
+      return fibers;
+    }
+
+    function buildEndCapFibers(centerExtrema, centerSamples, leftSamples, rightSamples, params, warpPoint) {
+      const fibers = [];
+      const { capFiberCount = 8, braidLength } = params;
+      const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
+
+      const lastPeak = centerExtrema.filter(e => (e.type === 'peak' || e.type === 'trough') && !e.paired).sort((a, b) => b.y - a.y)[0];
+      if (!lastPeak) return fibers;
+
+      const leftEnd = { x: leftSamples[leftSamples.length - 1].x, y: braidLength };
+      const rightEnd = { x: rightSamples[rightSamples.length - 1].x, y: braidLength };
+      const spanToEnd = braidLength - lastPeak.y;
+
+      for (let i = 0; i < fibersPerSide; i++) {
+        const t = (i + 0.5) / fibersPerSide;
+        const originY = lastPeak.y + spanToEnd * t * 0.2;
+        const originPoint = interpolateSamplesAt(centerSamples, originY);
+        const landingPoint = lerpVector({ x: leftEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, leftEnd, t);
+        const midPoint = lerpVector(originPoint, landingPoint, 0.4);
+        const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+
+        const points = [];
+        for (let j = 0; j <= 24; j++) {
+          const pt = j / 24;
+          points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+        }
+        fibers.push({ type: 'cap', side: 'left', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+      }
+
+      for (let i = 0; i < fibersPerSide; i++) {
+        const t = (i + 0.5) / fibersPerSide;
+        const originY = lastPeak.y + spanToEnd * t * 0.2;
+        const originPoint = interpolateSamplesAt(centerSamples, originY);
+        const landingPoint = lerpVector({ x: rightEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, rightEnd, t);
+        const midPoint = lerpVector(originPoint, landingPoint, 0.4);
+        const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+
+        const points = [];
+        for (let j = 0; j <= 24; j++) {
+          const pt = j / 24;
+          points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+        }
+        fibers.push({ type: 'cap', side: 'right', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+      }
+
+      return fibers;
+    }
+
+    function buildSpoutFibers(centerSamples, backbone, params, warpPoint) {
+      const fibers = [];
+      const { spoutFiberCount = 5, spoutLength = 50, spoutSpread = 30, spoutGravity = 0.3, spoutAtStart = false } = params;
+
+      if (spoutFiberCount <= 0) return fibers;
+
+      const gravityDir = { x: 0, y: 1 };
+
+      // End spout
+      const endPoint = centerSamples[centerSamples.length - 1];
+      let endTangent = { x: 0, y: 1 };
+      if (backbone) endTangent = normalizeVector(backbone.getTangentAt(1));
+
+      const endDir = normalizeVector(lerpVector(endTangent, gravityDir, spoutGravity));
+
+      for (let i = 0; i < spoutFiberCount; i++) {
+        const angleOffset = ((i - (spoutFiberCount - 1) / 2) / Math.max(1, spoutFiberCount - 1)) * spoutSpread;
+        const fiberDir = rotateVector(endDir, angleOffset);
+        const originPoint = { x: endPoint.x, y: endPoint.y };
+        const endPointFiber = { x: originPoint.x + fiberDir.x * spoutLength, y: originPoint.y + fiberDir.y * spoutLength };
+        const midPoint = lerpVector(originPoint, endPointFiber, 0.5);
+        const perpOffset = (i - (spoutFiberCount - 1) / 2) * 3;
+        const controlPoint = { x: midPoint.x - fiberDir.y * perpOffset, y: midPoint.y + fiberDir.x * perpOffset };
+
+        const points = [];
+        for (let j = 0; j <= 24; j++) {
+          const t = j / 24;
+          const point = quadraticPoint(originPoint, controlPoint, endPointFiber, t);
+          const warpedOrigin = warpPoint(originPoint);
+          const warpBlend = 1 - t;
+          const warpedPoint = warpPoint(point);
+          points.push({
+            x: warpedPoint.x * warpBlend + (warpedOrigin.x + (point.x - originPoint.x)) * (1 - warpBlend),
+            y: warpedPoint.y * warpBlend + (warpedOrigin.y + (point.y - originPoint.y)) * (1 - warpBlend)
+          });
+        }
+        fibers.push({ type: 'spout', side: 'center', points, spoutEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+      }
+
+      // Start spout (optional)
+      if (spoutAtStart) {
+        const startPoint = centerSamples[0];
+        let startTangent = { x: 0, y: -1 };
+        if (backbone) startTangent = normalizeVector({ x: -backbone.getTangentAt(0).x, y: -backbone.getTangentAt(0).y });
+
+        const invertedGravity = { x: 0, y: -1 };
+        const startDir = normalizeVector(lerpVector(startTangent, invertedGravity, spoutGravity));
+
+        for (let i = 0; i < spoutFiberCount; i++) {
+          const angleOffset = ((i - (spoutFiberCount - 1) / 2) / Math.max(1, spoutFiberCount - 1)) * spoutSpread;
+          const fiberDir = rotateVector(startDir, angleOffset);
+          const originPoint = { x: startPoint.x, y: startPoint.y };
+          const endPointFiber = { x: originPoint.x + fiberDir.x * spoutLength, y: originPoint.y + fiberDir.y * spoutLength };
+          const midPoint = lerpVector(originPoint, endPointFiber, 0.5);
+          const perpOffset = (i - (spoutFiberCount - 1) / 2) * 3;
+          const controlPoint = { x: midPoint.x - fiberDir.y * perpOffset, y: midPoint.y + fiberDir.x * perpOffset };
+
+          const points = [];
+          for (let j = 0; j <= 24; j++) {
+            const t = j / 24;
+            const point = quadraticPoint(originPoint, controlPoint, endPointFiber, t);
+            const warpedOrigin = warpPoint(originPoint);
+            const warpBlend = 1 - t;
+            const warpedPoint = warpPoint(point);
+            points.push({
+              x: warpedPoint.x * warpBlend + (warpedOrigin.x + (point.x - originPoint.x)) * (1 - warpBlend),
+              y: warpedPoint.y * warpBlend + (warpedOrigin.y + (point.y - originPoint.y)) * (1 - warpBlend)
+            });
+          }
+          fibers.push({ type: 'spout', side: 'center', points, spoutEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+        }
+      }
+
+      return fibers;
+    }
+
     function generateBraid(backbone, params) {
       // Curvature-aware parameters
       const redistributionFactor = params.redistributionFactor ?? 0;
@@ -748,6 +1012,7 @@
         zigzagScale: params.zigzagScale ?? 1.0,
         wallScale: params.wallScale ?? 1.0,
         tipTaper: params.tipTaper ?? 0.0,
+        tipTaperLength: params.tipTaperLength ?? 50,
         fiberCount: params.fiberCount ?? 10,
         fiberBias: params.fiberBias ?? 0.5,
         fiberLanding: params.fiberLanding ?? 0.0,
@@ -766,12 +1031,22 @@
         // Curvature-aware parameters
         arcLengths,
         redistributionFactor,
-        curvatureSmoothing
+        curvatureSmoothing,
+        // End cap parameters
+        enableCaps: params.enableCaps ?? true,
+        capFiberCount: params.capFiberCount ?? 8,
+        capGatherLength: params.capGatherLength ?? 10,
+        // Spout parameters
+        spoutFiberCount: params.spoutFiberCount ?? 5,
+        spoutLength: params.spoutLength ?? 50,
+        spoutSpread: params.spoutSpread ?? 30,
+        spoutGravity: params.spoutGravity ?? 0.3,
+        spoutAtStart: params.spoutAtStart ?? false
       };
 
       const centerSamples = sampleBoundary(generateCenterX, config);
-      const leftSamples = sampleBoundary((y, p) => generateWallX(y, 'left', p), config);
-      const rightSamples = sampleBoundary((y, p) => generateWallX(y, 'right', p), config);
+      const leftSamples = sampleBoundary((phaseY, actualY, p) => generateWallX(phaseY, actualY, 'left', p), config);
+      const rightSamples = sampleBoundary((phaseY, actualY, p) => generateWallX(phaseY, actualY, 'right', p), config);
 
       const centerExtrema = detectExtrema(centerSamples).map(ext => ({ ...ext, paired: false }));
       const leftExtrema = detectExtrema(leftSamples).map(ext => ({ ...ext, claimed: false }));
@@ -791,9 +1066,37 @@
         outlines.push({ side: pair.side, type: 'continuation', points: pair.diagRail.map(warpPoint), index: idx + 3 });
       });
 
-      const fibers = fiberCurves.map(fiber => ({ ...fiber, points: fiber.points.map(warpPoint) }));
+      const mainFibers = fiberCurves.map(fiber => ({ ...fiber, type: 'main', points: fiber.points.map(warpPoint) }));
 
-      return { outlines, fibers, metadata: { braidLength: config.braidLength, fiberCount: fibers.length, parameters: config } };
+      // Generate cap fibers (if enabled)
+      let capFibers = [];
+      if (config.enableCaps) {
+        const startCapFibers = buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, config, warpPoint);
+        const endCapFibers = buildEndCapFibers(centerExtrema, centerSamples, leftSamples, rightSamples, config, warpPoint);
+        capFibers = [...startCapFibers, ...endCapFibers];
+      }
+
+      // Generate spout fibers (if count > 0)
+      let spoutFibers = [];
+      if (config.spoutFiberCount > 0) {
+        spoutFibers = buildSpoutFibers(centerSamples, backbone, config, warpPoint);
+      }
+
+      const allFibers = [...mainFibers, ...capFibers, ...spoutFibers];
+
+      return {
+        outlines,
+        fibers: allFibers,
+        fiberGroups: { main: mainFibers, caps: capFibers, spouts: spoutFibers },
+        metadata: {
+          braidLength: config.braidLength,
+          fiberCount: allFibers.length,
+          mainFiberCount: mainFibers.length,
+          capFiberCount: capFibers.length,
+          spoutFiberCount: spoutFibers.length,
+          parameters: config
+        }
+      };
     }
 
     // ========================================================================
@@ -991,10 +1294,17 @@
       }
 
       if (currentBraid) {
-        // Draw fibers first (underneath)
-        ctx.strokeStyle = '#999';
+        // Debug colors for fiber types
+        const DEBUG_COLORS = {
+          main: '#999',
+          cap: '#0066cc',
+          spout: '#00aa44'
+        };
+
+        // Draw fibers with type-based colors
         ctx.lineWidth = 1;
         currentBraid.fibers.forEach(fiber => {
+          ctx.strokeStyle = DEBUG_COLORS[fiber.type] || DEBUG_COLORS.main;
           ctx.beginPath();
           fiber.points.forEach((p, i) => {
             if (i === 0) ctx.moveTo(p.x, p.y);
@@ -1070,6 +1380,7 @@
         fiberCount: parseInt(document.getElementById('fiberCount').value),
         fiberBow: parseFloat(document.getElementById('fiberBow').value),
         tipTaper: parseFloat(document.getElementById('tipTaper').value),
+        tipTaperLength: parseFloat(document.getElementById('tipTaperLength').value),
         redistributionFactor: parseFloat(document.getElementById('redistributionFactor').value),
         curvatureSmoothing: parseInt(document.getElementById('curvatureSmoothing').value),
         zigzagScale: parseFloat(document.getElementById('zigzagScale').value),
@@ -1085,6 +1396,16 @@
         landingSpread: parseFloat(document.getElementById('landingSpread').value),
         continuationLength: parseFloat(document.getElementById('continuationLength').value),
         continuationBias: parseFloat(document.getElementById('continuationBias').value),
+        // End cap parameters
+        enableCaps: document.getElementById('enableCaps').checked,
+        capFiberCount: parseInt(document.getElementById('capFiberCount').value),
+        capGatherLength: parseFloat(document.getElementById('capGatherLength').value),
+        // Spout parameters
+        spoutFiberCount: parseInt(document.getElementById('spoutFiberCount').value),
+        spoutLength: parseFloat(document.getElementById('spoutLength').value),
+        spoutSpread: parseFloat(document.getElementById('spoutSpread').value),
+        spoutGravity: parseFloat(document.getElementById('spoutGravity').value),
+        spoutAtStart: document.getElementById('spoutAtStart').checked,
         braidLength,
         sampleSpacing
       };
@@ -1092,7 +1413,8 @@
       currentBraid = generateBraid(currentBackbone, params);
 
       const elapsed = (performance.now() - startTime).toFixed(1);
-      statsEl.textContent = `Path: ${pathPoints.length} pts | Length: ${Math.round(currentBackbone.totalLength)}px | Fibers: ${currentBraid.fibers.length} | Outlines: ${currentBraid.outlines.length} | ${elapsed}ms`;
+      const meta = currentBraid.metadata;
+      statsEl.textContent = `Path: ${pathPoints.length} pts | Length: ${Math.round(currentBackbone.totalLength)}px | Fibers: ${meta.mainFiberCount} main + ${meta.capFiberCount} cap + ${meta.spoutFiberCount} spout | ${elapsed}ms`;
 
       render();
     }
@@ -1106,9 +1428,25 @@
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${A3_WIDTH} ${A3_HEIGHT}" width="${A3_WIDTH}" height="${A3_HEIGHT}">`;
       svg += `<rect width="100%" height="100%" fill="white"/>`;
 
-      // Fibers layer
-      svg += '<g id="braid-fibers" stroke="#999" fill="none" stroke-width="1">';
-      currentBraid.fibers.forEach(fiber => {
+      // Main fibers layer
+      svg += '<g id="main-fibers" stroke="#000" fill="none" stroke-width="1">';
+      currentBraid.fiberGroups.main.forEach(fiber => {
+        const d = 'M ' + fiber.points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' L ');
+        svg += `<path d="${d}"/>`;
+      });
+      svg += '</g>';
+
+      // Cap fibers layer
+      svg += '<g id="cap-fibers" stroke="#000" fill="none" stroke-width="1">';
+      currentBraid.fiberGroups.caps.forEach(fiber => {
+        const d = 'M ' + fiber.points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' L ');
+        svg += `<path d="${d}"/>`;
+      });
+      svg += '</g>';
+
+      // Spout fibers layer
+      svg += '<g id="spout-fibers" stroke="#000" fill="none" stroke-width="1">';
+      currentBraid.fiberGroups.spouts.forEach(fiber => {
         const d = 'M ' + fiber.points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' L ');
         svg += `<path d="${d}"/>`;
       });
@@ -1144,10 +1482,13 @@
     const controls = [
       'frequency', 'wallFrequency', 'zigzagScale', 'wallScale', 'wallSeparation',
       'leftWallPhase', 'rightWallPhase',
-      'fiberCount', 'fiberBow', 'tipTaper',
+      'fiberCount', 'fiberBow', 'tipTaper', 'tipTaperLength',
       'redistributionFactor', 'curvatureSmoothing',
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
-      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias'
+      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias',
+      // Cap and spout controls
+      'capFiberCount', 'capGatherLength',
+      'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity'
     ];
 
     controls.forEach(id => {
@@ -1159,6 +1500,11 @@
       });
       // Initialize display
       if (valEl) valEl.textContent = el.value;
+    });
+
+    // Checkbox controls
+    ['enableCaps', 'spoutAtStart'].forEach(id => {
+      document.getElementById(id).addEventListener('change', generate);
     });
 
     // Path type regenerates the backbone
