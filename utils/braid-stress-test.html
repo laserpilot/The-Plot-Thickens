@@ -85,11 +85,11 @@
     </div>
     <div class="control-group">
       <label>Zigzag Freq <span id="frequencyVal">56</span></label>
-      <input type="range" id="frequency" value="56" min="1" max="150" step="1">
+      <input type="range" id="frequency" value="56" min="1" max="300" step="1">
     </div>
     <div class="control-group">
       <label>Wall Freq <span id="wallFrequencyVal">28</span></label>
-      <input type="range" id="wallFrequency" value="28" min="1" max="150" step="1">
+      <input type="range" id="wallFrequency" value="28" min="1" max="300" step="1">
     </div>
     <div class="control-group">
       <label>Zigzag Amp <span id="zigzagScaleVal">0.5</span></label>
@@ -122,6 +122,46 @@
     <div class="control-group">
       <label>Tip Taper <span id="tipTaperVal">0</span></label>
       <input type="range" id="tipTaper" value="0" min="0" max="1" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Curve Tighten <span id="curvatureTightenVal">1</span></label>
+      <input type="range" id="curvatureTighten" value="1" min="0" max="10" step="0.1">
+    </div>
+    <div class="control-group">
+      <label>Min Inner <span id="minInnerScaleVal">0.2</span></label>
+      <input type="range" id="minInnerScale" value="0.2" min="0.05" max="0.5" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
+      <input type="range" id="cycleJitter" value="0" min="0" max="1" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Zigzag Phase <span id="zigzagPhaseVal">0</span>°</label>
+      <input type="range" id="zigzagPhase" value="0" min="-180" max="180" step="5">
+    </div>
+    <div class="control-group">
+      <label>Fiber Bias <span id="fiberBiasVal">0.5</span></label>
+      <input type="range" id="fiberBias" value="0.5" min="0" max="1" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Fiber Landing <span id="fiberLandingVal">0</span></label>
+      <input type="range" id="fiberLanding" value="0" min="0" max="1" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Bow Gradient <span id="bowGradientVal">2</span></label>
+      <input type="range" id="bowGradient" value="2" min="0.5" max="4" step="0.1">
+    </div>
+    <div class="control-group">
+      <label>Landing Spread <span id="landingSpreadVal">1</span></label>
+      <input type="range" id="landingSpread" value="1" min="0.1" max="1" step="0.05">
+    </div>
+    <div class="control-group">
+      <label>Cont. Length <span id="continuationLengthVal">20</span></label>
+      <input type="range" id="continuationLength" value="20" min="5" max="50" step="1">
+    </div>
+    <div class="control-group">
+      <label>Cont. Bias <span id="continuationBiasVal">0.7</span></label>
+      <input type="range" id="continuationBias" value="0.7" min="0" max="1" step="0.05">
     </div>
     <div class="control-group">
       <label>View Scale <span id="scaleVal">1</span></label>
@@ -349,7 +389,64 @@
       return bestMatch;
     }
 
-    function createWarpFunction(backbone, braidLength) {
+    // ========================================================================
+    // Curvature-Aware Tightening
+    // ========================================================================
+
+    function computeBackboneCurvature(backbone, braidLength, sampleCount = null) {
+      if (!backbone) return null;
+      const count = sampleCount || Math.max(50, Math.ceil(braidLength / 4));
+      const samples = [];
+      const epsilon = 1e-4;
+
+      for (let i = 0; i <= count; i++) {
+        const t = i / count;
+        const t0 = Math.max(0, t - epsilon);
+        const t1 = Math.min(1, t + epsilon);
+
+        const tan0 = backbone.getTangentAt(t0);
+        const tan1 = backbone.getTangentAt(t1);
+
+        let deltaAngle = Math.atan2(tan1.y, tan1.x) - Math.atan2(tan0.y, tan0.x);
+        if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+        if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+
+        const p0 = backbone.getPointAt(t0);
+        const p1 = backbone.getPointAt(t1);
+        const arcLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+        const curvature = arcLength > 1e-6 ? deltaAngle / arcLength : 0;
+
+        samples.push({ t, curvature });
+      }
+      return samples;
+    }
+
+    function getCurvatureAt(curvatureSamples, t) {
+      if (!curvatureSamples || curvatureSamples.length === 0) return 0;
+      const count = curvatureSamples.length - 1;
+      const idx = clamp(t, 0, 1) * count;
+      const i = Math.floor(idx);
+      const frac = idx - i;
+      const a = curvatureSamples[Math.min(i, count)];
+      const b = curvatureSamples[Math.min(i + 1, count)];
+      return a.curvature + (b.curvature - a.curvature) * frac;
+    }
+
+    function getInnerTightenScale(x, curvature, params) {
+      const { curvatureTighten = 200, minInnerScale = 0.2 } = params;
+      if (curvatureTighten === 0 || Math.abs(curvature) < 1e-6) return 1.0;
+
+      // Inner side: sign(x) == sign(curvature)
+      // Positive curvature (left turn) -> positive x (right side) is inner
+      // Negative curvature (right turn) -> negative x (left side) is inner
+      const isInner = (x * curvature) > 0;
+      if (!isInner) return 1.0;
+
+      const tightenAmount = Math.abs(curvature) * Math.abs(x) * curvatureTighten;
+      return clamp(1 - tightenAmount, minInnerScale, 1.0);
+    }
+
+    function createWarpFunction(backbone, braidLength, curvatureSamples = null, params = {}) {
       if (!backbone) return (point) => point;
 
       return (point) => {
@@ -357,9 +454,18 @@
         const base = backbone.getPointAt(t);
         const tangent = backbone.getTangentAt(t);
         const normal = { x: -tangent.y, y: tangent.x };
+
+        // Apply one-sided curvature tightening
+        let adjustedX = point.x;
+        if (curvatureSamples && params.curvatureTighten > 0) {
+          const curvature = getCurvatureAt(curvatureSamples, t);
+          const tightenScale = getInnerTightenScale(point.x, curvature, params);
+          adjustedX = point.x * tightenScale;
+        }
+
         return {
-          x: base.x + point.x * normal.x,
-          y: base.y + point.x * normal.y
+          x: base.x + adjustedX * normal.x,
+          y: base.y + adjustedX * normal.y
         };
       };
     }
@@ -577,7 +683,9 @@
         landingSpread: params.landingSpread ?? 1.0,
         wallSeparation: params.wallSeparation ?? 100,
         braidLength: params.braidLength ?? 800,
-        fiberSpacing: params.fiberSpacing ?? 3
+        fiberSpacing: params.fiberSpacing ?? 3,
+        curvatureTighten: params.curvatureTighten ?? 200,
+        minInnerScale: params.minInnerScale ?? 0.2
       };
 
       const centerSamples = sampleBoundary(generateCenterX, config);
@@ -592,7 +700,8 @@
       assignSideOrdering(continuationPairs);
       const fiberCurves = buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, config);
 
-      const warpPoint = createWarpFunction(backbone, config.braidLength);
+      const curvatureSamples = computeBackboneCurvature(backbone, config.braidLength);
+      const warpPoint = createWarpFunction(backbone, config.braidLength, curvatureSamples, config);
 
       const outlines = [];
       outlines.push({ side: 'center', type: 'zigzag', points: centerSamples.map(warpPoint), index: 0 });
@@ -881,11 +990,21 @@
         fiberCount: parseInt(document.getElementById('fiberCount').value),
         fiberBow: parseFloat(document.getElementById('fiberBow').value),
         tipTaper: parseFloat(document.getElementById('tipTaper').value),
+        curvatureTighten: parseFloat(document.getElementById('curvatureTighten').value),
+        minInnerScale: parseFloat(document.getElementById('minInnerScale').value),
         zigzagScale: parseFloat(document.getElementById('zigzagScale').value),
         wallScale: parseFloat(document.getElementById('wallScale').value),
         wallSeparation: parseFloat(document.getElementById('wallSeparation').value),
         leftWallPhase: parseFloat(document.getElementById('leftWallPhase').value),
         rightWallPhase: parseFloat(document.getElementById('rightWallPhase').value),
+        cycleJitter: parseFloat(document.getElementById('cycleJitter').value),
+        zigzagPhase: parseFloat(document.getElementById('zigzagPhase').value),
+        fiberBias: parseFloat(document.getElementById('fiberBias').value),
+        fiberLanding: parseFloat(document.getElementById('fiberLanding').value),
+        bowGradient: parseFloat(document.getElementById('bowGradient').value),
+        landingSpread: parseFloat(document.getElementById('landingSpread').value),
+        continuationLength: parseFloat(document.getElementById('continuationLength').value),
+        continuationBias: parseFloat(document.getElementById('continuationBias').value),
         braidLength,
         sampleSpacing
       };
@@ -945,7 +1064,10 @@
     const controls = [
       'frequency', 'wallFrequency', 'zigzagScale', 'wallScale', 'wallSeparation',
       'leftWallPhase', 'rightWallPhase',
-      'fiberCount', 'fiberBow', 'tipTaper'
+      'fiberCount', 'fiberBow', 'tipTaper',
+      'curvatureTighten', 'minInnerScale',
+      'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
+      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias'
     ];
 
     controls.forEach(id => {
