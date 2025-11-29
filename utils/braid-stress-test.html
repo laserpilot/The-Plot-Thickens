@@ -124,12 +124,12 @@
       <input type="range" id="tipTaper" value="0" min="0" max="1" step="0.05">
     </div>
     <div class="control-group">
-      <label>Curve Tighten <span id="curvatureTightenVal">1</span></label>
-      <input type="range" id="curvatureTighten" value="1" min="0" max="10" step="0.1">
+      <label>Redistribution <span id="redistributionFactorVal">0.5</span></label>
+      <input type="range" id="redistributionFactor" value="0.5" min="0" max="2" step="0.1">
     </div>
     <div class="control-group">
-      <label>Min Inner <span id="minInnerScaleVal">0.2</span></label>
-      <input type="range" id="minInnerScale" value="0.2" min="0.05" max="0.5" step="0.05">
+      <label>Curve Smooth <span id="curvatureSmoothingVal">5</span></label>
+      <input type="range" id="curvatureSmoothing" value="5" min="1" max="15" step="1">
     </div>
     <div class="control-group">
       <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
@@ -264,28 +264,29 @@
     function zigzagWave(y, params) {
       const { frequency, cycleJitter, zigzagPhase = 0 } = params;
       const phaseRad = (zigzagPhase * Math.PI) / 180;
-      let phase = phaseRad;
 
+      const cycles = frequency;
+      const t = (y / params.braidLength) * cycles * Math.PI + phaseRad;
+      let wave = triangleWave(t);
+
+      // Apply amplitude jitter per cycle (makes links taller/shorter without discontinuities)
       if (cycleJitter > 0) {
-        // Use smooth interpolation between cycle jitter values to avoid discontinuities
         const cyclePos = (y / params.braidLength) * frequency;
         const cycleIndex = Math.floor(cyclePos);
         const cycleFrac = cyclePos - cycleIndex;
 
-        // Get jitter for current and next cycle
-        const jitter0 = cycleRandom(cycleIndex);
-        const jitter1 = cycleRandom(cycleIndex + 1);
+        // Get amplitude scale for current and next cycle (range: 1-jitter to 1+jitter)
+        const jitter0 = 1 + cycleRandom(cycleIndex) * cycleJitter * 0.3;
+        const jitter1 = 1 + cycleRandom(cycleIndex + 1) * cycleJitter * 0.3;
 
-        // Smooth interpolation (using smoothstep for extra smoothness)
-        const t = cycleFrac * cycleFrac * (3 - 2 * cycleFrac);
-        const smoothJitter = jitter0 + (jitter1 - jitter0) * t;
+        // Smooth interpolation at cycle boundaries
+        const smoothT = cycleFrac * cycleFrac * (3 - 2 * cycleFrac);
+        const ampScale = jitter0 + (jitter1 - jitter0) * smoothT;
 
-        phase += smoothJitter * cycleJitter * Math.PI * 0.5;
+        wave *= ampScale;
       }
 
-      const cycles = frequency;
-      const t = (y / params.braidLength) * cycles * Math.PI + phase;
-      return triangleWave(t);
+      return wave;
     }
 
     function bounceWave(angle, phase, bounceFreq) {
@@ -332,11 +333,15 @@
 
     function sampleBoundary(generator, params) {
       const samples = [];
-      const { braidLength, sampleSpacing } = params;
+      const { braidLength, sampleSpacing, arcLengths } = params;
       const count = Math.max(5, Math.ceil(braidLength / sampleSpacing));
       for (let i = 0; i <= count; i++) {
         const y = (i / count) * braidLength;
-        samples.push({ x: generator(y, params), y, index: i });
+        // Use arc-length adjusted Y for wave generation if backbone is curved
+        const adjustedY = arcLengths
+          ? getFrequencyAdjustedY(y, braidLength, arcLengths)
+          : y;
+        samples.push({ x: generator(adjustedY, params), y, index: i });
       }
       return samples;
     }
@@ -406,17 +411,35 @@
     }
 
     // ========================================================================
-    // Curvature-Aware Tightening
+    // Arc-Length and Curvature Infrastructure
     // ========================================================================
 
-    function computeBackboneCurvature(backbone, braidLength, sampleCount = null) {
-      if (!backbone) return null;
-      const count = sampleCount || Math.max(50, Math.ceil(braidLength / 4));
-      const samples = [];
-      const epsilon = 1e-4;
+    function computeBackboneArcLengths(backbone, sampleCount = 200) {
+      const points = [];
+      for (let i = 0; i <= sampleCount; i++) {
+        points.push(backbone.getPointAt(i / sampleCount));
+      }
+      return calculateArcLengths(points);
+    }
 
-      for (let i = 0; i <= count; i++) {
-        const t = i / count;
+    function getFrequencyAdjustedY(y, braidLength, arcLengths) {
+      const totalArcLength = arcLengths[arcLengths.length - 1];
+      const t = clamp(y / braidLength, 0, 1);
+      const idx = t * (arcLengths.length - 1);
+      const i = Math.floor(idx);
+      const frac = idx - i;
+      const arcLen = arcLengths[i] + (arcLengths[Math.min(i + 1, arcLengths.length - 1)] - arcLengths[i]) * frac;
+      return (arcLen / totalArcLength) * braidLength;
+    }
+
+    function computeBackboneCurvature(backbone, braidLength, sampleCount = 100, smoothingWindow = 5) {
+      if (!backbone) return null;
+      const epsilon = 1e-4;
+      const raw = [];
+
+      // Compute raw curvature
+      for (let i = 0; i <= sampleCount; i++) {
+        const t = i / sampleCount;
         const t0 = Math.max(0, t - epsilon);
         const t1 = Math.min(1, t + epsilon);
 
@@ -432,9 +455,22 @@
         const arcLength = Math.hypot(p1.x - p0.x, p1.y - p0.y);
         const curvature = arcLength > 1e-6 ? deltaAngle / arcLength : 0;
 
-        samples.push({ t, curvature });
+        raw.push({ t, curvature });
       }
-      return samples;
+
+      // Apply moving average smoothing
+      const smoothed = [];
+      for (let i = 0; i < raw.length; i++) {
+        let sum = 0, count = 0;
+        for (let j = -smoothingWindow; j <= smoothingWindow; j++) {
+          const idx = Math.max(0, Math.min(raw.length - 1, i + j));
+          sum += raw[idx].curvature;
+          count++;
+        }
+        smoothed.push({ t: raw[i].t, curvature: sum / count });
+      }
+
+      return smoothed;
     }
 
     function getCurvatureAt(curvatureSamples, t) {
@@ -448,22 +484,30 @@
       return a.curvature + (b.curvature - a.curvature) * frac;
     }
 
-    function getInnerTightenScale(x, curvature, params) {
-      const { curvatureTighten = 200, minInnerScale = 0.2 } = params;
-      if (curvatureTighten === 0 || Math.abs(curvature) < 1e-6) return 1.0;
+    /**
+     * Redistribute strand positions to bias toward curve inside
+     */
+    function redistribute(x_norm, shift) {
+      // Clamp shift to safe range (prevents power going negative/zero)
+      const safeShift = clamp(shift, -0.95, 0.95);
 
-      // Inner side: sign(x) == sign(curvature)
-      // Positive curvature (left turn) -> positive x (right side) is inner
-      // Negative curvature (right turn) -> negative x (left side) is inner
-      const isInner = (x * curvature) > 0;
-      if (!isInner) return 1.0;
+      // Ease shift to prevent overcompensation at low curvature
+      const easedShift = safeShift * (2 - Math.abs(safeShift));
 
-      const tightenAmount = Math.abs(curvature) * Math.abs(x) * curvatureTighten;
-      return clamp(1 - tightenAmount, minInnerScale, 1.0);
+      const sign = Math.sign(x_norm);
+      const t = Math.abs(x_norm);
+
+      // Power-based redistribution
+      // Positive shift compresses positive x (right), expands negative x (left)
+      const power = sign > 0 ? (1 + easedShift) : (1 - easedShift);
+
+      return Math.pow(t, power) * sign;
     }
 
     function createWarpFunction(backbone, braidLength, curvatureSamples = null, params = {}) {
       if (!backbone) return (point) => point;
+
+      const { redistributionFactor = 0, wallSeparation = 100 } = params;
 
       return (point) => {
         const t = clamp(point.y / braidLength, 0, 1);
@@ -471,12 +515,19 @@
         const tangent = backbone.getTangentAt(t);
         const normal = { x: -tangent.y, y: tangent.x };
 
-        // Apply one-sided curvature tightening
         let adjustedX = point.x;
-        if (curvatureSamples && params.curvatureTighten > 0) {
+
+        // Apply curvature-based redistribution
+        if (curvatureSamples && redistributionFactor > 0) {
           const curvature = getCurvatureAt(curvatureSamples, t);
-          const tightenScale = getInnerTightenScale(point.x, curvature, params);
-          adjustedX = point.x * tightenScale;
+          const halfWidth = wallSeparation / 2;
+          const x_norm = point.x / halfWidth;
+          // Scale curvature by wallSeparation to get dimensionless quantity
+          // (curvature is rad/px, wallSeparation is px, so product is radians)
+          const scaledCurvature = curvature * wallSeparation;
+          const shift = -scaledCurvature * redistributionFactor;
+          const remapped = redistribute(x_norm, shift);
+          adjustedX = remapped * halfWidth;
         }
 
         return {
@@ -678,6 +729,18 @@
     }
 
     function generateBraid(backbone, params) {
+      // Curvature-aware parameters
+      const redistributionFactor = params.redistributionFactor ?? 0;
+      const curvatureSmoothing = params.curvatureSmoothing ?? 5;
+
+      // Compute backbone arc lengths for frequency adjustment
+      const arcLengths = backbone ? computeBackboneArcLengths(backbone) : null;
+
+      // Compute smoothed curvature for redistribution
+      const curvatureSamples = (backbone && redistributionFactor > 0)
+        ? computeBackboneCurvature(backbone, params.braidLength ?? 800, 100, curvatureSmoothing)
+        : null;
+
       const config = {
         frequency: params.frequency ?? 2.25,
         wallFrequency: params.wallFrequency ?? params.frequency ?? 2.25,
@@ -700,8 +763,10 @@
         wallSeparation: params.wallSeparation ?? 100,
         braidLength: params.braidLength ?? 800,
         fiberSpacing: params.fiberSpacing ?? 3,
-        curvatureTighten: params.curvatureTighten ?? 200,
-        minInnerScale: params.minInnerScale ?? 0.2
+        // Curvature-aware parameters
+        arcLengths,
+        redistributionFactor,
+        curvatureSmoothing
       };
 
       const centerSamples = sampleBoundary(generateCenterX, config);
@@ -716,7 +781,6 @@
       assignSideOrdering(continuationPairs);
       const fiberCurves = buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, config);
 
-      const curvatureSamples = computeBackboneCurvature(backbone, config.braidLength);
       const warpPoint = createWarpFunction(backbone, config.braidLength, curvatureSamples, config);
 
       const outlines = [];
@@ -1006,8 +1070,8 @@
         fiberCount: parseInt(document.getElementById('fiberCount').value),
         fiberBow: parseFloat(document.getElementById('fiberBow').value),
         tipTaper: parseFloat(document.getElementById('tipTaper').value),
-        curvatureTighten: parseFloat(document.getElementById('curvatureTighten').value),
-        minInnerScale: parseFloat(document.getElementById('minInnerScale').value),
+        redistributionFactor: parseFloat(document.getElementById('redistributionFactor').value),
+        curvatureSmoothing: parseInt(document.getElementById('curvatureSmoothing').value),
         zigzagScale: parseFloat(document.getElementById('zigzagScale').value),
         wallScale: parseFloat(document.getElementById('wallScale').value),
         wallSeparation: parseFloat(document.getElementById('wallSeparation').value),
@@ -1081,7 +1145,7 @@
       'frequency', 'wallFrequency', 'zigzagScale', 'wallScale', 'wallSeparation',
       'leftWallPhase', 'rightWallPhase',
       'fiberCount', 'fiberBow', 'tipTaper',
-      'curvatureTighten', 'minInnerScale',
+      'redistributionFactor', 'curvatureSmoothing',
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
       'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias'
     ];

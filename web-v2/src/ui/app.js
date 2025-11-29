@@ -977,9 +977,8 @@ export function initUI(store, renderer) {
     // Update CLI command display
     updateCLICommandDisplay(store.getState('config'));
 
-    // Always reprocess when outline toggle changes (if paths loaded)
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -996,8 +995,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlineOffset: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -1010,8 +1010,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlineOffset: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -1028,8 +1029,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlinePasses: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -1042,8 +1044,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlinePasses: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -1059,8 +1062,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlineMinLength: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });
@@ -1072,8 +1076,9 @@ export function initUI(store, renderer) {
       config: { ...config, outlineMaxLength: value }
     });
     updateCLICommandDisplay(store.getState('config'));
-    const originalPaths = store.getState('originalPaths');
-    if (originalPaths && originalPaths.length > 0) {
+
+    // Auto-process if live preview is enabled
+    if (store.getState('livePreview')) {
       throttledProcess();
     }
   });

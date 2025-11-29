@@ -343,6 +343,24 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       continue;
     }
 
+    // Calculate scaled outline passes based on path length
+    // Linear scaling: 0 passes at outlineMinLength, full passes at outlineMaxLength
+    let scaledOutlinePasses = config.outlinePasses || 1;
+    if (config.addOutline && (config.outlineMinLength !== null || config.outlineMaxLength !== null)) {
+      const outlineMin = config.outlineMinLength ?? minLength;
+      const outlineMax = config.outlineMaxLength ?? maxLength;
+
+      if (length <= outlineMin) {
+        scaledOutlinePasses = 0;
+      } else if (length >= outlineMax) {
+        scaledOutlinePasses = config.outlinePasses || 1;
+      } else {
+        // Linear interpolation
+        const t = (length - outlineMin) / (outlineMax - outlineMin);
+        scaledOutlinePasses = Math.round(t * (config.outlinePasses || 1));
+      }
+    }
+
     // Generate offset passes for this path
     // Note: generatePasses expects individual parameters, not an object
     const result = generatePasses(
@@ -362,24 +380,12 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       config.stripeFilled || 1,  // stripeFilled
       config.stripeEmpty || 1,   // stripeEmpty
       config.outlineOffset || 0.25,  // outlineOffset
-      config.outlinePasses || 1      // outlinePasses
+      scaledOutlinePasses        // outlinePasses (scaled by path length)
     );
 
     // Handle result - could be array of paths or {fills, outlines} object
     const passes = config.addOutline && result.fills ? result.fills : (Array.isArray(result) ? result : []);
-    let outlines = config.addOutline && result.outlines ? result.outlines : [];
-
-    // Filter outlines by path length (based on original path length)
-    if (outlines.length > 0 && (config.outlineMinLength !== null || config.outlineMaxLength !== null)) {
-      const passesFilter =
-        (config.outlineMinLength === null || length >= config.outlineMinLength) &&
-        (config.outlineMaxLength === null || length <= config.outlineMaxLength);
-
-      if (!passesFilter) {
-        // Path doesn't meet length criteria for outlines - clear them
-        outlines = [];
-      }
-    }
+    const outlines = config.addOutline && result.outlines ? result.outlines : [];
 
     // Add each pass as a separate path with proper SVG attributes
     passes.forEach((passData, passIndex) => {
@@ -404,7 +410,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         isOutline: true,
         // SVG display attributes for rendering and export
         fill: 'none',
-        stroke: 'black',
+        stroke: 'red',
         strokeWidth: 0.1
       });
     });

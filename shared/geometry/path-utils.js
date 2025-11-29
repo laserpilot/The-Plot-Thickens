@@ -565,9 +565,13 @@ function calculatePassNoise(passIndex, totalPasses, gradientMode, noiseMin, nois
  * @param {string} fillMode - Fill mode: 'offset' or 'crosshatch' (default: 'offset')
  * @param {Object} crosshatchOptions - Options for crosshatch mode: {angles: Array, spacing: number}
  * @param {boolean} extractOutline - Return outline paths separately (default: false)
+ * @param {number} stripeFilled - Number of filled stripes in pattern (default: 1)
+ * @param {number} stripeEmpty - Number of empty stripes in pattern (default: 1)
+ * @param {number} outlineOffset - Distance between outline passes (default: 0.25)
+ * @param {number} outlinePasses - Number of outline passes to generate (default: 1)
  * @returns {Array<string>|Object} Array of path strings, or {fills: Array, outlines: Array} if extractOutline=true
  */
-function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId = '', offsetEnvelope = null, useNormalMode = false, noiseFrequency = 50, sampleRate = 2, fillMode = 'offset', crosshatchOptions = null, extractOutline = false, stripeFilled = 1, stripeEmpty = 1) {
+function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId = '', offsetEnvelope = null, useNormalMode = false, noiseFrequency = 50, sampleRate = 2, fillMode = 'offset', crosshatchOptions = null, extractOutline = false, stripeFilled = 1, stripeEmpty = 1, outlineOffset = 0.25, outlinePasses = 1) {
   // Generate deterministic seed from path data if not provided
   if (seed === null) {
     seed = hashString(pathData);
@@ -725,22 +729,32 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
 
   // Default: offset fill mode
   const paths = [];
-  let leftOutline = null;
-  let rightOutline = null;
+  const outlinePathsArray = [];
 
-  // If outlines requested, generate outermost offset paths separately
-  // This ensures they're always present regardless of stripe pattern
+  // If outlines requested, generate multiple outline passes at increasing offset distances
+  // Each outline pass creates a pair (left and right) at outlineOffset spacing
   if (extractOutline && passes > 0) {
-    // Generate right outline (furthest right)
+    // Calculate the base distance from center (edge of fill ribbon)
     const rightPassIndex = Math.floor((passes - 1) / 2);
-    const rightDistance = rightPassIndex * baseOffset;
-    rightOutline = offsetPath(pathData, rightDistance, noise, seed + passes, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+    const baseRightDistance = rightPassIndex * baseOffset;
+    const leftPassIndex = passes > 1 ? Math.floor((passes - 2) / 2) + 1 : 0;
+    const baseLeftDistance = leftPassIndex * baseOffset;
 
-    // Generate left outline (furthest left) if we have multiple passes
-    if (passes > 1) {
-      const leftPassIndex = Math.floor((passes - 2) / 2) + 1;
-      const leftDistance = -leftPassIndex * baseOffset;
-      leftOutline = offsetPath(pathData, leftDistance, noise, seed + passes + 1, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+    // Generate multiple outline passes
+    for (let outlinePass = 0; outlinePass < outlinePasses; outlinePass++) {
+      const additionalOffset = outlinePass * outlineOffset;
+
+      // Right outline at increasing distance
+      const rightDistance = baseRightDistance + additionalOffset;
+      const rightOutline = offsetPath(pathData, rightDistance, noise, seed + passes + outlinePass * 2, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+      outlinePathsArray.push(rightOutline);
+
+      // Left outline at increasing distance (if we have room for left side)
+      if (passes > 1 || outlinePass > 0) {
+        const leftDistance = -(baseLeftDistance + additionalOffset);
+        const leftOutline = offsetPath(pathData, leftDistance, noise, seed + passes + outlinePass * 2 + 1, pathId, offsetEnvelope, useNormalMode, noiseFrequency, sampleRate);
+        outlinePathsArray.push(leftOutline);
+      }
     }
   }
 
@@ -833,10 +847,7 @@ function generatePasses(pathData, passes, baseOffset, noise, seed = null, pathId
 
   // Return with or without outlines
   if (extractOutline) {
-    const outlines = [];
-    if (rightOutline) outlines.push(rightOutline);
-    if (leftOutline) outlines.push(leftOutline);
-    return { fills: paths, outlines };
+    return { fills: paths, outlines: outlinePathsArray };
   }
 
   return paths;

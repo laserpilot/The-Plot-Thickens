@@ -143,4 +143,124 @@ variations.forEach(({ name, params }) => {
 
 console.log('  ✓ All variations generated successfully\n');
 
+// Test 6: Curvature-aware redistribution
+console.log('Test 6: Curvature-aware redistribution');
+
+// Create a sharply curved backbone (semicircle)
+const curvedBackbone = {
+  getPointAt(t) {
+    const angle = t * Math.PI; // 0 to PI (half circle)
+    return {
+      x: 300 + Math.cos(angle) * 200,
+      y: 200 + Math.sin(angle) * 200
+    };
+  },
+  getTangentAt(t) {
+    const delta = 0.001;
+    const p0 = this.getPointAt(Math.max(0, t - delta));
+    const p1 = this.getPointAt(Math.min(1, t + delta));
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: dx / len, y: dy / len };
+  }
+};
+
+// Test without redistribution
+const braidNoRedist = generateBraid(curvedBackbone, {
+  braidLength: 600,
+  frequency: 3.0,
+  redistributionFactor: 0
+});
+
+// Test with redistribution
+const braidWithRedist = generateBraid(curvedBackbone, {
+  braidLength: 600,
+  frequency: 3.0,
+  redistributionFactor: 0.8,
+  curvatureSmoothing: 5
+});
+
+console.log('  Without redistribution - fibers:', braidNoRedist.fibers.length);
+console.log('  With redistribution - fibers:', braidWithRedist.fibers.length);
+
+// Check that both generated valid output
+const validNoRedist = braidNoRedist.outlines.length > 0 && braidNoRedist.fibers.length > 0;
+const validWithRedist = braidWithRedist.outlines.length > 0 && braidWithRedist.fibers.length > 0;
+
+console.log('  Valid without redistribution:', validNoRedist ? '✓' : '✗');
+console.log('  Valid with redistribution:', validWithRedist ? '✓' : '✗');
+
+// Verify the redistribution parameter is in the config
+const hasRedistParam = braidWithRedist.metadata.parameters.redistributionFactor === 0.8;
+console.log('  Redistribution param stored:', hasRedistParam ? '✓' : '✗');
+
+if (validNoRedist && validWithRedist && hasRedistParam) {
+  console.log('  ✓ Curvature-aware redistribution tests passed\n');
+} else {
+  console.log('  ✗ Some curvature tests failed\n');
+  process.exit(1);
+}
+
+// Test 7: Arc-length parameterization
+console.log('Test 7: Arc-length parameterization');
+
+// Create an S-curve backbone where arc length differs from parameter length
+const sCurveBackbone = {
+  getPointAt(t) {
+    const y = t * 800;
+    const x = 200 + Math.sin(t * Math.PI * 4) * 80;
+    return { x, y };
+  },
+  getTangentAt(t) {
+    const delta = 0.001;
+    const p0 = this.getPointAt(Math.max(0, t - delta));
+    const p1 = this.getPointAt(Math.min(1, t + delta));
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: dx / len, y: dy / len };
+  }
+};
+
+const braidSCurve = generateBraid(sCurveBackbone, {
+  braidLength: 800,
+  frequency: 4.0,
+  redistributionFactor: 0.5
+});
+
+console.log('  S-curve braid fibers:', braidSCurve.fibers.length);
+console.log('  S-curve braid outlines:', braidSCurve.outlines.length);
+
+const validSCurve = braidSCurve.outlines.length > 0 && braidSCurve.fibers.length > 0;
+console.log('  Valid S-curve output:', validSCurve ? '✓' : '✗');
+
+if (validSCurve) {
+  console.log('  ✓ Arc-length parameterization tests passed\n');
+} else {
+  console.log('  ✗ Arc-length tests failed\n');
+  process.exit(1);
+}
+
+// Test 8: High curvature smoothing values
+console.log('Test 8: Curvature smoothing variations');
+
+const smoothingVariations = [
+  { smoothing: 1, name: 'Minimal smoothing' },
+  { smoothing: 5, name: 'Default smoothing' },
+  { smoothing: 15, name: 'Maximum smoothing' }
+];
+
+smoothingVariations.forEach(({ smoothing, name }) => {
+  const braid = generateBraid(curvedBackbone, {
+    braidLength: 600,
+    frequency: 3.0,
+    redistributionFactor: 0.6,
+    curvatureSmoothing: smoothing
+  });
+  console.log(`  ${name} (${smoothing}): ${braid.fibers.length} fibers`);
+});
+
+console.log('  ✓ Smoothing variations all generated successfully\n');
+
 console.log('✅ All tests passed!');
