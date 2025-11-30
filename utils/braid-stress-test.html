@@ -169,7 +169,7 @@
     </div>
     <div class="control-group">
       <label>View Scale <span id="scaleVal">1</span></label>
-      <input type="range" id="scale" value="1" min="0.25" max="1" step="0.05">
+      <input type="range" id="scale" value="1" min="0.25" max="2" step="0.05">
     </div>
     <details open style="background: #0f3460; padding: 10px; border-radius: 4px;">
       <summary style="cursor: pointer; font-weight: bold; color: #e94560;">End Caps & Spouts</summary>
@@ -206,6 +206,9 @@
         </div>
       </div>
     </details>
+    <div class="control-group">
+      <label><input type="checkbox" id="showDebug"> Show Debug</label>
+    </div>
     <button id="exportSvg" style="background: #0f3460;">Export SVG</button>
     <div class="stats" id="stats">Ready</div>
   </div>
@@ -624,9 +627,19 @@
 
     function buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema, params) {
       const pairs = [];
+      const { tipTaperLength = 50, braidLength, tipTaper = 0 } = params;
+
+      // Only apply safe zone if taper is significant
+      const useSafeZone = tipTaper > 0.3;
+      const safeMargin = useSafeZone ? tipTaperLength * 0.8 : 0;
 
       centerExtrema.forEach((tip) => {
         if (tip.paired) return;
+
+        // Skip extrema in taper zones - caps handle these
+        if (useSafeZone && (tip.y < safeMargin || tip.y > braidLength - safeMargin)) {
+          return;
+        }
 
         const side = tip.x >= 0 ? 'right' : 'left';
         const wallSamples = side === 'left' ? leftSamples : rightSamples;
@@ -817,52 +830,136 @@
     // End Cap and Spout Fiber Generation
     // ========================================================================
 
-    function buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, params, warpPoint) {
+    function buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, continuationPairs, params, warpPoint) {
       const fibers = [];
-      const { capFiberCount = 8, capGatherLength = 10, braidLength } = params;
+      const { capFiberCount = 8, capGatherLength = 10, braidLength, tipTaper = 0, fiberBow = 0.5 } = params;
       const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
+      // Use fiberBow to control cap fiber curvature - scale up for more dramatic effect
+      const capBowStrength = fiberBow * 80;
 
-      const leftTrough = leftExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
-      const rightTrough = rightExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
+      // Find the first continuation pair for each side (lowest y value = closest to start)
+      const leftPairs = continuationPairs.filter(p => p.side === 'left').sort((a, b) => a.wall.y - b.wall.y);
+      const rightPairs = continuationPairs.filter(p => p.side === 'right').sort((a, b) => a.wall.y - b.wall.y);
+      const firstLeftPair = leftPairs[0];
+      const firstRightPair = rightPairs[0];
 
-      const gatherStart = { x: centerSamples[0].x, y: 0 };
-      const gatherEnd = interpolateSamplesAt(centerSamples, Math.min(capGatherLength, braidLength * 0.1));
+      // When tipTaper is high, connect wall start to the first continuation rail
+      // Otherwise fall back to original gather point behavior
+      const useRailLanding = tipTaper > 0.3;
 
-      if (leftTrough) {
+      // Left side cap fibers
+      if (useRailLanding && firstLeftPair && firstLeftPair.diagRail && firstLeftPair.diagRail.length > 1) {
+        // Connect L-START to points along the first left continuation rail (diagRail from L1 to Z2)
+        const diagRail = firstLeftPair.diagRail;
+        const diagLengths = calculateArcLengths(diagRail);
+        const totalDiagLength = diagLengths[diagLengths.length - 1];
+        const originPoint = { x: leftSamples[0].x, y: 0 }; // L-START
+
         for (let i = 0; i < fibersPerSide; i++) {
           const t = (i + 0.5) / fibersPerSide;
-          const originY = leftTrough.y * (1 - t * 0.3);
-          const originPoint = interpolateSamplesAt(leftSamples, originY);
-          const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+          // Land across the full diagRail length
+          const landingParam = t;
+          const landingPoint = sampleCurveByArcLength(diagRail, diagLengths, landingParam);
+
+          // Create a smooth curve from wall start to the rail with bow
           const midPoint = lerpVector(originPoint, landingPoint, 0.5);
-          const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
-          const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+          // Outer fibers (lower t) get more bow, inner fibers (higher t) get less
+          const outernessFactor = 1 - t;
+          const bowAmount = capBowStrength * outernessFactor;
+          // Push control point toward the wall (negative x for left side)
+          const controlPoint = {
+            x: midPoint.x - bowAmount,
+            y: midPoint.y - bowAmount * 0.3  // slight upward pull
+          };
 
           const points = [];
           for (let j = 0; j <= 24; j++) {
             const pt = j / 24;
             points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
           }
-          fibers.push({ type: 'cap', side: 'left', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          fibers.push({ type: 'cap', side: 'left', points, capEnd: 'start', pairIndex: -1, targetPairIndex: 0, fiberIndex: i });
+        }
+      } else {
+        // Original behavior: connect wall trough to center gather point
+        const leftTrough = leftExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
+        const gatherStart = { x: centerSamples[0].x, y: 0 };
+        const gatherEnd = interpolateSamplesAt(centerSamples, Math.min(capGatherLength, braidLength * 0.1));
+
+        if (leftTrough) {
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const originY = leftTrough.y * (1 - t * 0.3);
+            const originPoint = interpolateSamplesAt(leftSamples, originY);
+            const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+            const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+            const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
+            const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'left', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          }
         }
       }
 
-      if (rightTrough) {
+      // Right side cap fibers
+      if (useRailLanding && firstRightPair && firstRightPair.diagRail && firstRightPair.diagRail.length > 1) {
+        // Connect R-START to points along the first right continuation rail
+        const diagRail = firstRightPair.diagRail;
+        const diagLengths = calculateArcLengths(diagRail);
+        const totalDiagLength = diagLengths[diagLengths.length - 1];
+        const originPoint = { x: rightSamples[0].x, y: 0 }; // R-START
+
         for (let i = 0; i < fibersPerSide; i++) {
           const t = (i + 0.5) / fibersPerSide;
-          const originY = rightTrough.y * (1 - t * 0.3);
-          const originPoint = interpolateSamplesAt(rightSamples, originY);
-          const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+          // Land across the full diagRail length
+          const landingParam = t;
+          const landingPoint = sampleCurveByArcLength(diagRail, diagLengths, landingParam);
+
+          // Create a smooth curve from wall start to the rail with bow
           const midPoint = lerpVector(originPoint, landingPoint, 0.5);
-          const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
-          const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+          // Outer fibers (lower t) get more bow, inner fibers (higher t) get less
+          const outernessFactor = 1 - t;
+          const bowAmount = capBowStrength * outernessFactor;
+          // Push control point toward the wall (positive x for right side)
+          const controlPoint = {
+            x: midPoint.x + bowAmount,
+            y: midPoint.y - bowAmount * 0.3  // slight upward pull
+          };
 
           const points = [];
           for (let j = 0; j <= 24; j++) {
             const pt = j / 24;
             points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
           }
-          fibers.push({ type: 'cap', side: 'right', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          fibers.push({ type: 'cap', side: 'right', points, capEnd: 'start', pairIndex: -1, targetPairIndex: 0, fiberIndex: i });
+        }
+      } else {
+        // Original behavior: connect wall trough to center gather point
+        const rightTrough = rightExtrema.filter(e => e.type === 'trough' && !e.claimed).sort((a, b) => a.y - b.y)[0];
+        const gatherStart = { x: centerSamples[0].x, y: 0 };
+        const gatherEnd = interpolateSamplesAt(centerSamples, Math.min(capGatherLength, braidLength * 0.1));
+
+        if (rightTrough) {
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const originY = rightTrough.y * (1 - t * 0.3);
+            const originPoint = interpolateSamplesAt(rightSamples, originY);
+            const landingPoint = lerpVector(gatherStart, gatherEnd, t);
+            const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+            const wallOffset = (originPoint.x - landingPoint.x) * 0.3;
+            const controlPoint = { x: midPoint.x + wallOffset, y: midPoint.y };
+
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'right', points, capEnd: 'start', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          }
         }
       }
 
@@ -1071,7 +1168,7 @@
       // Generate cap fibers (if enabled)
       let capFibers = [];
       if (config.enableCaps) {
-        const startCapFibers = buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, config, warpPoint);
+        const startCapFibers = buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, continuationPairs, config, warpPoint);
         const endCapFibers = buildEndCapFibers(centerExtrema, centerSamples, leftSamples, rightSamples, config, warpPoint);
         capFibers = [...startCapFibers, ...endCapFibers];
       }
@@ -1088,6 +1185,16 @@
         outlines,
         fibers: allFibers,
         fiberGroups: { main: mainFibers, caps: capFibers, spouts: spoutFibers },
+        debug: {
+          centerExtrema,
+          leftExtrema,
+          rightExtrema,
+          continuationPairs,
+          centerSamples,
+          leftSamples,
+          rightSamples,
+          config
+        },
         metadata: {
           braidLength: config.braidLength,
           fiberCount: allFibers.length,
@@ -1336,6 +1443,158 @@
           });
           ctx.stroke();
         });
+
+        // Debug visualization
+        if (document.getElementById('showDebug').checked && currentBraid.debug) {
+          const debug = currentBraid.debug;
+          const { tipTaperLength, braidLength } = debug.config;
+          const warpPoint = createWarpFunction(currentBackbone, braidLength, null, debug.config);
+
+          // Draw wall start/end points (not extrema, actual endpoints)
+          const leftStart = debug.leftSamples[0];
+          const leftEnd = debug.leftSamples[debug.leftSamples.length - 1];
+          const rightStart = debug.rightSamples[0];
+          const rightEnd = debug.rightSamples[debug.rightSamples.length - 1];
+          const centerStart = debug.centerSamples[0];
+          const centerEnd = debug.centerSamples[debug.centerSamples.length - 1];
+
+          // Left wall start/end - cyan squares
+          [{ pt: leftStart, label: 'L-START' }, { pt: leftEnd, label: 'L-END' }].forEach(({ pt, label }) => {
+            const warped = warpPoint(pt);
+            ctx.fillStyle = '#00ccff';
+            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(label, warped.x - 55, warped.y - 10);
+          });
+
+          // Right wall start/end - magenta squares
+          [{ pt: rightStart, label: 'R-START' }, { pt: rightEnd, label: 'R-END' }].forEach(({ pt, label }) => {
+            const warped = warpPoint(pt);
+            ctx.fillStyle = '#ff00cc';
+            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(label, warped.x + 10, warped.y - 10);
+          });
+
+          // Center/Zigzag start/end - yellow squares
+          [{ pt: centerStart, label: 'Z-START' }, { pt: centerEnd, label: 'Z-END' }].forEach(({ pt, label }) => {
+            const warped = warpPoint(pt);
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(label, warped.x + 10, warped.y - 10);
+          });
+
+          // Draw extrema markers
+          // Center extrema: green circles if paired, red if unpaired
+          debug.centerExtrema.forEach((e, idx) => {
+            const warped = warpPoint(e);
+            ctx.beginPath();
+            ctx.arc(warped.x, warped.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = e.paired ? '#00ff00' : '#ff0000';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            // Show red ring if in taper zone
+            if (e.y < tipTaperLength || e.y > braidLength - tipTaperLength) {
+              ctx.strokeStyle = '#ff0000';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.arc(warped.x, warped.y, 10, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            // Label with Z0, Z1, Z2... (Z for Zigzag center line)
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`Z${idx}`, warped.x + 10, warped.y - 4);
+          });
+
+          // Left wall extrema: cyan if claimed, orange if unclaimed
+          debug.leftExtrema.forEach((e, idx) => {
+            const warped = warpPoint(e);
+            ctx.beginPath();
+            ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = e.claimed ? '#00ccff' : '#ff6600';
+            ctx.fill();
+            // Label with L0, L1, L2...
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`L${idx}`, warped.x - 25, warped.y + 4);
+          });
+
+          // Right wall extrema: magenta if claimed, orange if unclaimed
+          debug.rightExtrema.forEach((e, idx) => {
+            const warped = warpPoint(e);
+            ctx.beginPath();
+            ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = e.claimed ? '#ff00cc' : '#ff6600';
+            ctx.fill();
+            // Label with R0, R1, R2...
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`R${idx}`, warped.x + 10, warped.y + 4);
+          });
+
+          // Draw origin points and landing rails for continuation pairs
+          debug.continuationPairs.forEach((pair, idx) => {
+            // Origin point (wall trough): white square
+            const wallWarped = warpPoint(pair.wall);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
+
+            // Landing point (center tip): white diamond
+            const tipWarped = warpPoint(pair.center);
+            ctx.save();
+            ctx.translate(tipWarped.x, tipWarped.y);
+            ctx.rotate(Math.PI / 4);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-4, -4, 8, 8);
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(-4, -4, 8, 8);
+            ctx.restore();
+
+            // Draw landing rail - thin purple line
+            if (pair.landingRail && pair.landingRail.length > 0) {
+              ctx.strokeStyle = 'rgba(128, 0, 255, 0.5)';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              pair.landingRail.forEach((p, i) => {
+                const wp = warpPoint(p);
+                if (i === 0) ctx.moveTo(wp.x, wp.y);
+                else ctx.lineTo(wp.x, wp.y);
+              });
+              ctx.stroke();
+            }
+          });
+
+          // Console log for debugging
+          console.log(`DEBUG tipTaper=${debug.config.tipTaper.toFixed(2)}:`, {
+            centerExtrema: debug.centerExtrema.length,
+            leftExtrema: debug.leftExtrema.length,
+            rightExtrema: debug.rightExtrema.length,
+            continuationPairs: debug.continuationPairs.length,
+            unpairedCenter: debug.centerExtrema.filter(e => !e.paired).length,
+            inTaperZone: debug.centerExtrema.filter(e =>
+              e.y < tipTaperLength || e.y > braidLength - tipTaperLength
+            ).length
+          });
+        }
       }
 
       ctx.restore();
@@ -1506,6 +1765,9 @@
     ['enableCaps', 'spoutAtStart'].forEach(id => {
       document.getElementById(id).addEventListener('change', generate);
     });
+
+    // Debug checkbox triggers re-render (not regenerate)
+    document.getElementById('showDebug').addEventListener('change', render);
 
     // Path type regenerates the backbone
     document.getElementById('pathType').addEventListener('change', generate);
