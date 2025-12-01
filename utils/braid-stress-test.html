@@ -178,8 +178,8 @@
           <label><input type="checkbox" id="enableCaps" checked> Enable Caps</label>
         </div>
         <div class="control-group">
-          <label>Cap Count <span id="capFiberCountVal">8</span></label>
-          <input type="range" id="capFiberCount" value="8" min="1" max="20" step="1">
+          <label>Cap Count <span id="capFiberCountVal">19</span></label>
+          <input type="range" id="capFiberCount" value="19" min="1" max="30" step="1">
         </div>
         <div class="control-group">
           <label>Cap Gather <span id="capGatherLengthVal">10</span></label>
@@ -205,12 +205,16 @@
           <label><input type="checkbox" id="spoutAtStart"> Spout at Start</label>
         </div>
         <div class="control-group">
-          <label>Cap Bow Angle <span id="capBowAngleVal">45</span>°</label>
-          <input type="range" id="capBowAngle" value="45" min="-180" max="180" step="5">
+          <label>Cap Bow Angle <span id="capBowAngleVal">-5</span>°</label>
+          <input type="range" id="capBowAngle" value="-5" min="-180" max="180" step="5">
         </div>
         <div class="control-group">
-          <label>Cap Landing <span id="capLandingDepthVal">0.3</span></label>
-          <input type="range" id="capLandingDepth" value="0.3" min="0" max="1" step="0.05">
+          <label>Cap Bow Strength <span id="capBowStrengthVal">1.4</span></label>
+          <input type="range" id="capBowStrength" value="1.4" min="0" max="3" step="0.1">
+        </div>
+        <div class="control-group">
+          <label>Cap Landing <span id="capLandingDepthVal">0.8</span></label>
+          <input type="range" id="capLandingDepth" value="0.8" min="0" max="1" step="0.05">
         </div>
       </div>
     </details>
@@ -887,10 +891,10 @@
 
     function buildStartCapFibers(leftExtrema, rightExtrema, centerSamples, leftSamples, rightSamples, continuationPairs, params, warpPoint, centerExtrema) {
       const fibers = [];
-      const { capFiberCount = 8, capGatherLength = 10, braidLength, tipTaper = 0, tipTaperLength = 50, fiberBow = 0.5, capBowAngle = 45, capLandingDepth = 0.3 } = params;
+      const { capFiberCount = 8, capGatherLength = 10, braidLength, tipTaper = 0, tipTaperLength = 50, fiberBow = 0.5, capBowAngle = 45, capLandingDepth = 0.3, capBowStrength: capBowStrengthParam = 1.0 } = params;
       const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
-      // Use fiberBow to control cap fiber curvature - scale up for more dramatic effect
-      const capBowStrength = fiberBow * 80;
+      // Use fiberBow as base, multiply by capBowStrength slider for more control
+      const capBowStrength = fiberBow * 80 * capBowStrengthParam;
       // Convert angle to radians for control point direction
       const angleRad = (capBowAngle * Math.PI) / 180;
 
@@ -922,14 +926,23 @@
 
           const originPoint = { x: leftSamples[0].x, y: 0 }; // L-START
 
+          // Determine which end of rail is closer to origin (for correct landing order)
+          const railStart = zigzagRail[0];
+          const railEnd = zigzagRail[zigzagRail.length - 1];
+          const distToStart = Math.hypot(railStart.x - originPoint.x, railStart.y - originPoint.y);
+          const distToEnd = Math.hypot(railEnd.x - originPoint.x, railEnd.y - originPoint.y);
+          const invertLanding = distToStart > distToEnd; // true if end is closer
+
           for (let i = 0; i < fibersPerSide; i++) {
             const t = (i + 0.5) / fibersPerSide;
-            // Invert landing order to prevent overlapping/twisting
-            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, 1 - t);
+            // Outer fibers land closer to origin, inner fibers land further
+            const landingT = invertLanding ? t : (1 - t);
+            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, landingT);
 
             // Create a smooth curve with bow using angle-based control
             const midPoint = lerpVector(originPoint, landingPoint, 0.5);
-            const outernessFactor = t; // Now matches inverted landing order
+            // All fibers get some bow, with gradient from outer to inner
+            const outernessFactor = 0.3 + 0.7 * (1 - t); // 1.0 for outer, 0.3 for inner
             const bowAmount = capBowStrength * outernessFactor;
             // Use angle for control direction, mirrored for left side (add PI)
             const controlPoint = {
@@ -990,14 +1003,23 @@
 
           const originPoint = { x: rightSamples[0].x, y: 0 }; // R-START
 
+          // Determine which end of rail is closer to origin (for correct landing order)
+          const railStart = zigzagRail[0];
+          const railEnd = zigzagRail[zigzagRail.length - 1];
+          const distToStart = Math.hypot(railStart.x - originPoint.x, railStart.y - originPoint.y);
+          const distToEnd = Math.hypot(railEnd.x - originPoint.x, railEnd.y - originPoint.y);
+          const invertLanding = distToStart > distToEnd; // true if end is closer
+
           for (let i = 0; i < fibersPerSide; i++) {
             const t = (i + 0.5) / fibersPerSide;
-            // Invert landing order to prevent overlapping/twisting
-            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, 1 - t);
+            // Outer fibers land closer to origin, inner fibers land further
+            const landingT = invertLanding ? t : (1 - t);
+            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, landingT);
 
             // Create a smooth curve with bow using angle-based control
             const midPoint = lerpVector(originPoint, landingPoint, 0.5);
-            const outernessFactor = t; // Now matches inverted landing order
+            // All fibers get some bow, with gradient from outer to inner
+            const outernessFactor = 0.3 + 0.7 * (1 - t); // 1.0 for outer, 0.3 for inner
             const bowAmount = capBowStrength * outernessFactor;
             // Use angle for control direction (no mirroring for right side)
             const controlPoint = {
@@ -1042,48 +1064,188 @@
       return fibers;
     }
 
-    function buildEndCapFibers(centerExtrema, centerSamples, leftSamples, rightSamples, params, warpPoint) {
-      const fibers = [];
-      const { capFiberCount = 8, braidLength } = params;
-      const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
+    // Select landing rail for END caps (searches from end of braid backwards)
+    function selectEndCapLandingRail(centerExtrema, braidLength, capLandingDepth, tipTaperLength) {
+      // Consider last N segments
+      const startIdx = Math.max(0, centerExtrema.length - 9);
+      const endIdx = centerExtrema.length - 1;
 
-      const lastPeak = centerExtrema.filter(e => (e.type === 'peak' || e.type === 'trough') && !e.paired).sort((a, b) => b.y - a.y)[0];
-      if (!lastPeak) return fibers;
+      // Target Y from end of braid
+      const maxY = braidLength - tipTaperLength * 0.1;  // Very shallow from end
+      const minY = braidLength - tipTaperLength * 0.9;  // Deep from end
+      const targetY = maxY - (maxY - minY) * capLandingDepth;
 
-      const leftEnd = { x: leftSamples[leftSamples.length - 1].x, y: braidLength };
-      const rightEnd = { x: rightSamples[rightSamples.length - 1].x, y: braidLength };
-      const spanToEnd = braidLength - lastPeak.y;
+      let bestIdx = endIdx - 1;
+      let bestDist = Infinity;
 
-      for (let i = 0; i < fibersPerSide; i++) {
-        const t = (i + 0.5) / fibersPerSide;
-        const originY = lastPeak.y + spanToEnd * t * 0.2;
-        const originPoint = interpolateSamplesAt(centerSamples, originY);
-        const landingPoint = lerpVector({ x: leftEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, leftEnd, t);
-        const midPoint = lerpVector(originPoint, landingPoint, 0.4);
-        const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+      for (let i = startIdx; i < endIdx; i++) {
+        const zA = centerExtrema[i];
+        const zB = centerExtrema[i + 1];
+        if (!zA || !zB) continue;
 
-        const points = [];
-        for (let j = 0; j <= 24; j++) {
-          const pt = j / 24;
-          points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+        const midY = (zA.y + zB.y) / 2;
+        const dist = Math.abs(midY - targetY);
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
         }
-        fibers.push({ type: 'cap', side: 'left', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
       }
 
-      for (let i = 0; i < fibersPerSide; i++) {
-        const t = (i + 0.5) / fibersPerSide;
-        const originY = lastPeak.y + spanToEnd * t * 0.2;
-        const originPoint = interpolateSamplesAt(centerSamples, originY);
-        const landingPoint = lerpVector({ x: rightEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, rightEnd, t);
-        const midPoint = lerpVector(originPoint, landingPoint, 0.4);
-        const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+      return bestIdx;
+    }
 
-        const points = [];
-        for (let j = 0; j <= 24; j++) {
-          const pt = j / 24;
-          points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+    function buildEndCapFibers(centerExtrema, centerSamples, leftSamples, rightSamples, params, warpPoint) {
+      const fibers = [];
+      const { capFiberCount = 8, braidLength, tipTaper = 0, tipTaperLength = 50, fiberBow = 0.5, capBowAngle = 45, capLandingDepth = 0.3, capBowStrength: capBowStrengthParam = 1.0 } = params;
+      const fibersPerSide = Math.max(1, Math.floor(capFiberCount / 2));
+      const capBowStrength = fiberBow * 80 * capBowStrengthParam;
+      // Flip angle for end caps (mirror of start)
+      const angleRad = ((capBowAngle + 180) * Math.PI) / 180;
+
+      const useZigzagLanding = tipTaper > 0.3 && centerExtrema && centerExtrema.length >= 3;
+
+      // Get dynamically selected indices for end
+      const selectedIdx = useZigzagLanding ? selectEndCapLandingRail(centerExtrema, braidLength, capLandingDepth, tipTaperLength) : centerExtrema.length - 2;
+      const lIdx = selectedIdx;
+      const rIdx = selectedIdx - 1 >= 0 ? selectedIdx - 1 : selectedIdx;
+
+      // Left side end cap fibers
+      if (useZigzagLanding && centerExtrema.length >= 2) {
+        const zA = centerExtrema[lIdx];
+        const zB = centerExtrema[lIdx + 1];
+
+        if (zA && zB) {
+          const segmentStart = zA.y;
+          const segmentEnd = zB.y;
+          const zigzagRail = [];
+          const numPoints = 20;
+          for (let k = 0; k <= numPoints; k++) {
+            const segY = segmentStart + (segmentEnd - segmentStart) * (k / numPoints);
+            zigzagRail.push(interpolateSamplesAt(centerSamples, segY));
+          }
+          const zigzagLengths = calculateArcLengths(zigzagRail);
+
+          const originPoint = { x: leftSamples[leftSamples.length - 1].x, y: braidLength }; // L-END
+
+          // Determine landing order
+          const railStart = zigzagRail[0];
+          const railEnd = zigzagRail[zigzagRail.length - 1];
+          const distToStart = Math.hypot(railStart.x - originPoint.x, railStart.y - originPoint.y);
+          const distToEnd = Math.hypot(railEnd.x - originPoint.x, railEnd.y - originPoint.y);
+          const invertLanding = distToStart > distToEnd;
+
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const landingT = invertLanding ? t : (1 - t);
+            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, landingT);
+
+            const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+            const outernessFactor = 0.3 + 0.7 * (1 - t);
+            const bowAmount = capBowStrength * outernessFactor;
+            const controlPoint = {
+              x: midPoint.x + bowAmount * Math.cos(angleRad + Math.PI),
+              y: midPoint.y + bowAmount * Math.sin(angleRad + Math.PI)
+            };
+
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'left', points, capEnd: 'end', pairIndex: -1, targetPairIndex: 0, fiberIndex: i });
+          }
         }
-        fibers.push({ type: 'cap', side: 'right', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+      } else {
+        // Fallback: simple end cap
+        const lastPeak = centerExtrema.filter(e => !e.paired).sort((a, b) => b.y - a.y)[0];
+        if (lastPeak) {
+          const leftEnd = { x: leftSamples[leftSamples.length - 1].x, y: braidLength };
+          const spanToEnd = braidLength - lastPeak.y;
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const originY = lastPeak.y + spanToEnd * t * 0.2;
+            const originPoint = interpolateSamplesAt(centerSamples, originY);
+            const landingPoint = lerpVector({ x: leftEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, leftEnd, t);
+            const midPoint = lerpVector(originPoint, landingPoint, 0.4);
+            const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'left', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          }
+        }
+      }
+
+      // Right side end cap fibers
+      if (useZigzagLanding && centerExtrema.length >= 2) {
+        const zA = centerExtrema[rIdx];
+        const zB = centerExtrema[rIdx + 1];
+
+        if (zA && zB) {
+          const segmentStart = zA.y;
+          const segmentEnd = zB.y;
+          const zigzagRail = [];
+          const numPoints = 20;
+          for (let k = 0; k <= numPoints; k++) {
+            const segY = segmentStart + (segmentEnd - segmentStart) * (k / numPoints);
+            zigzagRail.push(interpolateSamplesAt(centerSamples, segY));
+          }
+          const zigzagLengths = calculateArcLengths(zigzagRail);
+
+          const originPoint = { x: rightSamples[rightSamples.length - 1].x, y: braidLength }; // R-END
+
+          // Determine landing order
+          const railStart = zigzagRail[0];
+          const railEnd = zigzagRail[zigzagRail.length - 1];
+          const distToStart = Math.hypot(railStart.x - originPoint.x, railStart.y - originPoint.y);
+          const distToEnd = Math.hypot(railEnd.x - originPoint.x, railEnd.y - originPoint.y);
+          const invertLanding = distToStart > distToEnd;
+
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const landingT = invertLanding ? t : (1 - t);
+            const landingPoint = sampleCurveByArcLength(zigzagRail, zigzagLengths, landingT);
+
+            const midPoint = lerpVector(originPoint, landingPoint, 0.5);
+            const outernessFactor = 0.3 + 0.7 * (1 - t);
+            const bowAmount = capBowStrength * outernessFactor;
+            const controlPoint = {
+              x: midPoint.x + bowAmount * Math.cos(angleRad),
+              y: midPoint.y + bowAmount * Math.sin(angleRad)
+            };
+
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'right', points, capEnd: 'end', pairIndex: -1, targetPairIndex: 0, fiberIndex: i });
+          }
+        }
+      } else {
+        // Fallback: simple end cap
+        const lastPeak = centerExtrema.filter(e => !e.paired).sort((a, b) => b.y - a.y)[0];
+        if (lastPeak) {
+          const rightEnd = { x: rightSamples[rightSamples.length - 1].x, y: braidLength };
+          const spanToEnd = braidLength - lastPeak.y;
+          for (let i = 0; i < fibersPerSide; i++) {
+            const t = (i + 0.5) / fibersPerSide;
+            const originY = lastPeak.y + spanToEnd * t * 0.2;
+            const originPoint = interpolateSamplesAt(centerSamples, originY);
+            const landingPoint = lerpVector({ x: rightEnd.x, y: lastPeak.y + spanToEnd * 0.7 }, rightEnd, t);
+            const midPoint = lerpVector(originPoint, landingPoint, 0.4);
+            const controlPoint = { x: midPoint.x + (landingPoint.x - originPoint.x) * 0.2, y: midPoint.y + spanToEnd * 0.1 };
+            const points = [];
+            for (let j = 0; j <= 24; j++) {
+              const pt = j / 24;
+              points.push(warpPoint(quadraticPoint(originPoint, controlPoint, landingPoint, pt)));
+            }
+            fibers.push({ type: 'cap', side: 'right', points, capEnd: 'end', pairIndex: -1, targetPairIndex: -1, fiberIndex: i });
+          }
+        }
       }
 
       return fibers;
@@ -1211,6 +1373,7 @@
         capGatherLength: params.capGatherLength ?? 10,
         capBowAngle: params.capBowAngle ?? 45,
         capLandingDepth: params.capLandingDepth ?? 0.3,
+        capBowStrength: params.capBowStrength ?? 1.0,
         // Spout parameters
         spoutFiberCount: params.spoutFiberCount ?? 5,
         spoutLength: params.spoutLength ?? 50,
@@ -1738,6 +1901,7 @@
         capFiberCount: parseInt(document.getElementById('capFiberCount').value),
         capGatherLength: parseFloat(document.getElementById('capGatherLength').value),
         capBowAngle: parseFloat(document.getElementById('capBowAngle').value),
+        capBowStrength: parseFloat(document.getElementById('capBowStrength').value),
         capLandingDepth: parseFloat(document.getElementById('capLandingDepth').value),
         // Spout parameters
         spoutFiberCount: parseInt(document.getElementById('spoutFiberCount').value),
@@ -1827,7 +1991,7 @@
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
       'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias',
       // Cap and spout controls
-      'capFiberCount', 'capGatherLength', 'capBowAngle', 'capLandingDepth',
+      'capFiberCount', 'capGatherLength', 'capBowAngle', 'capBowStrength', 'capLandingDepth',
       'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity'
     ];
 
