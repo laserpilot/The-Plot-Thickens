@@ -58,6 +58,24 @@
       font-size: 12px;
       color: #888;
     }
+    .control-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      padding: 10px 15px;
+      background: rgba(15, 52, 96, 0.3);
+      border-radius: 4px;
+      align-items: flex-end;
+    }
+    .control-section-label {
+      width: 100%;
+      font-size: 10px;
+      font-weight: bold;
+      color: #e94560;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: -5px;
+    }
     .canvas-container {
       flex: 1;
       overflow: auto;
@@ -74,6 +92,7 @@
 </head>
 <body>
   <div class="controls">
+    <!-- Path Selection -->
     <div class="control-group">
       <label>Path Type</label>
       <select id="pathType">
@@ -83,99 +102,113 @@
         <option value="lissajous">Lissajous</option>
       </select>
     </div>
-    <div class="control-group">
-      <label>Zigzag Freq <span id="frequencyVal">160</span></label>
-      <input type="range" id="frequency" value="160" min="1" max="300" step="1">
+
+    <!-- Wave Pattern -->
+    <div class="control-section">
+      <span class="control-section-label">Wave Pattern</span>
+      <div class="control-group">
+        <label>Frequency <span id="frequencyVal">80</span></label>
+        <input type="range" id="frequency" value="80" min="1" max="150" step="1">
+      </div>
+      <div class="control-group">
+        <label>Zigzag Amp <span id="zigzagScaleVal">0.5</span></label>
+        <input type="range" id="zigzagScale" value="0.5" min="0.1" max="3" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>Zigzag Phase <span id="zigzagPhaseVal">0</span>°</label>
+        <input type="range" id="zigzagPhase" value="0" min="-180" max="180" step="5">
+      </div>
+      <div class="control-group">
+        <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
+        <input type="range" id="cycleJitter" value="0" min="0" max="1" step="0.05">
+      </div>
     </div>
-    <div class="control-group">
-      <label>Wall Freq <span id="wallFrequencyVal">80</span></label>
-      <input type="range" id="wallFrequency" value="80" min="1" max="300" step="1">
+
+    <!-- Wall Behavior -->
+    <div class="control-section">
+      <span class="control-section-label">Wall Behavior</span>
+      <div class="control-group">
+        <label>Wall Amp <span id="wallScaleVal">0.4</span></label>
+        <input type="range" id="wallScale" value="0.4" min="0.1" max="3" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>Wall Sep <span id="wallSeparationVal">105</span></label>
+        <input type="range" id="wallSeparation" value="105" min="20" max="200" step="5">
+      </div>
+      <div class="control-group">
+        <label>L Wall Phase <span id="leftWallPhaseVal">60</span>°</label>
+        <input type="range" id="leftWallPhase" value="60" min="-180" max="180" step="5">
+      </div>
+      <div class="control-group">
+        <label>R Wall Phase <span id="rightWallPhaseVal">160</span>°</label>
+        <input type="range" id="rightWallPhase" value="160" min="-180" max="180" step="5">
+      </div>
     </div>
-    <div class="control-group">
-      <label>Zigzag Amp <span id="zigzagScaleVal">0.5</span></label>
-      <input type="range" id="zigzagScale" value="0.5" min="0.1" max="3" step="0.1">
+
+    <!-- Fiber Shape & Count -->
+    <div class="control-section">
+      <span class="control-section-label">Fiber Shape</span>
+      <div class="control-group">
+        <label>Fiber Count <span id="fiberCountVal">8</span></label>
+        <input type="range" id="fiberCount" value="8" min="1" max="30" step="1">
+      </div>
+      <div class="control-group">
+        <label>Fiber Bow <span id="fiberBowVal">0.9</span></label>
+        <input type="range" id="fiberBow" value="0.9" min="0" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Bow Gradient <span id="bowGradientVal">2</span></label>
+        <input type="range" id="bowGradient" value="2" min="0.5" max="6" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>Fiber Bias <span id="fiberBiasVal">0.5</span></label>
+        <input type="range" id="fiberBias" value="0.5" min="0" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Fiber Landing <span id="fiberLandingVal">0</span></label>
+        <input type="range" id="fiberLanding" value="0" min="0" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Landing Spread <span id="landingSpreadVal">1</span></label>
+        <input type="range" id="landingSpread" value="1" min="0.1" max="1" step="0.05">
+      </div>
     </div>
-    <div class="control-group">
-      <label>Wall Amp <span id="wallScaleVal">0.4</span></label>
-      <input type="range" id="wallScale" value="0.4" min="0.1" max="3" step="0.1">
+
+    <!-- Curve & Advanced -->
+    <div class="control-section">
+      <span class="control-section-label">Curve & Advanced</span>
+      <div class="control-group">
+        <label>Redistribution <span id="redistributionFactorVal">0</span></label>
+        <input type="range" id="redistributionFactor" value="0" min="0" max="2" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>Curve Smooth <span id="curvatureSmoothingVal">5</span></label>
+        <input type="range" id="curvatureSmoothing" value="5" min="1" max="15" step="1">
+      </div>
+      <div class="control-group">
+        <label>Cont. Length <span id="continuationLengthVal">20</span></label>
+        <input type="range" id="continuationLength" value="20" min="1" max="50" step="1">
+      </div>
+      <div class="control-group">
+        <label>Cont. Bias <span id="continuationBiasVal">0.7</span></label>
+        <input type="range" id="continuationBias" value="0.7" min="0" max="4" step="0.05">
+      </div>
     </div>
-    <div class="control-group">
-      <label>Wall Sep <span id="wallSeparationVal">105</span></label>
-      <input type="range" id="wallSeparation" value="105" min="20" max="200" step="5">
-    </div>
-    <div class="control-group">
-      <label>L Wall Phase <span id="leftWallPhaseVal">60</span>°</label>
-      <input type="range" id="leftWallPhase" value="60" min="-180" max="180" step="5">
-    </div>
-    <div class="control-group">
-      <label>R Wall Phase <span id="rightWallPhaseVal">160</span>°</label>
-      <input type="range" id="rightWallPhase" value="160" min="-180" max="180" step="5">
-    </div>
-    <div class="control-group">
-      <label>Fiber Count <span id="fiberCountVal">8</span></label>
-      <input type="range" id="fiberCount" value="8" min="1" max="30" step="1">
-    </div>
-    <div class="control-group">
-      <label>Fiber Bow <span id="fiberBowVal">0.9</span></label>
-      <input type="range" id="fiberBow" value="0.9" min="0" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Tip Taper <span id="tipTaperVal">1</span></label>
-      <input type="range" id="tipTaper" value="1" min="0" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Taper Length <span id="tipTaperLengthVal">200</span></label>
-      <input type="range" id="tipTaperLength" value="200" min="10" max="200" step="5">
-    </div>
-    <div class="control-group">
-      <label>Redistribution <span id="redistributionFactorVal">0</span></label>
-      <input type="range" id="redistributionFactor" value="0" min="0" max="2" step="0.1">
-    </div>
-    <div class="control-group">
-      <label>Curve Smooth <span id="curvatureSmoothingVal">5</span></label>
-      <input type="range" id="curvatureSmoothing" value="5" min="1" max="15" step="1">
-    </div>
-    <div class="control-group">
-      <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
-      <input type="range" id="cycleJitter" value="0" min="0" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Zigzag Phase <span id="zigzagPhaseVal">0</span>°</label>
-      <input type="range" id="zigzagPhase" value="0" min="-180" max="180" step="5">
-    </div>
-    <div class="control-group">
-      <label>Fiber Bias <span id="fiberBiasVal">0.5</span></label>
-      <input type="range" id="fiberBias" value="0.5" min="0" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Fiber Landing <span id="fiberLandingVal">0</span></label>
-      <input type="range" id="fiberLanding" value="0" min="0" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Bow Gradient <span id="bowGradientVal">2</span></label>
-      <input type="range" id="bowGradient" value="2" min="0.5" max="6" step="0.1">
-    </div>
-    <div class="control-group">
-      <label>Landing Spread <span id="landingSpreadVal">1</span></label>
-      <input type="range" id="landingSpread" value="1" min="0.1" max="1" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>Cont. Length <span id="continuationLengthVal">20</span></label>
-      <input type="range" id="continuationLength" value="20" min="1" max="50" step="1">
-    </div>
-    <div class="control-group">
-      <label>Cont. Bias <span id="continuationBiasVal">0.7</span></label>
-      <input type="range" id="continuationBias" value="0.7" min="0" max="4" step="0.05">
-    </div>
-    <div class="control-group">
-      <label>View Scale <span id="scaleVal">1</span></label>
-      <input type="range" id="scale" value="1" min="0.25" max="2" step="0.05">
-    </div>
+
+    <!-- End Caps & Taper -->
     <details open style="background: #0f3460; padding: 10px; border-radius: 4px;">
-      <summary style="cursor: pointer; font-weight: bold; color: #e94560;">End Caps & Spouts</summary>
+      <summary style="cursor: pointer; font-weight: bold; color: #e94560;">End Caps & Taper</summary>
       <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
         <div class="control-group">
           <label><input type="checkbox" id="enableCaps" checked> Enable Caps</label>
+        </div>
+        <div class="control-group">
+          <label>Tip Taper <span id="tipTaperVal">1</span></label>
+          <input type="range" id="tipTaper" value="1" min="0" max="1" step="0.05">
+        </div>
+        <div class="control-group">
+          <label>Taper Length <span id="tipTaperLengthVal">200</span></label>
+          <input type="range" id="tipTaperLength" value="200" min="10" max="200" step="5">
         </div>
         <div class="control-group">
           <label>Cap Count <span id="capFiberCountVal">19</span></label>
@@ -185,6 +218,25 @@
           <label>Cap Gather <span id="capGatherLengthVal">10</span></label>
           <input type="range" id="capGatherLength" value="10" min="5" max="50" step="1">
         </div>
+        <div class="control-group">
+          <label>Cap Bow Angle <span id="capBowAngleVal">-5</span>°</label>
+          <input type="range" id="capBowAngle" value="-5" min="-180" max="180" step="5">
+        </div>
+        <div class="control-group">
+          <label>Cap Bow Strength <span id="capBowStrengthVal">1.4</span></label>
+          <input type="range" id="capBowStrength" value="1.4" min="0" max="3" step="0.1">
+        </div>
+        <div class="control-group">
+          <label>Cap Landing <span id="capLandingDepthVal">0.8</span></label>
+          <input type="range" id="capLandingDepth" value="0.8" min="0" max="1" step="0.05">
+        </div>
+      </div>
+    </details>
+
+    <!-- Spouts -->
+    <details style="background: #0f3460; padding: 10px; border-radius: 4px;">
+      <summary style="cursor: pointer; font-weight: bold; color: #e94560;">Spouts</summary>
+      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
         <div class="control-group">
           <label>Spout Count <span id="spoutFiberCountVal">5</span></label>
           <input type="range" id="spoutFiberCount" value="5" min="0" max="15" step="1">
@@ -204,24 +256,22 @@
         <div class="control-group">
           <label><input type="checkbox" id="spoutAtStart"> Spout at Start</label>
         </div>
-        <div class="control-group">
-          <label>Cap Bow Angle <span id="capBowAngleVal">-5</span>°</label>
-          <input type="range" id="capBowAngle" value="-5" min="-180" max="180" step="5">
-        </div>
-        <div class="control-group">
-          <label>Cap Bow Strength <span id="capBowStrengthVal">1.4</span></label>
-          <input type="range" id="capBowStrength" value="1.4" min="0" max="3" step="0.1">
-        </div>
-        <div class="control-group">
-          <label>Cap Landing <span id="capLandingDepthVal">0.8</span></label>
-          <input type="range" id="capLandingDepth" value="0.8" min="0" max="1" step="0.05">
-        </div>
       </div>
     </details>
-    <div class="control-group">
-      <label><input type="checkbox" id="showDebug"> Show Debug</label>
+
+    <!-- Display -->
+    <div class="control-section">
+      <span class="control-section-label">Display</span>
+      <div class="control-group">
+        <label>View Scale <span id="scaleVal">1</span></label>
+        <input type="range" id="scale" value="1" min="0.25" max="2" step="0.05">
+      </div>
+      <div class="control-group">
+        <label><input type="checkbox" id="showDebug"> Show Debug</label>
+      </div>
+      <button id="exportSvg" style="background: #0f3460;">Export SVG</button>
     </div>
-    <button id="exportSvg" style="background: #0f3460;">Export SVG</button>
+
     <div class="stats" id="stats">Ready</div>
   </div>
   <div class="canvas-container">
@@ -336,28 +386,43 @@
       const { frequency, cycleJitter, zigzagPhase = 0 } = params;
       const phaseRad = (zigzagPhase * Math.PI) / 180;
 
-      const cycles = frequency;
-      const t = (y / params.braidLength) * cycles * Math.PI + phaseRad;
-      let wave = triangleWave(t);
-
-      // Apply amplitude jitter per cycle (makes links taller/shorter without discontinuities)
+      // Apply frequency jitter - varies wavelength along braid (makes some cycles wider/narrower)
       if (cycleJitter > 0) {
-        const cyclePos = (y / params.braidLength) * frequency;
-        const cycleIndex = Math.floor(cyclePos);
-        const cycleFrac = cyclePos - cycleIndex;
+        // Walk through cycles with variable widths, accumulating position
+        const targetPos = y / params.braidLength;  // 0-1 along braid
+        let currentPos = 0;
+        let accumulatedPhase = 0;
+        let cycleIndex = 0;
 
-        // Get amplitude scale for current and next cycle (range: 1-jitter to 1+jitter)
-        const jitter0 = 1 + cycleRandom(cycleIndex) * cycleJitter * 0.3;
-        const jitter1 = 1 + cycleRandom(cycleIndex + 1) * cycleJitter * 0.3;
+        while (currentPos < targetPos && cycleIndex < frequency * 2) {
+          // Each cycle has its own width multiplier (some wider, some narrower)
+          const jitterAmount = cycleRandom(cycleIndex) * cycleJitter * 0.4;
+          const cycleWidthMult = 1 + jitterAmount;  // Range: 0.6 to 1.4 at max jitter
+          const baseCycleWidth = 1 / frequency;
+          const thisCycleWidth = baseCycleWidth * cycleWidthMult;
+          const cycleEnd = currentPos + thisCycleWidth;
 
-        // Smooth interpolation at cycle boundaries
-        const smoothT = cycleFrac * cycleFrac * (3 - 2 * cycleFrac);
-        const ampScale = jitter0 + (jitter1 - jitter0) * smoothT;
+          if (targetPos >= cycleEnd) {
+            // Fully past this cycle
+            accumulatedPhase += Math.PI;
+            currentPos = cycleEnd;
+            cycleIndex++;
+          } else {
+            // Within this cycle - interpolate
+            const progressInCycle = (targetPos - currentPos) / thisCycleWidth;
+            accumulatedPhase += progressInCycle * Math.PI;
+            break;
+          }
+        }
 
-        wave *= ampScale;
+        const t = accumulatedPhase + phaseRad;
+        return triangleWave(t);
       }
 
-      return wave;
+      // No jitter - use simple linear progression
+      const cycles = frequency;
+      const t = (y / params.braidLength) * cycles * Math.PI + phaseRad;
+      return triangleWave(t);
     }
 
     function bounceWave(angle, phase, bounceFreq) {
@@ -409,12 +474,50 @@
     }
 
     function generateWallX(phaseY, actualY, side, params) {
-      const { leftWallPhase = 0, rightWallPhase = 0, wallScale, wallSeparation = 100, wallFrequency, frequency } = params;
-      // Wall uses its own frequency, independent of zigzag
+      const { leftWallPhase = 0, rightWallPhase = 0, wallScale, wallSeparation = 100, wallFrequency, frequency, cycleJitter = 0 } = params;
+      // Wall uses its own frequency
       const wFreq = wallFrequency ?? frequency;
-      const angle = (phaseY / params.braidLength) * wFreq * Math.PI;
       const sidePhase = side === 'left' ? leftWallPhase : rightWallPhase;
       const phase = (sidePhase * Math.PI) / 180;
+
+      let angle;
+      if (cycleJitter > 0) {
+        // Apply aligned frequency jitter - wall cycles align with zigzag cycle pairs
+        // Since zigzag = 2x wall freq, each wall cycle spans 2 zigzag cycles
+        // Use same jitter pattern as zigzag but mapped to wall cycles
+        const targetPos = phaseY / params.braidLength;
+        let currentPos = 0;
+        let accumulatedAngle = 0;
+        let wallCycleIndex = 0;
+
+        while (currentPos < targetPos && wallCycleIndex < wFreq * 2) {
+          // Each wall cycle corresponds to zigzag cycles (wallCycleIndex * 2) and (wallCycleIndex * 2 + 1)
+          // Average their jitter to get wall cycle width
+          const zigzagIdx1 = wallCycleIndex * 2;
+          const zigzagIdx2 = wallCycleIndex * 2 + 1;
+          const jitter1 = cycleRandom(zigzagIdx1) * cycleJitter * 0.4;
+          const jitter2 = cycleRandom(zigzagIdx2) * cycleJitter * 0.4;
+          const avgJitter = (jitter1 + jitter2) / 2;
+          const cycleWidthMult = 1 + avgJitter;
+          const baseCycleWidth = 1 / wFreq;
+          const thisCycleWidth = baseCycleWidth * cycleWidthMult;
+          const cycleEnd = currentPos + thisCycleWidth;
+
+          if (targetPos >= cycleEnd) {
+            accumulatedAngle += Math.PI;
+            currentPos = cycleEnd;
+            wallCycleIndex++;
+          } else {
+            const progressInCycle = (targetPos - currentPos) / thisCycleWidth;
+            accumulatedAngle += progressInCycle * Math.PI;
+            break;
+          }
+        }
+        angle = accumulatedAngle;
+      } else {
+        angle = (phaseY / params.braidLength) * wFreq * Math.PI;
+      }
+
       // bounceFreq=1 since we now have explicit wall frequency control
       const envelope = bounceWave(angle, phase, 1);
       const amplitude = BASE_WALL_WIDTH * wallScale;
@@ -885,7 +988,6 @@
         }
       }
 
-      console.log(`Cap Landing: depth=${capLandingDepth.toFixed(2)}, targetY=${targetY.toFixed(0)}, selected=Z${bestIdx} (R→Z${bestIdx}-Z${bestIdx+1}, L→Z${bestIdx+1}-Z${bestIdx+2})`);
       return bestIdx;
     }
 
@@ -1864,8 +1966,9 @@
 
       currentBackbone = createBackboneFromPoints(pathPoints);
 
-      const frequency = parseFloat(document.getElementById('frequency').value);
-      const wallFrequency = parseFloat(document.getElementById('wallFrequency').value);
+      // Single frequency slider represents wall frequency; zigzag = 2x wall
+      const wallFrequency = parseFloat(document.getElementById('frequency').value);
+      const frequency = wallFrequency * 2;  // Zigzag frequency is always 2x wall
       const braidLength = currentBackbone.totalLength;
 
       // Adaptive sample spacing: use the HIGHER of the two frequencies
@@ -1913,7 +2016,6 @@
         sampleSpacing
       };
 
-      console.log('Generate params capLandingDepth:', params.capLandingDepth);
       currentBraid = generateBraid(currentBackbone, params);
 
       const elapsed = (performance.now() - startTime).toFixed(1);
@@ -1984,7 +2086,7 @@
 
     // Event listeners - live update on all controls
     const controls = [
-      'frequency', 'wallFrequency', 'zigzagScale', 'wallScale', 'wallSeparation',
+      'frequency', 'zigzagScale', 'wallScale', 'wallSeparation',
       'leftWallPhase', 'rightWallPhase',
       'fiberCount', 'fiberBow', 'tipTaper', 'tipTaperLength',
       'redistributionFactor', 'curvatureSmoothing',
