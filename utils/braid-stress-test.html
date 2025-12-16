@@ -100,6 +100,7 @@
         <option value="spiral">Spiral</option>
         <option value="zigzag">Zigzag</option>
         <option value="lissajous">Lissajous</option>
+        <option value="vshape">V-Shape (Debug)</option>
       </select>
     </div>
 
@@ -733,11 +734,178 @@
           adjustedX = remapped * halfWidth;
         }
 
+        // Reduce wall wave amplitude and clamp on inside of tight curves
+        if (curvatureSamples) {
+          const curvature = getCurvatureAt(curvatureSamples, t);
+
+          if (curvature !== 0) {
+            const radius = 1 / Math.abs(curvature);
+            const isWallPoint = Math.abs(adjustedX) > 30;
+
+            // Reduce wall wave amplitude ONLY on the inside of tight curves
+            if (isWallPoint) {
+              const baseOffset = (wallSeparation || 100) / 2;
+              const sign = adjustedX > 0 ? 1 : -1;
+              const expectedBase = sign * baseOffset;
+              const waveComponent = adjustedX - expectedBase;
+
+              // Determine if this wall is on the inside of the curve
+              // In screen coords (Y down): curvature > 0 = counterclockwise = curving LEFT
+              // curvature > 0 means curving left, so right wall (adjustedX > 0) is inside
+              // curvature < 0 means curving right, so left wall (adjustedX < 0) is inside
+              const isOnInside = (curvature > 0 && adjustedX > 0) || (curvature < 0 && adjustedX < 0);
+
+              // For tight curves, reduce wave amplitude on inside wall only
+              const threshold = baseOffset * 3;
+              let scaleFactor = 1;
+              if (isOnInside && radius < threshold) {
+                // More aggressive: linear scale but clamp harder at small radii
+                scaleFactor = Math.max(0, (radius - baseOffset) / (threshold - baseOffset));
+                // Apply quartic for very aggressive reduction on inside
+                scaleFactor = scaleFactor * scaleFactor * scaleFactor * scaleFactor;
+
+                // Also pull the wall inward toward backbone for very tight curves
+                // This prevents the inside wall from extending too far
+                const shrinkThreshold = baseOffset * 2.2; // ~115.5 for baseOffset 52.5
+                if (radius < shrinkThreshold) {
+                  // Shrink the base offset itself when radius is tight
+                  // At radius = baseOffset, shrinkFactor = 0 (wall on backbone)
+                  // At radius = shrinkThreshold, shrinkFactor = 1 (full offset)
+                  const shrinkFactor = Math.max(0, (radius - baseOffset) / (shrinkThreshold - baseOffset));
+                  const shrunkBase = expectedBase * shrinkFactor;
+                  adjustedX = shrunkBase + waveComponent * scaleFactor;
+                } else {
+                  adjustedX = expectedBase + waveComponent * scaleFactor;
+                }
+
+                // Debug: log wave reduction for inside wall (focus on tight curves)
+                if (!window.waveDebugCount) window.waveDebugCount = 0;
+                if (window.waveDebugCount < 20 && radius < shrinkThreshold) {
+                  const shrinkFactor = Math.max(0, (radius - baseOffset) / (shrinkThreshold - baseOffset));
+                  console.log(`[WAVE DEBUG] INSIDE TIGHT: radius=${radius.toFixed(1)}, shrinkFactor=${shrinkFactor.toFixed(3)}, waveScale=${scaleFactor.toFixed(4)}, adjustedX=${adjustedX.toFixed(1)}`);
+                  window.waveDebugCount++;
+                }
+              } else {
+                adjustedX = expectedBase + waveComponent;
+              }
+            }
+
+            // Also apply hard clamp as safety net on inside wall
+            // curvature > 0 = curving left, inside is positive X (right wall)
+            // curvature < 0 = curving right, inside is negative X (left wall)
+            const maxOffset = radius * 0.85;
+            if (curvature > 0 && adjustedX > 0) {
+              adjustedX = Math.min(adjustedX, maxOffset);
+            } else if (curvature < 0 && adjustedX < 0) {
+              adjustedX = Math.max(adjustedX, -maxOffset);
+            }
+          }
+        } else {
+          // DEBUG: Log if curvatureSamples is missing
+          if (!window.noSamplesLogged) {
+            console.log('[CLAMP DEBUG] No curvatureSamples in warp function');
+            window.noSamplesLogged = true;
+          }
+        }
+
         return {
           x: base.x + adjustedX * normal.x,
           y: base.y + adjustedX * normal.y
         };
       };
+    }
+
+    // Remove points that cause the path to fold back on itself
+    // This happens when wall points bunch up on the inside of tight curves
+    function removeFoldedPoints(points, minSpacing = 15) {
+      if (points.length < 3) return points;
+
+      const result = [points[0]];
+      let removedCount = 0;
+
+      // Track cumulative turn angle to detect fold regions
+      let cumulativeAngle = 0;
+      let lastAngle = null;
+
+      for (let i = 1; i < points.length - 1; i++) {
+        const prev = result[result.length - 1];
+        const curr = points[i];
+        const next = points[i + 1];
+
+        // Vector from prev to curr
+        const v1x = curr.x - prev.x;
+        const v1y = curr.y - prev.y;
+        const len1 = Math.sqrt(v1x * v1x + v1y * v1y);
+
+        // Skip if current point is too close to previous (bunched)
+        if (len1 < minSpacing) {
+          removedCount++;
+          continue;
+        }
+
+        // Vector from curr to next
+        const v2x = next.x - curr.x;
+        const v2y = next.y - curr.y;
+        const len2 = Math.sqrt(v2x * v2x + v2y * v2y);
+
+        // Check if path is turning sharply back
+        if (len1 > 0.1 && len2 > 0.1) {
+          const dot = v1x * v2x + v1y * v2y;
+          const cross = v1x * v2y - v1y * v2x;
+
+          // Calculate angle of turn
+          const angle = Math.atan2(cross, dot);
+
+          // Track cumulative angle in one direction
+          if (lastAngle !== null) {
+            // If turn continues in same direction, accumulate
+            if ((angle > 0 && lastAngle > 0) || (angle < 0 && lastAngle < 0)) {
+              cumulativeAngle += angle;
+            } else {
+              // Direction changed, reset
+              cumulativeAngle = angle;
+            }
+          } else {
+            cumulativeAngle = angle;
+          }
+          lastAngle = angle;
+
+          // If we've accumulated more than 120 degrees of turn, we're likely in a fold
+          if (Math.abs(cumulativeAngle) > Math.PI * 0.67) {
+            removedCount++;
+            cumulativeAngle = 0; // Reset after detecting fold
+            continue;
+          }
+
+          // If dot product is negative, vectors are pointing in opposite-ish directions
+          if (dot < 0) {
+            removedCount++;
+            continue;
+          }
+
+          // Also check for very tight cusps
+          const crossMag = Math.abs(cross);
+          if (crossMag > len1 * len2 * 0.8 && dot < len1 * len2 * 0.6) {
+            removedCount++;
+            continue;
+          }
+        }
+
+        result.push(curr);
+        // Reset cumulative angle when we accept a point
+        if (Math.abs(cumulativeAngle) < Math.PI * 0.3) {
+          cumulativeAngle = 0;
+        }
+      }
+
+      // Always include last point
+      result.push(points[points.length - 1]);
+
+      if (removedCount > 0) {
+        console.log(`[FOLD DEBUG] removeFoldedPoints: removed ${removedCount} of ${points.length} points`);
+      }
+
+      return result;
     }
 
     function buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema, params) {
@@ -879,7 +1047,7 @@
       });
     }
 
-    function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params) {
+    function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params, curvatureSamples = null) {
       const curves = [];
       const spacing = Math.max(1, params.fiberSpacing || 8);
       const totalFibers = params.fiberCount ? Math.max(1, Math.round(params.fiberCount)) : Math.max(3, Math.floor(spacing));
@@ -907,7 +1075,52 @@
         if (diagTotalLength < minLength || landingTotalLength < minLength) return;
 
         const maxFibersByLength = Math.floor(diagTotalLength / spacing);
-        const effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+        let effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+
+        // Scale down fiber count based on curvature compression
+        const originalFiberCount = effectiveFiberCount;
+        if (curvatureSamples && diagRail.length > 0) {
+          const braidLength = params.braidLength || 500;
+          const wallSeparation = params.wallSeparation || 100;
+
+          const pairY = diagRail[0].y;
+          const backboneT = clamp(pairY / braidLength, 0, 1);
+          const curvature = getCurvatureAt(curvatureSamples, backboneT);
+
+          if (curvature !== 0) {
+            // curvature > 0 = curving left, so right wall is inside
+            // curvature < 0 = curving right, so left wall is inside
+            const isOnInside = (curvature > 0 && pair.side === 'right') ||
+                               (curvature < 0 && pair.side === 'left');
+
+            if (isOnInside) {
+              const radius = 1 / Math.abs(curvature);
+              const halfWidth = wallSeparation / 2;
+              const compressionRatio = Math.max(0.2, (radius - halfWidth) / radius);
+              effectiveFiberCount = Math.max(1, Math.round(effectiveFiberCount * compressionRatio));
+
+              // DEBUG: Log tight curves where radius < 2x wallSeparation (potential fold-over zones)
+              if (radius < wallSeparation * 2) {
+                console.log(`[TIGHT CURVE] Pair ${pair.sideIndex} (${pair.side}):`, {
+                  pairY: pairY.toFixed(1),
+                  curvature: curvature.toFixed(6),
+                  radius: radius.toFixed(1),
+                  wallSep: wallSeparation,
+                  halfWidth: halfWidth.toFixed(1),
+                  isOnInside,
+                  compressionRatio: compressionRatio.toFixed(3),
+                  originalCount: originalFiberCount,
+                  reducedCount: effectiveFiberCount,
+                  FOLDOVER: radius < halfWidth ? '⚠️ YES' : 'no'
+                });
+              }
+            }
+          }
+        } else {
+          if (pair.sideIndex === 0) {
+            console.log('[COMPRESSION] curvatureSamples:', curvatureSamples ? 'EXISTS' : 'NULL');
+          }
+        }
 
         for (let i = 0; i < effectiveFiberCount; i++) {
           let fiberParam = (i + 1) / (effectiveFiberCount + 1);
@@ -1437,8 +1650,8 @@
       // Compute backbone arc lengths for frequency adjustment
       const arcLengths = backbone ? computeBackboneArcLengths(backbone) : null;
 
-      // Compute smoothed curvature for redistribution
-      const curvatureSamples = (backbone && redistributionFactor > 0)
+      // Compute smoothed curvature for redistribution and compression
+      const curvatureSamples = backbone
         ? computeBackboneCurvature(backbone, params.braidLength ?? 800, 100, curvatureSmoothing)
         : null;
 
@@ -1494,14 +1707,15 @@
 
       const continuationPairs = buildContinuationPairs(leftSamples, rightSamples, centerSamples, centerExtrema, leftExtrema, rightExtrema, config);
       assignSideOrdering(continuationPairs);
-      const fiberCurves = buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, config);
+      const fiberCurves = buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, config, curvatureSamples);
 
       const warpPoint = createWarpFunction(backbone, config.braidLength, curvatureSamples, config);
 
       const outlines = [];
       outlines.push({ side: 'center', type: 'zigzag', points: centerSamples.map(warpPoint), index: 0 });
-      outlines.push({ side: 'left', type: 'wall', points: leftSamples.map(warpPoint), index: 1 });
-      outlines.push({ side: 'right', type: 'wall', points: rightSamples.map(warpPoint), index: 2 });
+      // Apply fold removal to wall outlines to prevent fold-over on tight curves
+      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftSamples.map(warpPoint)), index: 1 });
+      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightSamples.map(warpPoint)), index: 2 });
       continuationPairs.forEach((pair, idx) => {
         outlines.push({ side: pair.side, type: 'continuation', points: pair.diagRail.map(warpPoint), index: idx + 3 });
       });
@@ -1658,6 +1872,73 @@
         points.push({
           x: centerX + Math.sin(a * t) * amplitudeX,
           y: centerY + Math.sin(b * t + Math.PI / 4) * amplitudeY
+        });
+      }
+
+      return points;
+    }
+
+    // Simple L-shape path for debugging fold-over issues
+    // Creates a single 90-degree turn with a rounded corner
+    function generateVShapePath(width, height, margin) {
+      const points = [];
+      const centerX = width / 2;
+      const centerY = height / 2;
+
+      // L-shape: vertical line going down, then 90° turn right, then horizontal line
+      const legLength = 600; // Length of each leg
+      const turnRadius = 200; // Radius of the curved corner - must be > wallSeparation/2 for inside wall to exist
+
+      // Starting point at top-center
+      const startX = centerX;
+      const startY = margin + 200;
+
+      // Corner is at center of page
+      const cornerX = centerX;
+      const cornerY = centerY;
+
+      // End point to the right
+      const endX = centerX + legLength;
+      const endY = centerY;
+
+      // First leg: straight vertical line going down (before the turn)
+      const straightPoints1 = 40;
+      for (let i = 0; i <= straightPoints1; i++) {
+        const t = i / straightPoints1;
+        points.push({
+          x: startX,
+          y: startY + (cornerY - turnRadius - startY) * t
+        });
+      }
+
+      // Curved 90-degree turn (quarter circle)
+      // Going from pointing down (angle = PI/2) to pointing right (angle = 0)
+      // Center of turn arc is at (cornerX + turnRadius, cornerY - turnRadius)
+      const turnPoints = 30;
+      const turnCenterX = cornerX + turnRadius;
+      const turnCenterY = cornerY - turnRadius;
+
+      for (let i = 0; i <= turnPoints; i++) {
+        const t = i / turnPoints;
+        // Start at angle PI (left side of circle, pointing down)
+        // End at angle PI/2 (bottom of circle, pointing right)
+        const angle = Math.PI - t * (Math.PI / 2);
+        points.push({
+          x: turnCenterX + Math.cos(angle) * turnRadius,
+          y: turnCenterY + Math.sin(angle) * turnRadius
+        });
+      }
+
+      // Second leg: straight horizontal line going right (after the turn)
+      const straightPoints2 = 40;
+      const turnEndX = cornerX + turnRadius;
+      const turnEndY = cornerY;
+
+      for (let i = 1; i <= straightPoints2; i++) {
+        const t = i / straightPoints2;
+        points.push({
+          x: turnEndX + (endX - turnEndX) * t,
+          y: turnEndY
         });
       }
 
@@ -1927,16 +2208,16 @@
           });
 
           // Console log for debugging
-          console.log(`DEBUG tipTaper=${debug.config.tipTaper.toFixed(2)}:`, {
-            centerExtrema: debug.centerExtrema.length,
-            leftExtrema: debug.leftExtrema.length,
-            rightExtrema: debug.rightExtrema.length,
-            continuationPairs: debug.continuationPairs.length,
-            unpairedCenter: debug.centerExtrema.filter(e => !e.paired).length,
-            inTaperZone: debug.centerExtrema.filter(e =>
-              e.y < tipTaperLength || e.y > braidLength - tipTaperLength
-            ).length
-          });
+          // console.log(`DEBUG tipTaper=${debug.config.tipTaper.toFixed(2)}:`, {
+          //   centerExtrema: debug.centerExtrema.length,
+          //   leftExtrema: debug.leftExtrema.length,
+          //   rightExtrema: debug.rightExtrema.length,
+          //   continuationPairs: debug.continuationPairs.length,
+          //   unpairedCenter: debug.centerExtrema.filter(e => !e.paired).length,
+          //   inTaperZone: debug.centerExtrema.filter(e =>
+          //     e.y < tipTaperLength || e.y > braidLength - tipTaperLength
+          //   ).length
+          // });
         }
       }
 
@@ -1959,6 +2240,17 @@
           break;
         case 'lissajous':
           pathPoints = generateLissajousPath(A3_WIDTH, A3_HEIGHT, margin);
+          break;
+        case 'vshape':
+          pathPoints = generateVShapePath(A3_WIDTH, A3_HEIGHT, margin);
+          // L-shape works better with lower frequency - set to 14 if higher
+          {
+            const freqSlider = document.getElementById('frequency');
+            if (parseFloat(freqSlider.value) > 20) {
+              freqSlider.value = 14;
+              document.getElementById('frequencyVal').textContent = '14';
+            }
+          }
           break;
         default:
           pathPoints = generateMeanderingPath(A3_WIDTH, A3_HEIGHT, margin);

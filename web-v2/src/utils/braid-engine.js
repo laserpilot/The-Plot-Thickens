@@ -208,6 +208,40 @@ function getCurvatureAt(curvatureSamples, t) {
 }
 
 /**
+ * Calculate compression factor for a point based on curvature
+ * Returns a value 0-1 where lower values mean more compression (fewer samples needed)
+ * @param {number} x - X coordinate (negative = left, positive = right)
+ * @param {number} curvature - Local curvature (positive = left turn, negative = right turn)
+ * @param {number} wallSeparation - Width of the braid
+ */
+function getCompressionFactor(x, curvature, wallSeparation) {
+  if (curvature === 0) return 1; // No compression on straight sections
+
+  const radius = 1 / Math.abs(curvature);
+  const halfWidth = wallSeparation / 2;
+
+  // Determine if this point is on the inside of the curve
+  // In screen coords (Y down): curvature > 0 = curving left, curvature < 0 = curving right
+  // curvature > 0 (left turn) → right side (x > 0) is inside
+  // curvature < 0 (right turn) → left side (x < 0) is inside
+  const isInside = (curvature > 0 && x > 0) || (curvature < 0 && x < 0);
+
+  if (!isInside) return 1; // Outside of curve - no compression
+
+  // How far from center as a ratio of half-width
+  const distanceRatio = Math.abs(x) / halfWidth;
+
+  // How much the inner arc compresses relative to the centerline
+  // Inner arc length = (radius - offset) * angle, centerline = radius * angle
+  // Ratio = (radius - offset) / radius = 1 - offset/radius
+  const offset = Math.abs(x);
+  const compressionRatio = Math.max(0.1, 1 - offset / radius);
+
+  // Blend based on how far from center (center has no compression)
+  return 1 - (1 - compressionRatio) * distanceRatio;
+}
+
+/**
  * Redistribute strand positions to bias toward curve inside
  * @param {number} x_norm - Normalized x coordinate (-1 to 1)
  * @param {number} shift - Shift amount (-1 to 1), negative = bias left
@@ -461,6 +495,24 @@ function createWarpFunction(backbone, braidLength, curvatureSamples = null, para
       adjustedX = remapped * halfWidth;
     }
 
+    // Directional curvature clamp to prevent fold-over on tight curves
+    if (curvatureSamples) {
+      const curvature = getCurvatureAt(curvatureSamples, t);
+      if (curvature !== 0) {
+        const radius = 1 / Math.abs(curvature);
+        const maxOffset = radius * 0.85; // safety margin
+
+        // Only clamp the INSIDE of the curve
+        if (curvature > 0 && adjustedX < 0) {
+          // Left turn: negative X is inside
+          adjustedX = Math.max(adjustedX, -maxOffset);
+        } else if (curvature < 0 && adjustedX > 0) {
+          // Right turn: positive X is inside
+          adjustedX = Math.min(adjustedX, maxOffset);
+        }
+      }
+    }
+
     return {
       x: base.x + adjustedX * normal.x,
       y: base.y + adjustedX * normal.y
@@ -625,7 +677,7 @@ function assignSideOrdering(continuationPairs) {
 // Fiber Generation
 // ============================================================================
 
-function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params) {
+function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSamples, params, curvatureSamples = null) {
   const curves = [];
   const spacing = Math.max(1, params.fiberSpacing || 8);
   const totalFibers = params.fiberCount
@@ -662,7 +714,61 @@ function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSa
 
     // Calculate proportional fiber count
     const maxFibersByLength = Math.floor(diagTotalLength / spacing);
-    const effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+    let effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+
+    // Scale down fiber count based on curvature compression
+    // If this pair is on the inside of a tight curve, reduce fiber count
+    const originalFiberCount = effectiveFiberCount;
+    if (curvatureSamples && diagRail.length > 0) {
+      const braidLength = params.braidLength || 500;
+      const wallSeparation = params.wallSeparation || 100;
+
+      // Get the Y range of this continuation pair
+      const pairY = diagRail[0].y; // Use start of diagonal rail
+      const backboneT = clamp(pairY / braidLength, 0, 1);
+      const curvature = getCurvatureAt(curvatureSamples, backboneT);
+
+      if (curvature !== 0) {
+        // Determine if this pair is on the inside of the curve
+        // pair.side tells us which wall this continuation goes to
+        // curvature > 0 = curving left → right wall is inside
+        // curvature < 0 = curving right → left wall is inside
+        const isOnInside = (curvature > 0 && pair.side === 'right') ||
+                           (curvature < 0 && pair.side === 'left');
+
+        if (isOnInside) {
+          const radius = 1 / Math.abs(curvature);
+          const halfWidth = wallSeparation / 2;
+
+          // Calculate compression ratio: how much the inner arc shrinks
+          // Inner arc = (radius - offset) / radius
+          const compressionRatio = Math.max(0.2, (radius - halfWidth) / radius);
+
+          // Scale fiber count by compression ratio
+          effectiveFiberCount = Math.max(1, Math.round(effectiveFiberCount * compressionRatio));
+
+          // DEBUG: Log compression details for first few pairs
+          if (pair.sideIndex < 3) {
+            console.log(`[COMPRESSION DEBUG] Pair ${pair.sideIndex} (${pair.side}):`, {
+              pairY: pairY.toFixed(1),
+              curvature: curvature.toFixed(6),
+              radius: radius.toFixed(1),
+              wallSep: wallSeparation,
+              halfWidth: halfWidth.toFixed(1),
+              isOnInside,
+              compressionRatio: compressionRatio.toFixed(3),
+              originalCount: originalFiberCount,
+              reducedCount: effectiveFiberCount
+            });
+          }
+        }
+      }
+    } else {
+      // DEBUG: Log when curvatureSamples is missing
+      if (pair.sideIndex === 0) {
+        console.log('[COMPRESSION DEBUG] curvatureSamples:', curvatureSamples ? 'EXISTS' : 'NULL');
+      }
+    }
 
     for (let i = 0; i < effectiveFiberCount; i++) {
       let fiberParam = (i + 1) / (effectiveFiberCount + 1);
@@ -709,12 +815,34 @@ function buildFiberCurves(continuationPairs, leftSamples, rightSamples, centerSa
         y: midStraight.y + toWall.y * controlPointDistance
       };
 
-      // Generate bezier curve points
+      // Generate bezier curve points with curvature-aware sampling
       const points = [];
       const segmentCount = 24;
+      const braidLength = params.braidLength || 500;
+      const wallSeparation = params.wallSeparation || 100;
+
       for (let j = 0; j <= segmentCount; j++) {
         const t = j / segmentCount;
         const point = quadraticPoint(originPoint, controlPoint, landingPoint, t);
+
+        // Check if this point should be included based on curvature compression
+        if (curvatureSamples && j > 0 && j < segmentCount) {
+          const backboneT = clamp(point.y / braidLength, 0, 1);
+          const curvature = getCurvatureAt(curvatureSamples, backboneT);
+          const compression = getCompressionFactor(point.x, curvature, wallSeparation);
+
+          // Skip points in heavily compressed regions, but keep minimum density
+          // compression < 0.5 means significant compression
+          // Use modulo to keep every Nth point based on compression level
+          if (compression < 0.5) {
+            const skipFactor = Math.floor(1 / compression); // e.g., compression 0.25 -> skip 3 of every 4
+            const keepEvery = Math.max(2, Math.min(4, skipFactor)); // Keep at least every 4th, at most every 2nd
+            if (j % keepEvery !== 0) {
+              continue; // Skip this point
+            }
+          }
+        }
+
         points.push(point);
       }
 
@@ -1197,7 +1325,8 @@ export function generateBraid(backbone, params) {
     leftSamples,
     rightSamples,
     centerSamples,
-    config
+    config,
+    curvatureSamples
   );
 
   // Create warp function (with curvature-aware redistribution)
