@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Braid Stress Test - A3 Long Path</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #1a1a2e;
@@ -13,6 +19,7 @@
       display: flex;
       flex-direction: column;
     }
+
     .controls {
       padding: 15px;
       background: #16213e;
@@ -21,16 +28,19 @@
       flex-wrap: wrap;
       align-items: center;
     }
+
     .control-group {
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
+
     .control-group label {
       font-size: 11px;
       color: #888;
       text-transform: uppercase;
     }
+
     .control-group select {
       padding: 6px 10px;
       background: #0f3460;
@@ -39,10 +49,12 @@
       border-radius: 4px;
       width: 120px;
     }
+
     .control-group input[type="range"] {
       width: 100px;
       accent-color: #e94560;
     }
+
     button {
       padding: 10px 20px;
       background: #e94560;
@@ -52,12 +64,17 @@
       cursor: pointer;
       font-weight: bold;
     }
-    button:hover { background: #ff6b6b; }
+
+    button:hover {
+      background: #ff6b6b;
+    }
+
     .stats {
       margin-left: auto;
       font-size: 12px;
       color: #888;
     }
+
     .control-section {
       display: flex;
       flex-wrap: wrap;
@@ -67,6 +84,7 @@
       border-radius: 4px;
       align-items: flex-end;
     }
+
     .control-section-label {
       width: 100%;
       font-size: 10px;
@@ -76,6 +94,7 @@
       letter-spacing: 1px;
       margin-bottom: -5px;
     }
+
     .canvas-container {
       flex: 1;
       overflow: auto;
@@ -84,12 +103,14 @@
       justify-content: center;
       align-items: flex-start;
     }
+
     canvas {
       background: #fff;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
+
 <body>
   <div class="controls">
     <!-- Path Selection -->
@@ -100,7 +121,7 @@
         <option value="spiral">Spiral</option>
         <option value="zigzag">Zigzag</option>
         <option value="lissajous">Lissajous</option>
-        <option value="vshape">V-Shape (Debug)</option>
+        <option value="vshape">L-Shape (Debug)</option>
       </select>
     </div>
 
@@ -194,6 +215,10 @@
         <label>Cont. Bias <span id="continuationBiasVal">0.7</span></label>
         <input type="range" id="continuationBias" value="0.7" min="0" max="4" step="0.05">
       </div>
+      <div class="control-group">
+        <label>Inside Thin <span id="insideThinningVal">0</span></label>
+        <input type="range" id="insideThinning" value="0" min="0" max="1" step="0.05">
+      </div>
     </div>
 
     <!-- End Caps & Taper -->
@@ -269,6 +294,12 @@
       </div>
       <div class="control-group">
         <label><input type="checkbox" id="showDebug"> Show Debug</label>
+      </div>
+      <div class="control-group">
+        <label><input type="checkbox" id="showWallPoints"> Show Wall Points</label>
+      </div>
+      <div class="control-group">
+        <label><input type="checkbox" id="experimentalCurveMode"> Experimental Curve Mode</label>
       </div>
       <button id="exportSvg" style="background: #0f3460;">Export SVG</button>
     </div>
@@ -711,7 +742,7 @@
     function createWarpFunction(backbone, braidLength, curvatureSamples = null, params = {}) {
       if (!backbone) return (point) => point;
 
-      const { redistributionFactor = 0, wallSeparation = 100 } = params;
+      const { redistributionFactor = 0, wallSeparation = 100, experimentalCurveMode = false } = params;
 
       return (point) => {
         const t = clamp(point.y / braidLength, 0, 1);
@@ -735,7 +766,8 @@
         }
 
         // Reduce wall wave amplitude and clamp on inside of tight curves
-        if (curvatureSamples) {
+        // (Only when experimental curve mode is enabled)
+        if (experimentalCurveMode && curvatureSamples) {
           const curvature = getCurvatureAt(curvatureSamples, t);
 
           if (curvature !== 0) {
@@ -903,6 +935,90 @@
 
       if (removedCount > 0) {
         console.log(`[FOLD DEBUG] removeFoldedPoints: removed ${removedCount} of ${points.length} points`);
+      }
+
+      return result;
+    }
+
+    /**
+     * Decimate wall points on the inside of tight curves
+     * This runs BEFORE removeFoldedPoints to thin out bunched areas proactively
+     * @param {Array} warpedPoints - Points already warped to curve space
+     * @param {Array} originalSamples - Original samples (for Y position to get curvature)
+     * @param {Array} curvatureSamples - Curvature data for the backbone
+     * @param {Object} params - Parameters including wallSeparation, braidLength, thinningFactor
+     * @param {string} side - 'left' or 'right' wall
+     */
+    function decimateInsideCurve(warpedPoints, originalSamples, curvatureSamples, params, side) {
+      if (!curvatureSamples || warpedPoints.length < 3) return warpedPoints;
+
+      const { wallSeparation = 100, braidLength = 800, insideThinning = 0, experimentalCurveMode = false } = params;
+      // Only decimate when experimental curve mode is enabled AND thinning > 0
+      if (!experimentalCurveMode || insideThinning <= 0) return warpedPoints;
+
+      const halfWidth = wallSeparation / 2;
+      const result = [warpedPoints[0]];
+      let removedCount = 0;
+
+      for (let i = 1; i < warpedPoints.length - 1; i++) {
+        const sample = originalSamples[i];
+        if (!sample) {
+          result.push(warpedPoints[i]);
+          continue;
+        }
+
+        const t = clamp(sample.y / braidLength, 0, 1);
+        const curvature = getCurvatureAt(curvatureSamples, t);
+
+        // Skip if straight section
+        if (curvature === 0) {
+          result.push(warpedPoints[i]);
+          continue;
+        }
+
+        const radius = 1 / Math.abs(curvature);
+        // curvature > 0 = curving left, right wall is inside
+        // curvature < 0 = curving right, left wall is inside
+        const isOnInside = (curvature > 0 && side === 'right') ||
+                           (curvature < 0 && side === 'left');
+
+        // Not on inside - keep the point
+        if (!isOnInside) {
+          result.push(warpedPoints[i]);
+          continue;
+        }
+
+        // On inside of curve - check if we should thin
+        // Tighter curves get more aggressive thinning
+        const tightnessRatio = halfWidth / radius; // Higher = tighter
+        const threshold = halfWidth * 5; // Extended range for smoother falloff
+
+        if (radius < threshold) {
+          // Calculate min distance to previous point based on tightness and slider
+          const baseDist = 4; // Normal sample spacing
+          // At max tightness (radius = halfWidth), skip factor = insideThinning * 12
+          // At threshold, skip factor = 0
+          const skipFactor = insideThinning * 12 * Math.pow((threshold - radius) / (threshold - halfWidth), 1.5);
+          const minDist = baseDist * (1 + skipFactor);
+
+          const prev = result[result.length - 1];
+          const curr = warpedPoints[i];
+          const dist = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+
+          if (dist < minDist) {
+            removedCount++;
+            continue;
+          }
+        }
+
+        result.push(warpedPoints[i]);
+      }
+
+      // Always include last point
+      result.push(warpedPoints[warpedPoints.length - 1]);
+
+      if (removedCount > 0) {
+        console.log(`[DECIMATE] ${side} wall: removed ${removedCount} of ${warpedPoints.length} points (thinning=${insideThinning.toFixed(2)})`);
       }
 
       return result;
@@ -1078,8 +1194,10 @@
         let effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
 
         // Scale down fiber count based on curvature compression
+        // (Only when experimental curve mode is enabled)
+        const experimentalCurveMode = params.experimentalCurveMode || false;
         const originalFiberCount = effectiveFiberCount;
-        if (curvatureSamples && diagRail.length > 0) {
+        if (experimentalCurveMode && curvatureSamples && diagRail.length > 0) {
           const braidLength = params.braidLength || 500;
           const wallSeparation = params.wallSeparation || 100;
 
@@ -1091,7 +1209,7 @@
             // curvature > 0 = curving left, so right wall is inside
             // curvature < 0 = curving right, so left wall is inside
             const isOnInside = (curvature > 0 && pair.side === 'right') ||
-                               (curvature < 0 && pair.side === 'left');
+              (curvature < 0 && pair.side === 'left');
 
             if (isOnInside) {
               const radius = 1 / Math.abs(curvature);
@@ -1682,6 +1800,7 @@
         arcLengths,
         redistributionFactor,
         curvatureSmoothing,
+        insideThinning: params.insideThinning ?? 0,
         // End cap parameters
         enableCaps: params.enableCaps ?? true,
         capFiberCount: params.capFiberCount ?? 8,
@@ -1713,9 +1832,15 @@
 
       const outlines = [];
       outlines.push({ side: 'center', type: 'zigzag', points: centerSamples.map(warpPoint), index: 0 });
-      // Apply fold removal to wall outlines to prevent fold-over on tight curves
-      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftSamples.map(warpPoint)), index: 1 });
-      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightSamples.map(warpPoint)), index: 2 });
+
+      // Apply decimation then fold removal to wall outlines to prevent fold-over on tight curves
+      // Decimation thins out bunched points on inside of curves, fold removal handles remaining issues
+      const leftWarped = leftSamples.map(warpPoint);
+      const rightWarped = rightSamples.map(warpPoint);
+      const leftDecimated = decimateInsideCurve(leftWarped, leftSamples, curvatureSamples, config, 'left');
+      const rightDecimated = decimateInsideCurve(rightWarped, rightSamples, curvatureSamples, config, 'right');
+      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftDecimated), index: 1 });
+      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightDecimated), index: 2 });
       continuationPairs.forEach((pair, idx) => {
         outlines.push({ side: pair.side, type: 'continuation', points: pair.diagRail.map(warpPoint), index: idx + 3 });
       });
@@ -1750,6 +1875,7 @@
           centerSamples,
           leftSamples,
           rightSamples,
+          curvatureSamples,
           config
         },
         metadata: {
@@ -2219,6 +2345,68 @@
           //   ).length
           // });
         }
+
+        // Wall points visualization (separate from main debug)
+        if (document.getElementById('showWallPoints').checked && currentBraid.debug) {
+          const debug = currentBraid.debug;
+          const { braidLength, wallSeparation } = debug.config;
+          const warpPoint = createWarpFunction(currentBackbone, braidLength, debug.curvatureSamples, debug.config);
+          const curvatureSamples = debug.curvatureSamples;
+          const halfWidth = wallSeparation / 2;
+
+          // Helper to get color based on curvature state
+          function getPointColor(sample, side) {
+            if (!curvatureSamples) return side === 'left' ? '#00ccff' : '#ff00cc';
+
+            const t = clamp(sample.y / braidLength, 0, 1);
+            const curvature = getCurvatureAt(curvatureSamples, t);
+
+            if (curvature === 0) return '#888888'; // Straight - gray
+
+            const radius = 1 / Math.abs(curvature);
+            // curvature > 0 = curving left, right wall (side='right') is inside
+            // curvature < 0 = curving right, left wall (side='left') is inside
+            const isOnInside = (curvature > 0 && side === 'right') ||
+                               (curvature < 0 && side === 'left');
+
+            if (!isOnInside) return '#4444ff'; // Outside of curve - blue
+
+            // Inside of curve - color by tightness
+            if (radius < halfWidth) return '#ff0000'; // Very tight (will fold) - red
+            if (radius < halfWidth * 2) return '#ff6600'; // Tight - orange
+            if (radius < halfWidth * 3) return '#ffcc00'; // Moderate - yellow
+            return '#00ff00'; // Loose inside - green
+          }
+
+          // Draw left wall sample points
+          debug.leftSamples.forEach((sample, idx) => {
+            const warped = warpPoint(sample);
+            const color = getPointColor(sample, 'left');
+            ctx.beginPath();
+            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          });
+
+          // Draw right wall sample points
+          debug.rightSamples.forEach((sample, idx) => {
+            const warped = warpPoint(sample);
+            const color = getPointColor(sample, 'right');
+            ctx.beginPath();
+            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          });
+
+          // Show point counts in console
+          console.log(`[WALL POINTS] Left: ${debug.leftSamples.length}, Right: ${debug.rightSamples.length}`);
+        }
       }
 
       ctx.restore();
@@ -2246,9 +2434,9 @@
           // L-shape works better with lower frequency - set to 14 if higher
           {
             const freqSlider = document.getElementById('frequency');
-            if (parseFloat(freqSlider.value) > 20) {
-              freqSlider.value = 14;
-              document.getElementById('frequencyVal').textContent = '14';
+            if (parseFloat(freqSlider.value) > 40) {
+              freqSlider.value = 40;
+              document.getElementById('frequencyVal').textContent = '40';
             }
           }
           break;
@@ -2291,6 +2479,8 @@
         landingSpread: parseFloat(document.getElementById('landingSpread').value),
         continuationLength: parseFloat(document.getElementById('continuationLength').value),
         continuationBias: parseFloat(document.getElementById('continuationBias').value),
+        insideThinning: parseFloat(document.getElementById('insideThinning').value),
+        experimentalCurveMode: document.getElementById('experimentalCurveMode').checked,
         // End cap parameters
         enableCaps: document.getElementById('enableCaps').checked,
         capFiberCount: parseInt(document.getElementById('capFiberCount').value),
@@ -2383,7 +2573,7 @@
       'fiberCount', 'fiberBow', 'tipTaper', 'tipTaperLength',
       'redistributionFactor', 'curvatureSmoothing',
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
-      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias',
+      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias', 'insideThinning',
       // Cap and spout controls
       'capFiberCount', 'capGatherLength', 'capBowAngle', 'capBowStrength', 'capLandingDepth',
       'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity'
@@ -2401,12 +2591,13 @@
     });
 
     // Checkbox controls
-    ['enableCaps', 'spoutAtStart'].forEach(id => {
+    ['enableCaps', 'spoutAtStart', 'experimentalCurveMode'].forEach(id => {
       document.getElementById(id).addEventListener('change', generate);
     });
 
     // Debug checkbox triggers re-render (not regenerate)
     document.getElementById('showDebug').addEventListener('change', render);
+    document.getElementById('showWallPoints').addEventListener('change', render);
 
     // Path type regenerates the backbone
     document.getElementById('pathType').addEventListener('change', generate);
@@ -2423,4 +2614,5 @@
     generate();
   </script>
 </body>
+
 </html>
