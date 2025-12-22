@@ -135,6 +135,7 @@
         <option value="zigzag">Zigzag</option>
         <option value="lissajous">Lissajous</option>
         <option value="vshape">L-Shape (Debug)</option>
+        <option value="scale-test">Scale Test (Multi)</option>
       </select>
     </div>
 
@@ -143,11 +144,11 @@
       <span class="control-section-label">Wave Pattern</span>
       <div class="control-group">
         <label>Wavelength <span id="wavelengthVal">70</span>px</label>
-        <input type="range" id="wavelength" value="70" min="30" max="200" step="5">
+        <input type="range" id="wavelength" value="70" min="30" max="200" step="1">
       </div>
       <div class="control-group">
         <label>Zigzag Amp <span id="zigzagScaleVal">0.2</span></label>
-        <input type="range" id="zigzagScale" value="0.2" min="0.1" max="3" step="0.1">
+        <input type="range" id="zigzagScale" value="0.2" min="0.01" max="1" step="0.01">
       </div>
       <div class="control-group">
         <label>Zigzag Phase <span id="zigzagPhaseVal">60</span>°</label>
@@ -155,7 +156,7 @@
       </div>
       <div class="control-group">
         <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
-        <input type="range" id="cycleJitter" value="0" min="0" max="1" step="0.05">
+        <input type="range" id="cycleJitter" value="0" min="0" max="3" step="0.05">
       </div>
     </div>
 
@@ -164,7 +165,7 @@
       <span class="control-section-label">Wall Behavior</span>
       <div class="control-group">
         <label>Wall Amp <span id="wallScaleVal">0.4</span></label>
-        <input type="range" id="wallScale" value="0.4" min="0.1" max="3" step="0.1">
+        <input type="range" id="wallScale" value="0.4" min="0.1" max="1" step="0.01">
       </div>
       <div class="control-group">
         <label>Wall Sep <span id="wallSeparationVal">105</span></label>
@@ -290,6 +291,25 @@
         </div>
         <div class="control-group">
           <label><input type="checkbox" id="spoutAtStart"> Spout at Start</label>
+        </div>
+      </div>
+    </details>
+
+    <!-- Path Scaling -->
+    <details style="background: #0f3460; padding: 10px; border-radius: 4px;">
+      <summary style="cursor: pointer; font-weight: bold; color: #e94560;">Path Scaling</summary>
+      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+        <div class="control-group">
+          <label>Reference Length <span id="referencePathLengthVal">1400</span>px</label>
+          <input type="range" id="referencePathLength" value="1400" min="100" max="3000" step="25">
+        </div>
+        <div class="control-group">
+          <label>Scale Power <span id="scalePathPowerVal">1</span></label>
+          <input type="range" id="scalePathPower" value="1" min="0.01" max="3" step="0.01">
+        </div>
+        <div class="control-group">
+          <label>Bow Scale Power <span id="scaleBowPowerVal">0.5</span></label>
+          <input type="range" id="scaleBowPower" value="0.5" min="0" max="2" step="0.05">
         </div>
       </div>
     </details>
@@ -957,10 +977,6 @@
       // Always include last point
       result.push(points[points.length - 1]);
 
-      if (removedCount > 0) {
-        console.log(`[FOLD DEBUG] removeFoldedPoints: removed ${removedCount} of ${points.length} points`);
-      }
-
       return result;
     }
 
@@ -1004,7 +1020,7 @@
         // curvature > 0 = curving left, right wall is inside
         // curvature < 0 = curving right, left wall is inside
         const isOnInside = (curvature > 0 && side === 'right') ||
-                           (curvature < 0 && side === 'left');
+          (curvature < 0 && side === 'left');
 
         // Not on inside - keep the point
         if (!isOnInside) {
@@ -1257,10 +1273,6 @@
                 });
               }
             }
-          }
-        } else {
-          if (pair.sideIndex === 0) {
-            console.log('[COMPRESSION] curvatureSamples:', curvatureSamples ? 'EXISTS' : 'NULL');
           }
         }
 
@@ -1819,7 +1831,7 @@
         landingSpread: params.landingSpread ?? 1.0,
         wallSeparation: params.wallSeparation ?? 100,
         braidLength: params.braidLength ?? 800,
-        fiberSpacing: params.fiberSpacing ?? 3,
+        fiberSpacing: (params.fiberSpacing ?? 3) * (params.pathScaleFactor ?? 1),
         // Curvature-aware parameters
         arcLengths,
         redistributionFactor,
@@ -1837,7 +1849,9 @@
         spoutLength: params.spoutLength ?? 50,
         spoutSpread: params.spoutSpread ?? 30,
         spoutGravity: params.spoutGravity ?? 0.3,
-        spoutAtStart: params.spoutAtStart ?? false
+        spoutAtStart: params.spoutAtStart ?? false,
+        // Path scaling
+        pathScaleFactor: params.pathScaleFactor ?? 1.0
       };
 
       const centerSamples = sampleBoundary(generateCenterX, config);
@@ -1863,8 +1877,10 @@
       const rightWarped = rightSamples.map(warpPoint);
       const leftDecimated = decimateInsideCurve(leftWarped, leftSamples, curvatureSamples, config, 'left');
       const rightDecimated = decimateInsideCurve(rightWarped, rightSamples, curvatureSamples, config, 'right');
-      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftDecimated), index: 1 });
-      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightDecimated), index: 2 });
+      // Scale minSpacing for fold removal based on path scale factor
+      const scaledMinSpacing = Math.max(2, 15 * config.pathScaleFactor);
+      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftDecimated, scaledMinSpacing), index: 1 });
+      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightDecimated, scaledMinSpacing), index: 2 });
       continuationPairs.forEach((pair, idx) => {
         outlines.push({ side: pair.side, type: 'continuation', points: pair.diagRail.map(warpPoint), index: idx + 3 });
       });
@@ -2093,6 +2109,41 @@
       }
 
       return points;
+    }
+
+    function generateScaleTestPaths(width, height, margin) {
+      // Generate multiple straight horizontal paths at different lengths
+      // to test path scaling behavior
+      const maxLength = height - 2 * margin; // Full A3 height minus margins
+      const percentages = [1.0, 0.5, 0.25, 0.1];
+      const paths = [];
+
+      const startX = margin;
+      const spacing = (width - 2 * margin) / (percentages.length + 1);
+
+      percentages.forEach((pct, idx) => {
+        const pathLength = maxLength * pct;
+        const centerX = startX + spacing * (idx + 1);
+        const startY = (height - pathLength) / 2;
+
+        // Create a straight vertical path
+        const points = [];
+        const numPoints = Math.max(10, Math.floor(pathLength / 10));
+        for (let i = 0; i <= numPoints; i++) {
+          const t = i / numPoints;
+          points.push({
+            x: centerX,
+            y: startY + pathLength * t
+          });
+        }
+
+        paths.push({
+          id: `scale-${Math.round(pct * 100)}pct`,
+          points
+        });
+      });
+
+      return paths;
     }
 
     // ========================================================================
@@ -2522,217 +2573,217 @@
 
       // Debug visualization (shows first braid only)
       if (document.getElementById('showDebug').checked && currentBraid && currentBraid.debug) {
-          const debug = currentBraid.debug;
-          const { tipTaperLength, braidLength } = debug.config;
-          const warpPoint = createWarpFunction(currentBackbone, braidLength, null, debug.config);
+        const debug = currentBraid.debug;
+        const { tipTaperLength, braidLength } = debug.config;
+        const warpPoint = createWarpFunction(currentBackbone, braidLength, null, debug.config);
 
-          // Draw wall start/end points (not extrema, actual endpoints)
-          const leftStart = debug.leftSamples[0];
-          const leftEnd = debug.leftSamples[debug.leftSamples.length - 1];
-          const rightStart = debug.rightSamples[0];
-          const rightEnd = debug.rightSamples[debug.rightSamples.length - 1];
-          const centerStart = debug.centerSamples[0];
-          const centerEnd = debug.centerSamples[debug.centerSamples.length - 1];
+        // Draw wall start/end points (not extrema, actual endpoints)
+        const leftStart = debug.leftSamples[0];
+        const leftEnd = debug.leftSamples[debug.leftSamples.length - 1];
+        const rightStart = debug.rightSamples[0];
+        const rightEnd = debug.rightSamples[debug.rightSamples.length - 1];
+        const centerStart = debug.centerSamples[0];
+        const centerEnd = debug.centerSamples[debug.centerSamples.length - 1];
 
-          // Left wall start/end - cyan squares
-          [{ pt: leftStart, label: 'L-START' }, { pt: leftEnd, label: 'L-END' }].forEach(({ pt, label }) => {
-            const warped = warpPoint(pt);
-            ctx.fillStyle = '#00ccff';
-            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.strokeStyle = '#000';
+        // Left wall start/end - cyan squares
+        [{ pt: leftStart, label: 'L-START' }, { pt: leftEnd, label: 'L-END' }].forEach(({ pt, label }) => {
+          const warped = warpPoint(pt);
+          ctx.fillStyle = '#00ccff';
+          ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(label, warped.x - 55, warped.y - 10);
+        });
+
+        // Right wall start/end - magenta squares
+        [{ pt: rightStart, label: 'R-START' }, { pt: rightEnd, label: 'R-END' }].forEach(({ pt, label }) => {
+          const warped = warpPoint(pt);
+          ctx.fillStyle = '#ff00cc';
+          ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(label, warped.x + 10, warped.y - 10);
+        });
+
+        // Center/Zigzag start/end - yellow squares
+        [{ pt: centerStart, label: 'Z-START' }, { pt: centerEnd, label: 'Z-END' }].forEach(({ pt, label }) => {
+          const warped = warpPoint(pt);
+          ctx.fillStyle = '#ffcc00';
+          ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(label, warped.x + 10, warped.y - 10);
+        });
+
+        // Draw extrema markers
+        // Center extrema: green circles if paired, red if unpaired
+        debug.centerExtrema.forEach((e, idx) => {
+          const warped = warpPoint(e);
+          ctx.beginPath();
+          ctx.arc(warped.x, warped.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = e.paired ? '#00ff00' : '#ff0000';
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          // Show red ring if in taper zone
+          if (e.y < tipTaperLength || e.y > braidLength - tipTaperLength) {
+            ctx.strokeStyle = '#ff0000';
             ctx.lineWidth = 2;
-            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 12px monospace';
-            ctx.fillText(label, warped.x - 55, warped.y - 10);
-          });
-
-          // Right wall start/end - magenta squares
-          [{ pt: rightStart, label: 'R-START' }, { pt: rightEnd, label: 'R-END' }].forEach(({ pt, label }) => {
-            const warped = warpPoint(pt);
-            ctx.fillStyle = '#ff00cc';
-            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 12px monospace';
-            ctx.fillText(label, warped.x + 10, warped.y - 10);
-          });
-
-          // Center/Zigzag start/end - yellow squares
-          [{ pt: centerStart, label: 'Z-START' }, { pt: centerEnd, label: 'Z-END' }].forEach(({ pt, label }) => {
-            const warped = warpPoint(pt);
-            ctx.fillStyle = '#ffcc00';
-            ctx.fillRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(warped.x - 6, warped.y - 6, 12, 12);
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 12px monospace';
-            ctx.fillText(label, warped.x + 10, warped.y - 10);
-          });
-
-          // Draw extrema markers
-          // Center extrema: green circles if paired, red if unpaired
-          debug.centerExtrema.forEach((e, idx) => {
-            const warped = warpPoint(e);
             ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = e.paired ? '#00ff00' : '#ff0000';
-            ctx.fill();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
+            ctx.arc(warped.x, warped.y, 10, 0, Math.PI * 2);
             ctx.stroke();
-            // Show red ring if in taper zone
-            if (e.y < tipTaperLength || e.y > braidLength - tipTaperLength) {
-              ctx.strokeStyle = '#ff0000';
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.arc(warped.x, warped.y, 10, 0, Math.PI * 2);
-              ctx.stroke();
-            }
-            // Label with Z0, Z1, Z2... (Z for Zigzag center line)
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText(`Z${idx}`, warped.x + 10, warped.y - 4);
-          });
-
-          // Left wall extrema: cyan if claimed, orange if unclaimed
-          debug.leftExtrema.forEach((e, idx) => {
-            const warped = warpPoint(e);
-            ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = e.claimed ? '#00ccff' : '#ff6600';
-            ctx.fill();
-            // Label with L0, L1, L2...
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText(`L${idx}`, warped.x - 25, warped.y + 4);
-          });
-
-          // Right wall extrema: magenta if claimed, orange if unclaimed
-          debug.rightExtrema.forEach((e, idx) => {
-            const warped = warpPoint(e);
-            ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = e.claimed ? '#ff00cc' : '#ff6600';
-            ctx.fill();
-            // Label with R0, R1, R2...
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText(`R${idx}`, warped.x + 10, warped.y + 4);
-          });
-
-          // Draw origin points and landing rails for continuation pairs
-          debug.continuationPairs.forEach((pair, idx) => {
-            // Origin point (wall trough): white square
-            const wallWarped = warpPoint(pair.wall);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
-
-            // Landing point (center tip): white diamond
-            const tipWarped = warpPoint(pair.center);
-            ctx.save();
-            ctx.translate(tipWarped.x, tipWarped.y);
-            ctx.rotate(Math.PI / 4);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-4, -4, 8, 8);
-            ctx.strokeStyle = '#000';
-            ctx.strokeRect(-4, -4, 8, 8);
-            ctx.restore();
-
-            // Draw landing rail - thin purple line
-            if (pair.landingRail && pair.landingRail.length > 0) {
-              ctx.strokeStyle = 'rgba(128, 0, 255, 0.5)';
-              ctx.lineWidth = 3;
-              ctx.beginPath();
-              pair.landingRail.forEach((p, i) => {
-                const wp = warpPoint(p);
-                if (i === 0) ctx.moveTo(wp.x, wp.y);
-                else ctx.lineTo(wp.x, wp.y);
-              });
-              ctx.stroke();
-            }
-          });
-
-          // Console log for debugging
-          // console.log(`DEBUG tipTaper=${debug.config.tipTaper.toFixed(2)}:`, {
-          //   centerExtrema: debug.centerExtrema.length,
-          //   leftExtrema: debug.leftExtrema.length,
-          //   rightExtrema: debug.rightExtrema.length,
-          //   continuationPairs: debug.continuationPairs.length,
-          //   unpairedCenter: debug.centerExtrema.filter(e => !e.paired).length,
-          //   inTaperZone: debug.centerExtrema.filter(e =>
-          //     e.y < tipTaperLength || e.y > braidLength - tipTaperLength
-          //   ).length
-          // });
-        }
-
-        // Wall points visualization (separate from main debug)
-        if (document.getElementById('showWallPoints').checked && currentBraid.debug) {
-          const debug = currentBraid.debug;
-          const { braidLength, wallSeparation } = debug.config;
-          const warpPoint = createWarpFunction(currentBackbone, braidLength, debug.curvatureSamples, debug.config);
-          const curvatureSamples = debug.curvatureSamples;
-          const halfWidth = wallSeparation / 2;
-
-          // Helper to get color based on curvature state
-          function getPointColor(sample, side) {
-            if (!curvatureSamples) return side === 'left' ? '#00ccff' : '#ff00cc';
-
-            const t = clamp(sample.y / braidLength, 0, 1);
-            const curvature = getCurvatureAt(curvatureSamples, t);
-
-            if (curvature === 0) return '#888888'; // Straight - gray
-
-            const radius = 1 / Math.abs(curvature);
-            // curvature > 0 = curving left, right wall (side='right') is inside
-            // curvature < 0 = curving right, left wall (side='left') is inside
-            const isOnInside = (curvature > 0 && side === 'right') ||
-                               (curvature < 0 && side === 'left');
-
-            if (!isOnInside) return '#4444ff'; // Outside of curve - blue
-
-            // Inside of curve - color by tightness
-            if (radius < halfWidth) return '#ff0000'; // Very tight (will fold) - red
-            if (radius < halfWidth * 2) return '#ff6600'; // Tight - orange
-            if (radius < halfWidth * 3) return '#ffcc00'; // Moderate - yellow
-            return '#00ff00'; // Loose inside - green
           }
+          // Label with Z0, Z1, Z2... (Z for Zigzag center line)
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText(`Z${idx}`, warped.x + 10, warped.y - 4);
+        });
 
-          // Draw left wall sample points
-          debug.leftSamples.forEach((sample, idx) => {
-            const warped = warpPoint(sample);
-            const color = getPointColor(sample, 'left');
+        // Left wall extrema: cyan if claimed, orange if unclaimed
+        debug.leftExtrema.forEach((e, idx) => {
+          const warped = warpPoint(e);
+          ctx.beginPath();
+          ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = e.claimed ? '#00ccff' : '#ff6600';
+          ctx.fill();
+          // Label with L0, L1, L2...
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText(`L${idx}`, warped.x - 25, warped.y + 4);
+        });
+
+        // Right wall extrema: magenta if claimed, orange if unclaimed
+        debug.rightExtrema.forEach((e, idx) => {
+          const warped = warpPoint(e);
+          ctx.beginPath();
+          ctx.arc(warped.x, warped.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = e.claimed ? '#ff00cc' : '#ff6600';
+          ctx.fill();
+          // Label with R0, R1, R2...
+          ctx.fillStyle = '#000';
+          ctx.font = 'bold 11px monospace';
+          ctx.fillText(`R${idx}`, warped.x + 10, warped.y + 4);
+        });
+
+        // Draw origin points and landing rails for continuation pairs
+        debug.continuationPairs.forEach((pair, idx) => {
+          // Origin point (wall trough): white square
+          const wallWarped = warpPoint(pair.wall);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(wallWarped.x - 4, wallWarped.y - 4, 8, 8);
+
+          // Landing point (center tip): white diamond
+          const tipWarped = warpPoint(pair.center);
+          ctx.save();
+          ctx.translate(tipWarped.x, tipWarped.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-4, -4, 8, 8);
+          ctx.strokeStyle = '#000';
+          ctx.strokeRect(-4, -4, 8, 8);
+          ctx.restore();
+
+          // Draw landing rail - thin purple line
+          if (pair.landingRail && pair.landingRail.length > 0) {
+            ctx.strokeStyle = 'rgba(128, 0, 255, 0.5)';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 0.5;
+            pair.landingRail.forEach((p, i) => {
+              const wp = warpPoint(p);
+              if (i === 0) ctx.moveTo(wp.x, wp.y);
+              else ctx.lineTo(wp.x, wp.y);
+            });
             ctx.stroke();
-          });
+          }
+        });
 
-          // Draw right wall sample points
-          debug.rightSamples.forEach((sample, idx) => {
-            const warped = warpPoint(sample);
-            const color = getPointColor(sample, 'right');
-            ctx.beginPath();
-            ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          });
+        // Console log for debugging
+        // console.log(`DEBUG tipTaper=${debug.config.tipTaper.toFixed(2)}:`, {
+        //   centerExtrema: debug.centerExtrema.length,
+        //   leftExtrema: debug.leftExtrema.length,
+        //   rightExtrema: debug.rightExtrema.length,
+        //   continuationPairs: debug.continuationPairs.length,
+        //   unpairedCenter: debug.centerExtrema.filter(e => !e.paired).length,
+        //   inTaperZone: debug.centerExtrema.filter(e =>
+        //     e.y < tipTaperLength || e.y > braidLength - tipTaperLength
+        //   ).length
+        // });
+      }
 
-          // Show point counts in console
-          console.log(`[WALL POINTS] Left: ${debug.leftSamples.length}, Right: ${debug.rightSamples.length}`);
+      // Wall points visualization (separate from main debug)
+      if (document.getElementById('showWallPoints').checked && currentBraid.debug) {
+        const debug = currentBraid.debug;
+        const { braidLength, wallSeparation } = debug.config;
+        const warpPoint = createWarpFunction(currentBackbone, braidLength, debug.curvatureSamples, debug.config);
+        const curvatureSamples = debug.curvatureSamples;
+        const halfWidth = wallSeparation / 2;
+
+        // Helper to get color based on curvature state
+        function getPointColor(sample, side) {
+          if (!curvatureSamples) return side === 'left' ? '#00ccff' : '#ff00cc';
+
+          const t = clamp(sample.y / braidLength, 0, 1);
+          const curvature = getCurvatureAt(curvatureSamples, t);
+
+          if (curvature === 0) return '#888888'; // Straight - gray
+
+          const radius = 1 / Math.abs(curvature);
+          // curvature > 0 = curving left, right wall (side='right') is inside
+          // curvature < 0 = curving right, left wall (side='left') is inside
+          const isOnInside = (curvature > 0 && side === 'right') ||
+            (curvature < 0 && side === 'left');
+
+          if (!isOnInside) return '#4444ff'; // Outside of curve - blue
+
+          // Inside of curve - color by tightness
+          if (radius < halfWidth) return '#ff0000'; // Very tight (will fold) - red
+          if (radius < halfWidth * 2) return '#ff6600'; // Tight - orange
+          if (radius < halfWidth * 3) return '#ffcc00'; // Moderate - yellow
+          return '#00ff00'; // Loose inside - green
         }
+
+        // Draw left wall sample points
+        debug.leftSamples.forEach((sample, idx) => {
+          const warped = warpPoint(sample);
+          const color = getPointColor(sample, 'left');
+          ctx.beginPath();
+          ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        });
+
+        // Draw right wall sample points
+        debug.rightSamples.forEach((sample, idx) => {
+          const warped = warpPoint(sample);
+          const color = getPointColor(sample, 'right');
+          ctx.beginPath();
+          ctx.arc(warped.x, warped.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        });
+
+        // Show point counts in console
+        console.log(`[WALL POINTS] Left: ${debug.leftSamples.length}, Right: ${debug.rightSamples.length}`);
+      }
 
       ctx.restore();
     }
@@ -2741,32 +2792,41 @@
      * Get common braid parameters from UI
      */
     function getParams(braidLength) {
-      // Wavelength-based frequency: consistent visual density regardless of path length
+      // Path scaling: scale parameters based on path length relative to reference
+      const referenceLength = parseFloat(document.getElementById('referencePathLength').value);
+      const scalePower = parseFloat(document.getElementById('scalePathPower').value);
+      const bowScalePower = parseFloat(document.getElementById('scaleBowPower').value);
+      const lengthRatio = braidLength / Math.max(referenceLength, 1);
+      const pathScaleFactor = Math.pow(lengthRatio, scalePower);
+      const bowScaleFactor = Math.pow(lengthRatio, bowScalePower);
+
+      // Wavelength stays constant - shorter paths naturally get fewer cycles
       const targetWavelength = parseFloat(document.getElementById('wavelength').value);
       const wallFrequency = braidLength / targetWavelength;
       const frequency = wallFrequency * 2;
 
-      const sampleSpacing = Math.min(2, targetWavelength / 40);
+      const sampleSpacing = Math.min(1, targetWavelength / 80);  // Doubled sample rate
 
       return {
         frequency,
         wallFrequency,
         fiberCount: parseInt(document.getElementById('fiberCount').value),
-        fiberBow: parseFloat(document.getElementById('fiberBow').value),
+        fiberBow: parseFloat(document.getElementById('fiberBow').value) * bowScaleFactor,
         tipTaper: parseFloat(document.getElementById('tipTaper').value),
-        tipTaperLength: parseFloat(document.getElementById('tipTaperLength').value),
+        tipTaperLength: parseFloat(document.getElementById('tipTaperLength').value) * pathScaleFactor,
         redistributionFactor: parseFloat(document.getElementById('redistributionFactor').value),
         curvatureSmoothing: parseInt(document.getElementById('curvatureSmoothing').value),
-        zigzagScale: parseFloat(document.getElementById('zigzagScale').value),
-        wallScale: parseFloat(document.getElementById('wallScale').value),
+        zigzagScale: parseFloat(document.getElementById('zigzagScale').value) * pathScaleFactor,
+        wallScale: parseFloat(document.getElementById('wallScale').value) * pathScaleFactor,
         wallSeparation: (() => {
           const baseWallSep = parseFloat(document.getElementById('wallSeparation').value);
+          const scaledWallSep = baseWallSep * pathScaleFactor; // Apply path scaling first
           const lengthScale = parseFloat(document.getElementById('wallLengthScale').value);
           const referenceWavelength = 70; // px - the default wavelength
           // Scale wall separation proportionally to wavelength when lengthScale > 0
           // At lengthScale=0: use base value; at lengthScale=1: scale proportionally
-          const scaleFactor = 1 + lengthScale * (targetWavelength / referenceWavelength - 1);
-          return baseWallSep * scaleFactor;
+          const wavelengthScaleFactor = 1 + lengthScale * (targetWavelength / referenceWavelength - 1);
+          return scaledWallSep * wavelengthScaleFactor;
         })(),
         leftWallPhase: parseFloat(document.getElementById('leftWallPhase').value),
         rightWallPhase: parseFloat(document.getElementById('rightWallPhase').value),
@@ -2793,12 +2853,19 @@
         spoutAtStart: document.getElementById('spoutAtStart').checked,
         braidLength,
         sampleSpacing,
-        targetWavelength
+        targetWavelength,
+        pathScaleFactor
       };
     }
 
     function generate() {
       const startTime = performance.now();
+
+      // Scale test mode: generate test paths at different lengths
+      const pathType = document.getElementById('pathType').value;
+      if (pathType === 'scale-test' && (!importedPaths || importedPaths.length === 0)) {
+        importedPaths = generateScaleTestPaths(A3_WIDTH, A3_HEIGHT, 100);
+      }
 
       // Multi-path mode: process imported SVG paths
       if (importedPaths && importedPaths.length > 0) {
@@ -2828,15 +2895,19 @@
         currentBackbone = allBackbones[0];
         currentBraid = allBraids[0];
 
+        // Compute path length stats
+        const pathLengths = allBackbones.map(b => b.totalLength);
+        const longestPath = Math.round(Math.max(...pathLengths));
+        const shortestPath = Math.round(Math.min(...pathLengths));
+
         const elapsed = (performance.now() - startTime).toFixed(1);
-        statsEl.textContent = `${importedPaths.length} paths | Fibers: ${totalFibers} main + ${totalCaps} cap + ${totalSpouts} spout | ${elapsed}ms`;
+        statsEl.textContent = `${importedPaths.length} paths | Longest: ${longestPath}px, Shortest: ${shortestPath}px | Fibers: ${totalFibers} main + ${totalCaps} cap + ${totalSpouts} spout | ${elapsed}ms`;
 
         render();
         return;
       }
 
       // Single path mode: use test path generators
-      const pathType = document.getElementById('pathType').value;
       const margin = 100;
 
       let pathPoints;
@@ -2957,7 +3028,9 @@
       'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias', 'insideThinning',
       // Cap and spout controls
       'capFiberCount', 'capGatherLength', 'capBowAngle', 'capBowStrength', 'capLandingDepth',
-      'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity'
+      'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity',
+      // Path scaling controls
+      'referencePathLength', 'scalePathPower', 'scaleBowPower'
     ];
 
     controls.forEach(id => {
