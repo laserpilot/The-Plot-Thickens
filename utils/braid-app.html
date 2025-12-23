@@ -55,6 +55,17 @@
       accent-color: #e94560;
     }
 
+    /* Section-specific slider colors */
+    .section-wave input[type="range"] { accent-color: #7eb8da; }
+    .section-wall input[type="range"] { accent-color: #a8d4a8; }
+    .section-fiber input[type="range"] { accent-color: #dab894; }
+    .section-breaks input[type="range"] { accent-color: #c9a8d4; }
+    .section-curve input[type="range"] { accent-color: #d4a8a8; }
+    .section-caps input[type="range"] { accent-color: #a8c9d4; }
+    .section-spouts input[type="range"] { accent-color: #d4d4a8; }
+    .section-scaling input[type="range"] { accent-color: #d4a8c9; }
+    .section-display input[type="range"] { accent-color: #a8d4c9; }
+
     button {
       padding: 10px 20px;
       background: #e94560;
@@ -140,11 +151,11 @@
     </div>
 
     <!-- Wave Pattern -->
-    <div class="control-section">
+    <div class="control-section section-wave">
       <span class="control-section-label">Wave Pattern</span>
       <div class="control-group">
-        <label>Wavelength <span id="wavelengthVal">70</span>px</label>
-        <input type="range" id="wavelength" value="70" min="30" max="200" step="1">
+        <label>Wavelength <span id="wavelengthVal">97</span>px</label>
+        <input type="range" id="wavelength" value="97" min="30" max="200" step="1">
       </div>
       <div class="control-group">
         <label>Zigzag Amp <span id="zigzagScaleVal">0.2</span></label>
@@ -155,21 +166,21 @@
         <input type="range" id="zigzagPhase" value="60" min="-180" max="180" step="5">
       </div>
       <div class="control-group">
-        <label>Cycle Jitter <span id="cycleJitterVal">0</span></label>
-        <input type="range" id="cycleJitter" value="0" min="0" max="3" step="0.05">
+        <label>Cycle Jitter <span id="cycleJitterVal">1.15</span></label>
+        <input type="range" id="cycleJitter" value="1.15" min="0" max="3" step="0.05">
       </div>
     </div>
 
     <!-- Wall Behavior -->
-    <div class="control-section">
+    <div class="control-section section-wall">
       <span class="control-section-label">Wall Behavior</span>
       <div class="control-group">
         <label>Wall Amp <span id="wallScaleVal">0.4</span></label>
         <input type="range" id="wallScale" value="0.4" min="0.1" max="1" step="0.01">
       </div>
       <div class="control-group">
-        <label>Wall Sep <span id="wallSeparationVal">105</span></label>
-        <input type="range" id="wallSeparation" value="105" min="20" max="200" step="5">
+        <label>Wall Sep <span id="wallSeparationVal">60</span></label>
+        <input type="range" id="wallSeparation" value="60" min="20" max="200" step="5">
       </div>
       <div class="control-group">
         <label>Wall/Length <span id="wallLengthScaleVal">0</span></label>
@@ -186,23 +197,23 @@
     </div>
 
     <!-- Fiber Shape & Count -->
-    <div class="control-section">
+    <div class="control-section section-fiber">
       <span class="control-section-label">Fiber Shape</span>
       <div class="control-group">
-        <label>Fiber Count <span id="fiberCountVal">8</span></label>
-        <input type="range" id="fiberCount" value="8" min="1" max="30" step="1">
+        <label>Fiber Count <span id="fiberCountVal">17</span></label>
+        <input type="range" id="fiberCount" value="17" min="1" max="100" step="1">
       </div>
       <div class="control-group">
         <label>Fiber Bow <span id="fiberBowVal">0.5</span></label>
         <input type="range" id="fiberBow" value="0.5" min="0" max="1" step="0.05">
       </div>
       <div class="control-group">
-        <label>Bow Gradient <span id="bowGradientVal">2</span></label>
-        <input type="range" id="bowGradient" value="2" min="0.5" max="6" step="0.1">
+        <label>Bow Gradient <span id="bowGradientVal">2.6</span></label>
+        <input type="range" id="bowGradient" value="2.6" min="0.5" max="6" step="0.1">
       </div>
       <div class="control-group">
-        <label>Fiber Bias <span id="fiberBiasVal">0.5</span></label>
-        <input type="range" id="fiberBias" value="0.5" min="0" max="1" step="0.05">
+        <label>Fiber Bias <span id="fiberBiasVal">0.6</span></label>
+        <input type="range" id="fiberBias" value="0.6" min="0" max="1" step="0.05">
       </div>
       <div class="control-group">
         <label>Fiber Landing <span id="fiberLandingVal">0</span></label>
@@ -213,30 +224,30 @@
         <input type="range" id="landingSpread" value="1" min="0.1" max="1" step="0.05">
       </div>
       <div class="control-group">
-        <label>Fiber Jiggle <span id="fiberJiggleVal">0</span></label>
-        <input type="range" id="fiberJiggle" value="0" min="0" max="1" step="0.05">
+        <label>Fiber Jiggle <span id="fiberJiggleVal">0.25</span></label>
+        <input type="range" id="fiberJiggle" value="0.25" min="0" max="1" step="0.05">
       </div>
     </div>
 
     <!-- Fiber Breaks -->
-    <div class="control-section">
+    <div class="control-section section-breaks">
       <span class="control-section-label">Fiber Breaks</span>
       <div class="control-group">
-        <label>Break Chance <span id="breakChanceVal">0</span></label>
-        <input type="range" id="breakChance" value="0" min="0" max="1" step="0.05">
+        <label>Break Chance <span id="breakChanceVal">0.75</span></label>
+        <input type="range" id="breakChance" value="0.75" min="0" max="1" step="0.05">
       </div>
       <div class="control-group">
-        <label>Break Coherence <span id="breakCoherenceVal">0.5</span></label>
-        <input type="range" id="breakCoherence" value="0.5" min="0" max="1" step="0.05">
+        <label>Break Coherence <span id="breakCoherenceVal">0</span></label>
+        <input type="range" id="breakCoherence" value="0" min="0" max="1" step="0.05">
       </div>
       <div class="control-group">
-        <label>Gap Size <span id="breakGapSizeVal">8</span></label>
-        <input type="range" id="breakGapSize" value="8" min="3" max="15" step="1">
+        <label>Gap Size <span id="breakGapSizeVal">15</span></label>
+        <input type="range" id="breakGapSize" value="15" min="3" max="15" step="1">
       </div>
     </div>
 
     <!-- Curve & Advanced -->
-    <div class="control-section">
+    <div class="control-section section-curve">
       <span class="control-section-label">Curve & Advanced</span>
       <div class="control-group">
         <label>Curve Smooth <span id="curvatureSmoothingVal">5</span></label>
@@ -247,15 +258,19 @@
         <input type="range" id="continuationLength" value="20" min="1" max="50" step="1">
       </div>
       <div class="control-group">
-        <label>Cont. Bias <span id="continuationBiasVal">0.7</span></label>
-        <input type="range" id="continuationBias" value="0.7" min="0" max="4" step="0.05">
+        <label>Cont. Bias <span id="continuationBiasVal">1.65</span></label>
+        <input type="range" id="continuationBias" value="1.65" min="0" max="4" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Wall Smooth <span id="wallSmoothVal">10</span></label>
+        <input type="range" id="wallSmooth" value="10" min="1" max="10" step="1">
       </div>
     </div>
 
     <!-- End Caps & Taper -->
-    <details open style="background: #0f3460; padding: 10px; border-radius: 4px;">
+    <details style="background: #0f3460; padding: 10px; border-radius: 4px;">
       <summary style="cursor: pointer; font-weight: bold; color: #e94560;">End Caps & Taper</summary>
-      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+      <div class="section-caps" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
         <div class="control-group">
           <label><input type="checkbox" id="enableCaps"> Enable Caps</label>
         </div>
@@ -293,7 +308,7 @@
     <!-- Spouts -->
     <details style="background: #0f3460; padding: 10px; border-radius: 4px;">
       <summary style="cursor: pointer; font-weight: bold; color: #e94560;">Spouts</summary>
-      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+      <div class="section-spouts" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
         <div class="control-group">
           <label>Spout Count <span id="spoutFiberCountVal">0</span></label>
           <input type="range" id="spoutFiberCount" value="0" min="0" max="15" step="1">
@@ -317,26 +332,26 @@
     </details>
 
     <!-- Path Scaling -->
-    <details style="background: #0f3460; padding: 10px; border-radius: 4px;">
+    <details open style="background: #0f3460; padding: 10px; border-radius: 4px;">
       <summary style="cursor: pointer; font-weight: bold; color: #e94560;">Path Scaling</summary>
-      <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+      <div class="section-scaling" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
         <div class="control-group">
-          <label>Reference Length <span id="referencePathLengthVal">1400</span>px</label>
-          <input type="range" id="referencePathLength" value="1400" min="100" max="3000" step="25">
+          <label>Reference Length <span id="referencePathLengthVal">1650</span>px</label>
+          <input type="range" id="referencePathLength" value="1650" min="100" max="3500" step="25">
         </div>
         <div class="control-group">
-          <label>Scale Power <span id="scalePathPowerVal">1</span></label>
-          <input type="range" id="scalePathPower" value="1" min="0.01" max="3" step="0.01">
+          <label>Scale Power <span id="scalePathPowerVal">1.77</span></label>
+          <input type="range" id="scalePathPower" value="1.77" min="0.01" max="3" step="0.01">
         </div>
         <div class="control-group">
-          <label>Bow Scale Power <span id="scaleBowPowerVal">0.5</span></label>
-          <input type="range" id="scaleBowPower" value="0.5" min="0" max="2" step="0.05">
+          <label>Bow Scale Power <span id="scaleBowPowerVal">0.25</span></label>
+          <input type="range" id="scaleBowPower" value="0.25" min="0" max="2" step="0.05">
         </div>
       </div>
     </details>
 
     <!-- Display -->
-    <div class="control-section">
+    <div class="control-section section-display">
       <span class="control-section-label">Display</span>
       <div class="control-group">
         <label>View Scale <span id="scaleVal">1</span></label>
@@ -1240,7 +1255,8 @@
 
         const wallRail = [];
         const wallSpan = tip.y - trough.y;
-        const wallSegments = Math.max(8, Math.ceil(wallSpan / 6));
+        const wallSmoothFactor = params.wallSmooth || 1;
+        const wallSegments = Math.max(8, Math.ceil(wallSpan / 6)) * wallSmoothFactor;
         for (let i = 0; i <= wallSegments; i++) {
           const ty = trough.y + wallSpan * (i / wallSegments);
           wallRail.push(interpolateSamplesAt(wallSamples, ty));
@@ -1249,7 +1265,7 @@
 
         const centerRail = [];
         const centerSpan = tip.y - trough.y;
-        const centerSegments = Math.max(8, Math.ceil(centerSpan / 6));
+        const centerSegments = Math.max(8, Math.ceil(centerSpan / 6)) * wallSmoothFactor;
         for (let i = 0; i <= centerSegments; i++) {
           const ty = trough.y + centerSpan * (i / centerSegments);
           centerRail.push(interpolateSamplesAt(centerSamples, ty));
@@ -1352,8 +1368,7 @@
         const minLength = spacing * 2;
         if (diagTotalLength < minLength || landingTotalLength < minLength) return;
 
-        const maxFibersByLength = Math.floor(diagTotalLength / spacing);
-        let effectiveFiberCount = Math.min(totalFibers, Math.max(1, maxFibersByLength));
+        let effectiveFiberCount = totalFibers;
 
         // Scale down fiber count based on curvature compression
         // (Only when experimental curve mode is enabled)
@@ -1983,6 +1998,7 @@
         sampleSpacing: params.sampleSpacing ?? 4,
         continuationLength: params.continuationLength ?? 20,
         continuationBias: params.continuationBias ?? 0.7,
+        wallSmooth: params.wallSmooth ?? 1,
         landingSpread: params.landingSpread ?? 1.0,
         fiberJiggle: params.fiberJiggle ?? 0,
         breakChance: params.breakChance ?? 0,
@@ -2036,10 +2052,12 @@
       const rightWarped = rightSamples.map(warpPoint);
       const leftDecimated = decimateInsideCurve(leftWarped, leftSamples, curvatureSamples, config, 'left');
       const rightDecimated = decimateInsideCurve(rightWarped, rightSamples, curvatureSamples, config, 'right');
-      // Scale minSpacing for fold removal based on path scale factor
-      const scaledMinSpacing = Math.max(2, 15 * config.pathScaleFactor);
-      outlines.push({ side: 'left', type: 'wall', points: removeFoldedPoints(leftDecimated, scaledMinSpacing), index: 1 });
-      outlines.push({ side: 'right', type: 'wall', points: removeFoldedPoints(rightDecimated, scaledMinSpacing), index: 2 });
+      // Scale minSpacing for fold removal - wallSmooth reduces spacing for more detail
+      const scaledMinSpacing = Math.max(1, (15 * config.pathScaleFactor) / (config.wallSmooth || 1));
+      const leftFinal = removeFoldedPoints(leftDecimated, scaledMinSpacing);
+      const rightFinal = removeFoldedPoints(rightDecimated, scaledMinSpacing);
+      outlines.push({ side: 'left', type: 'wall', points: leftFinal, index: 1 });
+      outlines.push({ side: 'right', type: 'wall', points: rightFinal, index: 2 });
       continuationPairs.forEach((pair, idx) => {
         outlines.push({ side: pair.side, type: 'continuation', points: pair.diagRail.map(warpPoint), index: idx + 3 });
       });
@@ -2964,7 +2982,8 @@
       const wallFrequency = braidLength / targetWavelength;
       const frequency = wallFrequency * 2;
 
-      const sampleSpacing = Math.min(1, targetWavelength / 80);  // Doubled sample rate
+      const wallSmooth = parseInt(document.getElementById('wallSmooth').value) || 1;
+      const sampleSpacing = Math.min(1, targetWavelength / 80) / wallSmooth;  // wallSmooth multiplies sample rate
 
       return {
         frequency,
@@ -3001,6 +3020,7 @@
         breakGapSize: parseFloat(document.getElementById('breakGapSize').value),
         continuationLength: parseFloat(document.getElementById('continuationLength').value),
         continuationBias: parseFloat(document.getElementById('continuationBias').value),
+        wallSmooth: parseInt(document.getElementById('wallSmooth').value),
         insideThinning: parseFloat(document.getElementById('insideThinning').value),
         experimentalCurveMode: document.getElementById('experimentalCurveMode').checked,
         enableCaps: document.getElementById('enableCaps').checked,
@@ -3191,7 +3211,7 @@
       'bowGradient', 'landingSpread', 'fiberJiggle',
       // Fiber break controls
       'breakChance', 'breakCoherence', 'breakGapSize',
-      'continuationLength', 'continuationBias', 'insideThinning',
+      'continuationLength', 'continuationBias', 'wallSmooth', 'insideThinning',
       // Cap and spout controls
       'capFiberCount', 'capGatherLength', 'capBowAngle', 'capBowStrength', 'capLandingDepth',
       'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity',
