@@ -212,6 +212,27 @@
         <label>Landing Spread <span id="landingSpreadVal">1</span></label>
         <input type="range" id="landingSpread" value="1" min="0.1" max="1" step="0.05">
       </div>
+      <div class="control-group">
+        <label>Fiber Jiggle <span id="fiberJiggleVal">0</span></label>
+        <input type="range" id="fiberJiggle" value="0" min="0" max="1" step="0.05">
+      </div>
+    </div>
+
+    <!-- Fiber Breaks -->
+    <div class="control-section">
+      <span class="control-section-label">Fiber Breaks</span>
+      <div class="control-group">
+        <label>Break Chance <span id="breakChanceVal">0</span></label>
+        <input type="range" id="breakChance" value="0" min="0" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Break Coherence <span id="breakCoherenceVal">0.5</span></label>
+        <input type="range" id="breakCoherence" value="0.5" min="0" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Gap Size <span id="breakGapSizeVal">8</span></label>
+        <input type="range" id="breakGapSize" value="8" min="3" max="15" step="1">
+      </div>
     </div>
 
     <!-- Curve & Advanced -->
@@ -438,6 +459,107 @@
       }
 
       return { ...rail[rail.length - 1] };
+    }
+
+    // Compute total length of a polyline
+    function computePolylineLength(points) {
+      let length = 0;
+      for (let i = 1; i < points.length; i++) {
+        length += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      }
+      return length;
+    }
+
+    // Extract a segment of a polyline between two t values (0-1)
+    function extractPolylineSegment(points, tStart, tEnd) {
+      if (points.length < 2) return [...points];
+      if (tStart >= tEnd) return [];
+
+      const lengths = calculateArcLengths(points);
+      const totalLength = lengths[lengths.length - 1];
+      const startLen = tStart * totalLength;
+      const endLen = tEnd * totalLength;
+
+      const segment = [];
+      let started = false;
+
+      for (let i = 0; i < points.length - 1; i++) {
+        const lenA = lengths[i];
+        const lenB = lengths[i + 1];
+
+        // Check if this edge contains our start point
+        if (!started && startLen >= lenA && startLen <= lenB) {
+          const segLen = lenB - lenA;
+          const t = segLen > 0 ? (startLen - lenA) / segLen : 0;
+          segment.push({
+            x: points[i].x + (points[i + 1].x - points[i].x) * t,
+            y: points[i].y + (points[i + 1].y - points[i].y) * t
+          });
+          started = true;
+        }
+
+        // Check if this edge contains our end point
+        if (started && endLen >= lenA && endLen <= lenB) {
+          const segLen = lenB - lenA;
+          const t = segLen > 0 ? (endLen - lenA) / segLen : 0;
+          segment.push({
+            x: points[i].x + (points[i + 1].x - points[i].x) * t,
+            y: points[i].y + (points[i + 1].y - points[i].y) * t
+          });
+          break;
+        }
+
+        // Add the end of this edge if we've started but haven't ended
+        if (started && lenB < endLen) {
+          segment.push({ ...points[i + 1] });
+        }
+      }
+
+      return segment;
+    }
+
+    // Split a fiber polyline into segments with gaps
+    function splitFiberWithGaps(points, numBreaks, gapSize, opts) {
+      const totalLength = computePolylineLength(points);
+      if (totalLength < gapSize * (numBreaks + 1)) {
+        return [points]; // Too short to break
+      }
+
+      const segments = [];
+      const gapT = gapSize / totalLength;
+
+      // Generate break positions with coherence
+      const breakPositions = [];
+      for (let b = 0; b < numBreaks; b++) {
+        // Mix random position with coherent seed
+        const randomT = 0.2 + Math.random() * 0.6; // Keep breaks in middle 60%
+        const coherentT = 0.3 + ((opts.pairSeed + b * 0.3 + opts.fiberIndex * 0.1) % 1) * 0.4;
+        const t = randomT * (1 - opts.coherence) + coherentT * opts.coherence;
+        breakPositions.push(clamp(t, 0.15, 0.85));
+      }
+      breakPositions.sort((a, b) => a - b);
+
+      // Split points at break positions, removing gap-sized sections
+      let lastEnd = 0;
+      for (const breakT of breakPositions) {
+        const gapStart = Math.max(lastEnd, breakT - gapT / 2);
+        const gapEnd = Math.min(1, breakT + gapT / 2);
+
+        // Extract segment from lastEnd to gapStart
+        if (gapStart > lastEnd + 0.05) {
+          const seg = extractPolylineSegment(points, lastEnd, gapStart);
+          if (seg.length > 1) segments.push(seg);
+        }
+        lastEnd = gapEnd;
+      }
+
+      // Final segment
+      if (lastEnd < 0.95) {
+        const finalSeg = extractPolylineSegment(points, lastEnd, 1);
+        if (finalSeg.length > 1) segments.push(finalSeg);
+      }
+
+      return segments.length > 0 ? segments : [points];
     }
 
     // Triangle wave for sharp pointy zigzags
@@ -1276,14 +1398,26 @@
           }
         }
 
+        // Break parameters with coherence seed for this pair
+        const breakChance = params.breakChance ?? 0;
+        const breakCoherence = params.breakCoherence ?? 0.5;
+        const breakGapSize = params.breakGapSize ?? 8;
+        const pairBreakSeed = Math.random();
+
         for (let i = 0; i < effectiveFiberCount; i++) {
           let fiberParam = (i + 1) / (effectiveFiberCount + 1);
           const ease = 0.5 - 0.5 * Math.cos(Math.PI * fiberParam);
           fiberParam = fiberParam + (ease - fiberParam) * (bias - 0.5) * 2;
 
-          const originParam = fiberParam;
+          // Add jiggle to origin and landing independently
+          const jiggleAmount = params.fiberJiggle ?? 0;
+          const maxJiggle = 0.15; // Max displacement as fraction of spacing
+          const originJiggle = (Math.random() - 0.5) * 2 * jiggleAmount * maxJiggle;
+          const landingJiggle = (Math.random() - 0.5) * 2 * jiggleAmount * maxJiggle;
+
+          const originParam = clamp(fiberParam + originJiggle, 0.05, 0.95);
           const landingDirection = pair.side === 'left' ? (1 - fiberParam) : (1 - fiberParam);
-          const landingParam = clamp(landingOffset + landingDirection * landingSpread, 0, 1);
+          const landingParam = clamp(landingOffset + landingDirection * landingSpread + landingJiggle, 0, 1);
 
           const originPoint = sampleCurveByArcLength(diagRail, diagLengths, originParam);
           const landingPoint = sampleCurveByArcLength(landingRail, landingLengths, landingParam);
@@ -1316,7 +1450,28 @@
             points.push(quadraticPoint(originPoint, controlPoint, landingPoint, t));
           }
 
-          curves.push({ side: pair.side, points, pairIndex: pair.sideIndex ?? 0, targetPairIndex: pair.oppositeIndex ?? pair.sideIndex, fiberIndex: i });
+          // Optionally break the fiber into segments with gaps
+          if (breakChance > 0 && Math.random() < breakChance) {
+            const numBreaks = Math.random() < 0.5 ? 1 : 2; // 1-2 breaks = 2-3 segments
+            const segments = splitFiberWithGaps(points, numBreaks, breakGapSize, {
+              coherence: breakCoherence,
+              pairSeed: pairBreakSeed,
+              fiberIndex: i
+            });
+
+            segments.forEach((seg, segIdx) => {
+              curves.push({
+                side: pair.side,
+                points: seg,
+                pairIndex: pair.sideIndex ?? 0,
+                targetPairIndex: pair.oppositeIndex ?? pair.sideIndex,
+                fiberIndex: i,
+                segmentIndex: segIdx
+              });
+            });
+          } else {
+            curves.push({ side: pair.side, points, pairIndex: pair.sideIndex ?? 0, targetPairIndex: pair.oppositeIndex ?? pair.sideIndex, fiberIndex: i });
+          }
         }
       });
 
@@ -1829,6 +1984,10 @@
         continuationLength: params.continuationLength ?? 20,
         continuationBias: params.continuationBias ?? 0.7,
         landingSpread: params.landingSpread ?? 1.0,
+        fiberJiggle: params.fiberJiggle ?? 0,
+        breakChance: params.breakChance ?? 0,
+        breakCoherence: params.breakCoherence ?? 0.5,
+        breakGapSize: params.breakGapSize ?? 8,
         wallSeparation: params.wallSeparation ?? 100,
         braidLength: params.braidLength ?? 800,
         fiberSpacing: (params.fiberSpacing ?? 3) * (params.pathScaleFactor ?? 1),
@@ -2836,6 +2995,10 @@
         fiberLanding: parseFloat(document.getElementById('fiberLanding').value),
         bowGradient: parseFloat(document.getElementById('bowGradient').value),
         landingSpread: parseFloat(document.getElementById('landingSpread').value),
+        fiberJiggle: parseFloat(document.getElementById('fiberJiggle').value),
+        breakChance: parseFloat(document.getElementById('breakChance').value),
+        breakCoherence: parseFloat(document.getElementById('breakCoherence').value),
+        breakGapSize: parseFloat(document.getElementById('breakGapSize').value),
         continuationLength: parseFloat(document.getElementById('continuationLength').value),
         continuationBias: parseFloat(document.getElementById('continuationBias').value),
         insideThinning: parseFloat(document.getElementById('insideThinning').value),
@@ -3025,7 +3188,10 @@
       'fiberCount', 'fiberBow', 'tipTaper', 'tipTaperLength',
       'redistributionFactor', 'curvatureSmoothing',
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
-      'bowGradient', 'landingSpread', 'continuationLength', 'continuationBias', 'insideThinning',
+      'bowGradient', 'landingSpread', 'fiberJiggle',
+      // Fiber break controls
+      'breakChance', 'breakCoherence', 'breakGapSize',
+      'continuationLength', 'continuationBias', 'insideThinning',
       // Cap and spout controls
       'capFiberCount', 'capGatherLength', 'capBowAngle', 'capBowStrength', 'capLandingDepth',
       'spoutFiberCount', 'spoutLength', 'spoutSpread', 'spoutGravity',
