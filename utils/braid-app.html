@@ -56,15 +56,41 @@
     }
 
     /* Section-specific slider colors */
-    .section-wave input[type="range"] { accent-color: #7eb8da; }
-    .section-wall input[type="range"] { accent-color: #a8d4a8; }
-    .section-fiber input[type="range"] { accent-color: #dab894; }
-    .section-breaks input[type="range"] { accent-color: #c9a8d4; }
-    .section-curve input[type="range"] { accent-color: #d4a8a8; }
-    .section-caps input[type="range"] { accent-color: #a8c9d4; }
-    .section-spouts input[type="range"] { accent-color: #d4d4a8; }
-    .section-scaling input[type="range"] { accent-color: #d4a8c9; }
-    .section-display input[type="range"] { accent-color: #a8d4c9; }
+    .section-wave input[type="range"] {
+      accent-color: #7eb8da;
+    }
+
+    .section-wall input[type="range"] {
+      accent-color: #a8d4a8;
+    }
+
+    .section-fiber input[type="range"] {
+      accent-color: #dab894;
+    }
+
+    .section-breaks input[type="range"] {
+      accent-color: #c9a8d4;
+    }
+
+    .section-curve input[type="range"] {
+      accent-color: #d4a8a8;
+    }
+
+    .section-caps input[type="range"] {
+      accent-color: #a8c9d4;
+    }
+
+    .section-spouts input[type="range"] {
+      accent-color: #d4d4a8;
+    }
+
+    .section-scaling input[type="range"] {
+      accent-color: #d4a8c9;
+    }
+
+    .section-display input[type="range"] {
+      accent-color: #a8d4c9;
+    }
 
     button {
       padding: 10px 20px;
@@ -227,6 +253,14 @@
         <label>Fiber Jiggle <span id="fiberJiggleVal">0.25</span></label>
         <input type="range" id="fiberJiggle" value="0.25" min="0" max="1" step="0.05">
       </div>
+      <div class="control-group">
+        <label>Arc Shift <span id="arcTangentBlendVal">0</span></label>
+        <input type="range" id="arcTangentBlend" value="0" min="-1" max="1" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Arc Lean <span id="arcLeanVal">0</span></label>
+        <input type="range" id="arcLean" value="0" min="-1" max="1" step="0.05">
+      </div>
     </div>
 
     <!-- Fiber Breaks -->
@@ -340,8 +374,8 @@
           <input type="range" id="referencePathLength" value="1650" min="100" max="3500" step="25">
         </div>
         <div class="control-group">
-          <label>Scale Power <span id="scalePathPowerVal">1.77</span></label>
-          <input type="range" id="scalePathPower" value="1.77" min="0.01" max="3" step="0.01">
+          <label>Scale Power <span id="scalePathPowerVal">0.01</span></label>
+          <input type="range" id="scalePathPower" value="0.01" min="0.01" max="3" step="0.01">
         </div>
         <div class="control-group">
           <label>Bow Scale Power <span id="scaleBowPowerVal">0.25</span></label>
@@ -799,6 +833,73 @@
       const dy = next.y - prev.y;
       const len = Math.hypot(dx, dy) || 1;
       return { x: dx / len, y: dy / len };
+    }
+
+    // Estimate tangent at a parametric position (0-1) along a rail using arc-length sampling
+    function estimateRailTangent(rail, lengths, param) {
+      if (!rail || rail.length < 2 || !lengths || lengths.length < 2) {
+        return { x: 0, y: 1 }; // Default to vertical if invalid
+      }
+      const totalLength = lengths[lengths.length - 1] || 1;
+      const targetLength = param * totalLength;
+
+      // Find the index where we are
+      let idx = 0;
+      for (let i = 0; i < lengths.length - 1; i++) {
+        if (lengths[i + 1] >= targetLength) {
+          idx = i;
+          break;
+        }
+        idx = i;
+      }
+
+      // Sample points slightly before and after for tangent
+      const delta = 0.05;
+      const paramBefore = Math.max(0, param - delta);
+      const paramAfter = Math.min(1, param + delta);
+      const pointBefore = sampleCurveByArcLength(rail, lengths, paramBefore);
+      const pointAfter = sampleCurveByArcLength(rail, lengths, paramAfter);
+
+      const dx = pointAfter.x - pointBefore.x;
+      const dy = pointAfter.y - pointBefore.y;
+      const len = Math.hypot(dx, dy) || 1;
+      return { x: dx / len, y: dy / len };
+    }
+
+    // Get cycle index for a given Y position along the braid
+    function getCycleIndexAtY(y, params) {
+      const { frequency, cycleJitter, braidLength } = params;
+      if (!cycleJitter || cycleJitter <= 0) {
+        // No jitter - simple calculation
+        return Math.floor((y / braidLength) * frequency);
+      }
+
+      // Walk through jittered cycles
+      const targetPos = y / braidLength;
+      let currentPos = 0;
+      let cycleIndex = 0;
+
+      while (currentPos < targetPos && cycleIndex < frequency * 2) {
+        const jitterAmount = cycleRandom(cycleIndex) * cycleJitter * 0.4;
+        const cycleWidthMult = 1 + jitterAmount;
+        const baseCycleWidth = 1 / frequency;
+        const thisCycleWidth = baseCycleWidth * cycleWidthMult;
+        const cycleEnd = currentPos + thisCycleWidth;
+
+        if (targetPos >= cycleEnd) {
+          currentPos = cycleEnd;
+          cycleIndex++;
+        } else {
+          break;
+        }
+      }
+      return cycleIndex;
+    }
+
+    // Get the jitter multiplier for a specific cycle
+    function getCycleJitterAmount(cycleIndex, cycleJitter) {
+      if (!cycleJitter || cycleJitter <= 0) return 0;
+      return cycleRandom(cycleIndex) * cycleJitter * 0.4;
     }
 
     function findWallPartner(centerExt, wallExtrema, side, params) {
@@ -1349,8 +1450,13 @@
       const landingOffset = clamp(params.fiberLanding ?? 0.0, 0, 1);
       const landingSpread = clamp(params.landingSpread ?? 1.0, 0.1, 1);
       const bowStrength = clamp(params.fiberBow ?? 0.5, 0, 1);
+      const arcTangentBlend = clamp(params.arcTangentBlend ?? 0, -1, 1);
+      const arcLean = params.arcLean ?? 0;
 
-      continuationPairs.forEach(pair => {
+      for (let pairIdx = 0; pairIdx < continuationPairs.length; pairIdx++) {
+        const pair = continuationPairs[pairIdx];
+        // Find the next pair on the SAME side (skip one, since pairs alternate left/right)
+        const nextSameSidePair = continuationPairs[pairIdx + 2] || null;
         const diagRail = pair.diagRail || [];
         const diagLengths = pair.diagLengths || [];
         const wallRail = pair.wallRail || [];
@@ -1360,13 +1466,13 @@
           : (pair.landingRail && pair.landingRail.length ? pair.landingRail : pair.centerRail);
         const landingLengths = pair.oppositeLandingLengths || pair.landingLengths || pair.centerLengths;
 
-        if (!diagRail.length || !diagLengths.length || !landingRail?.length || !landingLengths?.length) return;
+        if (!diagRail.length || !diagLengths.length || !landingRail?.length || !landingLengths?.length) continue;
 
         const diagTotalLength = diagLengths[diagLengths.length - 1] || 0;
         const landingTotalLength = landingLengths[landingLengths.length - 1] || 0;
 
         const minLength = spacing * 2;
-        if (diagTotalLength < minLength || landingTotalLength < minLength) return;
+        if (diagTotalLength < minLength || landingTotalLength < minLength) continue;
 
         let effectiveFiberCount = totalFibers;
 
@@ -1443,19 +1549,88 @@
           let toWall = normalizeVector({ x: wallPoint.x - originPoint.x, y: wallPoint.y - originPoint.y });
           if (!isFinite(toWall.x) || !isFinite(toWall.y)) toWall = { x: 0, y: 0 };
 
+          // Get the tangent of the continuation line (diagRail) at the origin point
+          const diagTangent = estimateRailTangent(diagRail, diagLengths, originParam);
+
+          // DEBUG: Log values for first fiber of first few pairs
+          if (pairIdx < 2 && i === 0) {
+            console.log(`[DEBUG] Pair ${pairIdx}, Fiber ${i}:`, {
+              arcTangentBlend,
+              arcLean,
+              diagTangent,
+              originPoint,
+              landingPoint,
+              diagRailLength: diagRail.length,
+              diagLengthsLength: diagLengths.length
+            });
+          }
+
           const gradientPower = clamp(params.bowGradient ?? 2.0, 0.5, 4);
           const shapedFactor = Math.pow(outernessFactor, gradientPower);
 
           const controlPointDistance = bowStrength * shapedFactor * 100;
 
-          const midStraight = {
+          // Base midpoint between origin and landing
+          let midStraight = {
             x: originPoint.x + (landingPoint.x - originPoint.x) * 0.5,
             y: originPoint.y + (landingPoint.y - originPoint.y) * 0.5
           };
 
+          // Arc Tangent Blend: shift the midpoint along the braid direction (Y-axis)
+          // This "pulls" the arc peak up or down along the path
+          // arcTangentBlend = 0: centered (current behavior)
+          // arcTangentBlend = 1: shifted toward landing, arcTangentBlend = -1: shifted toward origin
+          if (arcTangentBlend !== 0) {
+            // Calculate how far along the fiber path we could shift
+            const fiberLength = Math.hypot(landingPoint.x - originPoint.x, landingPoint.y - originPoint.y);
+            const maxShift = fiberLength * 0.4; // Max 40% of fiber length
+            const shiftAmount = arcTangentBlend * maxShift;
+
+            // Shift midpoint along Y-axis (braid direction)
+            // Positive = toward landing (further along braid), Negative = toward origin
+            midStraight = {
+              x: midStraight.x,
+              y: midStraight.y + shiftAmount
+            };
+          }
+
+          // Arc Lean: shift control point toward the next continuation on the same side
+          // This helps fibers "flow" toward where they'll connect next
+          // Works with a base amount, amplified when jitter is present
+          let leanOffsetX = 0;
+          let leanOffsetY = 0;
+          if (arcLean !== 0 && nextSameSidePair && nextSameSidePair.diagRail && nextSameSidePair.diagRail.length > 0) {
+            // Get the origin of the next same-side continuation (where fibers will go next)
+            // The end of diagRail (index -1) is the center tip, start (index 0) is the wall trough
+            // We want to lean toward the center tip of the next pair
+            const nextTarget = nextSameSidePair.diagRail[nextSameSidePair.diagRail.length - 1];
+
+            // Direction from current control point area toward next continuation's tip
+            const toNextDir = normalizeVector({
+              x: nextTarget.x - midStraight.x,
+              y: nextTarget.y - midStraight.y
+            });
+
+            // Get local jitter amount for this cycle (0-1 range roughly)
+            const pairY = diagRail[0]?.y || 0;
+            const cycleIdx = getCycleIndexAtY(pairY, params);
+            const localJitter = Math.abs(getCycleJitterAmount(cycleIdx, params.cycleJitter));
+
+            // Base lean + jitter amplification
+            // With no jitter: uses base lean strength
+            // With jitter: amplified proportionally
+            const baseLeanScale = 15; // Base pixel offset at arcLean=1
+            const jitterAmplification = 1 + localJitter * 2; // Up to 3x with max jitter
+            const leanStrength = arcLean * baseLeanScale * jitterAmplification;
+
+            // Lean toward the next same-side continuation
+            leanOffsetX = toNextDir.x * leanStrength;
+            leanOffsetY = toNextDir.y * leanStrength;
+          }
+
           const controlPoint = {
-            x: midStraight.x + toWall.x * controlPointDistance,
-            y: midStraight.y + toWall.y * controlPointDistance
+            x: midStraight.x + toWall.x * controlPointDistance + leanOffsetX,
+            y: midStraight.y + toWall.y * controlPointDistance + leanOffsetY
           };
 
           const points = [];
@@ -1488,7 +1663,7 @@
             curves.push({ side: pair.side, points, pairIndex: pair.sideIndex ?? 0, targetPairIndex: pair.oppositeIndex ?? pair.sideIndex, fiberIndex: i });
           }
         }
-      });
+      }
 
       return curves;
     }
@@ -2001,6 +2176,8 @@
         wallSmooth: params.wallSmooth ?? 1,
         landingSpread: params.landingSpread ?? 1.0,
         fiberJiggle: params.fiberJiggle ?? 0,
+        arcTangentBlend: params.arcTangentBlend ?? 0,
+        arcLean: params.arcLean ?? 0,
         breakChance: params.breakChance ?? 0,
         breakCoherence: params.breakCoherence ?? 0.5,
         breakGapSize: params.breakGapSize ?? 8,
@@ -3015,6 +3192,8 @@
         bowGradient: parseFloat(document.getElementById('bowGradient').value),
         landingSpread: parseFloat(document.getElementById('landingSpread').value),
         fiberJiggle: parseFloat(document.getElementById('fiberJiggle').value),
+        arcTangentBlend: parseFloat(document.getElementById('arcTangentBlend').value),
+        arcLean: parseFloat(document.getElementById('arcLean').value),
         breakChance: parseFloat(document.getElementById('breakChance').value),
         breakCoherence: parseFloat(document.getElementById('breakCoherence').value),
         breakGapSize: parseFloat(document.getElementById('breakGapSize').value),
@@ -3208,7 +3387,7 @@
       'fiberCount', 'fiberBow', 'tipTaper', 'tipTaperLength',
       'redistributionFactor', 'curvatureSmoothing',
       'cycleJitter', 'zigzagPhase', 'fiberBias', 'fiberLanding',
-      'bowGradient', 'landingSpread', 'fiberJiggle',
+      'bowGradient', 'landingSpread', 'fiberJiggle', 'arcTangentBlend', 'arcLean',
       // Fiber break controls
       'breakChance', 'breakCoherence', 'breakGapSize',
       'continuationLength', 'continuationBias', 'wallSmooth', 'insideThinning',
