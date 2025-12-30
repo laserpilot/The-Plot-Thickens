@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three-Strand Braid - Polygon Clipping Approach</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    .canvas-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .canvas-panel {
+      background: #252525;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .canvas-panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #a0a0a0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      background: #1a1a1a;
+      border-radius: 4px;
+      border: 1px solid #333;
+    }
+
+    .controls {
+      background: #252525;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .controls h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #fff;
+    }
+
+    .control-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-item label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #b0b0b0;
+    }
+
+    .control-item .value {
+      color: #4a9eff;
+      font-weight: 600;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #333;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #4a9eff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #6bb0ff;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #4a9eff;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #6bb0ff;
+    }
+
+    .toggles {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px solid #333;
+      margin-top: 20px;
+    }
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .toggle-item label {
+      font-size: 13px;
+      color: #b0b0b0;
+      cursor: pointer;
+    }
+
+    .phase-indicator {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #4a9eff;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      padding: 15px;
+      background: #1a1a1a;
+      border-radius: 4px;
+      margin-top: 15px;
+      font-size: 12px;
+      color: #808080;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    .stats .stat {
+      display: flex;
+      gap: 6px;
+    }
+
+    .stats .stat-label {
+      color: #606060;
+    }
+
+    .stats .stat-value {
+      color: #4a9eff;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1200px) {
+      .canvas-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>
+      Three-Strand Braid - Chevron Construction
+      <span class="phase-indicator" id="phaseIndicator">Phase A</span>
+    </h1>
+
+    <div class="canvas-grid">
+      <div class="canvas-panel">
+        <h2>1. Boundary Curves (Chevron Construction)</h2>
+        <canvas id="canvas1" width="400" height="500"></canvas>
+      </div>
+      <div class="canvas-panel">
+        <h2>2. Chevron Polygons (Straight)</h2>
+        <canvas id="canvas2" width="400" height="500"></canvas>
+      </div>
+      <div class="canvas-panel">
+        <h2>3. Warped (Final Result)</h2>
+        <canvas id="canvas3" width="400" height="500"></canvas>
+      </div>
+    </div>
+
+    <div class="controls">
+      <h2>Controls</h2>
+
+      <div class="control-group">
+        <div class="control-item">
+          <label>
+            <span>Frequency (cycles)</span>
+            <span class="value" id="frequencyValue">1.4</span>
+          </label>
+          <input type="range" id="frequency" min="0.5" max="5" step="0.1" value="1.4">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Thickness (px)</span>
+            <span class="value" id="thicknessValue">23</span>
+          </label>
+          <input type="range" id="thickness" min="5" max="50" step="1" value="23">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Zigzag Scale</span>
+            <span class="value" id="zigzagScaleValue">0.80×</span>
+          </label>
+          <input type="range" id="zigzagScale" min="0.2" max="1.5" step="0.05" value="0.8">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Outer Wall Scale</span>
+            <span class="value" id="outerWallScaleValue">0.90×</span>
+          </label>
+          <input type="range" id="outerWallScale" min="0.5" max="3" step="0.1" value="0.9">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Wall Separation (px)</span>
+            <span class="value" id="wallSeparationValue">55</span>
+          </label>
+          <input type="range" id="wallSeparation" min="0" max="200" step="5" value="55">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Center Phase (°)</span>
+            <span class="value" id="zigzagPhaseValue">35°</span>
+          </label>
+          <input type="range" id="zigzagPhase" min="-180" max="180" step="5" value="35">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Left Wall Phase (°)</span>
+            <span class="value" id="leftWallPhaseValue">-55°</span>
+          </label>
+          <input type="range" id="leftWallPhase" min="-180" max="180" step="5" value="-55">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Right Wall Phase (°)</span>
+            <span class="value" id="rightWallPhaseValue">5°</span>
+          </label>
+          <input type="range" id="rightWallPhase" min="-180" max="180" step="5" value="5">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Braid Length (px)</span>
+            <span class="value" id="braidLengthValue">400</span>
+          </label>
+          <input type="range" id="braidLength" min="200" max="800" step="50" value="400">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Segment Angle (degrees)</span>
+            <span class="value" id="segmentAngleValue">19</span>
+          </label>
+          <input type="range" id="segmentAngle" min="1" max="20" step="1" value="19">
+        </div>
+
+        <div class="control-item" id="amplitudeControl">
+          <label>
+            <span>Backbone Amplitude (px)</span>
+            <span class="value" id="amplitudeValue">0</span>
+          </label>
+          <input type="range" id="amplitude" min="0" max="100" step="0.1" value="0">
+        </div>
+
+        <div class="control-item">
+          <label>
+            <span>Canvas Zoom</span>
+            <span class="value" id="zoomValue">1.00×</span>
+          </label>
+          <input type="range" id="zoom" min="0.5" max="3" step="0.1" value="1">
+        </div>
+      </div>
+
+      <div class="toggles">
+        <div class="toggle-item">
+          <input type="checkbox" id="useAutoPhase" checked>
+          <label for="useAutoPhase">Auto-Sync Wall Phase</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showStrandFaces" checked>
+          <label for="showStrandFaces">Show Strand Fills</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showWireframes">
+          <label for="showWireframes">Show Wireframes</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showZDepth">
+          <label for="showZDepth">Z-Depth Colors</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showBoundaries" checked>
+          <label for="showBoundaries">Show Boundary Curves</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showSegmentSamples">
+          <label for="showSegmentSamples">Show Segment Samples</label>
+        </div>
+        <div class="toggle-item">
+          <input type="checkbox" id="showContinuousFaces">
+          <label for="showContinuousFaces">Show Continuous Faces</label>
+        </div>
+      </div>
+
+      <div class="color-legend" style="padding: 15px; background: #1a1a1a; border-radius: 4px; margin-top: 15px; font-size: 12px; color: #808080; font-family: 'Monaco', 'Courier New', monospace;">
+        <div style="margin-bottom: 8px; color: #a0a0a0; font-weight: 600;">STRAND COLORS:</div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 16px; height: 16px; background: #ff4444; border-radius: 2px;"></div>
+            <span>Strand 0 (Red)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 16px; height: 16px; background: #44ff44; border-radius: 2px;"></div>
+            <span>Strand 1 (Green)</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 16px; height: 16px; background: #4444ff; border-radius: 2px;"></div>
+            <span>Strand 2 (Blue)</span>
+          </div>
+        </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333; color: #606060; font-size: 11px;">
+          <strong style="color: #808080;">Debug Markers:</strong>
+          <span style="color: #ff0000;">●</span> Center Extrema
+          <span style="color: #0088ff;">●</span> Left Wall
+          <span style="color: #ff0088;">●</span> Right Wall
+          <span style="color: #ff8800;">━</span> Diagonals
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">Segments:</span>
+          <span class="stat-value" id="segmentCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Polygons:</span>
+          <span class="stat-value" id="polygonCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Extrema:</span>
+          <span class="stat-value" id="extremaCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Render Time:</span>
+          <span class="stat-value" id="renderTime">0ms</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg Center Δx:</span>
+          <span class="stat-value" id="avgCenterSlope">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg Wall Δx:</span>
+          <span class="stat-value" id="avgWallSlope">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // Global State
+    // ========================================
+    const state = {
+      params: {
+        frequency: 1.4,
+        thickness: 23,
+        braidLength: 400,
+        segmentAngleDelta: 19,
+        backboneAmplitude: 0,
+        zigzagScale: 0.8,
+        outerWallScale: 0.9,
+        wallSeparation: 55,
+        zigzagPhase: 35,
+        leftWallPhase: -55,
+        rightWallPhase: 5,
+        useAutoPhase: true  // Enable auto-sync by default
+      },
+      segments: [],
+      boundaries: null,  // Chevron boundary curves
+      backbonePath: null,
+      visualization: {
+        showWireframes: false,
+        showZDepth: false,
+        showBoundaries: true,  // Show boundaries by default
+        showSegmentSamples: false,
+        showContinuousFaces: false,
+        showStrandFaces: true,  // Show filled strand polygons by default
+        zoom: 1.0  // Canvas zoom level
+      },
+      debugStats: {
+        avgCenterSlope: 0,
+        avgWallSlope: 0
+      }
+    };
+
+    const STRAND_COLORS = ['#ff4444', '#44ff44', '#4444ff'];
+    const STRAND_COLORS_TRANSPARENT = ['rgba(255, 68, 68, 0.3)', 'rgba(68, 255, 68, 0.3)', 'rgba(68, 68, 255, 0.3)'];
+
+    // ========================================
+    // Stage 1: Straight Braid Generation
+    // ========================================
+    function generateStraightBraid(params) {
+      const { frequency, braidLength, segmentAngleDelta, thickness } = params;
+      const segments = [];
+
+      // Total angle range for all cycles
+      const totalAngle = frequency * 2 * Math.PI;
+      const angleStep = (segmentAngleDelta * Math.PI) / 180;
+
+      for (let angle = 0; angle < totalAngle; angle += angleStep) {
+        const segment = {
+          angleStart: angle,
+          angleEnd: Math.min(angle + angleStep, totalAngle),
+          strands: []
+        };
+
+        // Generate all 3 strands for this segment
+        for (let strandIndex = 0; strandIndex < 3; strandIndex++) {
+          const phase = (strandIndex / 3) * 2 * Math.PI;
+
+          // Calculate z-depth at segment midpoint for role selection
+          const midAngle = (angle + segment.angleEnd) / 2;
+          const z = Math.cos(midAngle + phase);  // 1 = front, -1 = back
+
+          segment.strands.push({
+            strandIndex,
+            phase,                 // Phase offset for left/right assignment
+            z                      // Z-depth for front/back sorting
+          });
+        }
+
+        segments.push(segment);
+      }
+
+      return segments;
+    }
+
+    // ========================================
+    // Boundary Curve Generators (Chevron Construction)
+    // ========================================
+    function generateCenterZigZag(y, params) {
+      const { frequency, braidLength, thickness, zigzagScale, zigzagPhase } = params;
+      const totalAngle = frequency * 2 * Math.PI;
+      const angle = (y / braidLength) * totalAngle;
+      const phaseOffset = (zigzagPhase * Math.PI) / 180;
+
+      // Triangle wave: sharp V-shapes at the center where strands cross
+      // For three-strand braid: 3 complete V-cycles per 2π rotation
+      const triangleWave = Math.asin(Math.sin(angle * 3 + phaseOffset)) / (Math.PI / 2);
+      const amplitude = thickness * zigzagScale; // Center V should be narrower than the full braid
+      return amplitude * triangleWave;
+    }
+
+    // Helper: Calculate automatic phase synchronization for walls
+    function calculateAutoPhase(zigzagPhase, side) {
+      // Goal: Offset wall troughs from zigzag peaks for rhombus geometry
+      // For a braid, wall troughs should be between zigzag peaks, not aligned
+      // Zigzag frequency: angle * 3 (3 V-cycles per 2π)
+      // Wall frequency: angle * 1.5 (3 bulges per 2π)
+      // Frequency ratio: 3 / 1.5 = 2
+
+      // Convert zigzag phase to radians
+      const zigzagPhaseRad = (zigzagPhase * Math.PI) / 180;
+
+      // For proper braid geometry, wall troughs should be offset by ~90°
+      // from zigzag peaks (quarter cycle)
+      // This creates vertical separation for the diagonal connections
+
+      // Base phase calculation (aligned to zigzag)
+      let wallPhaseRad = -3 * Math.PI / 4 + zigzagPhaseRad / 2;
+
+      // Add 90° offset to shift wall troughs between zigzag peaks
+      // This creates the vertical span needed for visible diagonal rhombuses
+      wallPhaseRad += Math.PI / 2;
+
+      // Add side-specific offset (left vs right are 180° apart)
+      if (side === 'right') {
+        wallPhaseRad += Math.PI; // Right wall is opposite phase
+      }
+
+      // Convert back to degrees
+      return (wallPhaseRad * 180) / Math.PI;
+    }
+
+    function generateOuterWall(y, side, params) {
+      const {
+        frequency,
+        braidLength,
+        thickness,
+        outerWallScale,
+        wallSeparation,
+        zigzagPhase,
+        leftWallPhase,
+        rightWallPhase,
+        useAutoPhase  // New parameter to toggle auto-sync
+      } = params;
+      const totalAngle = frequency * 2 * Math.PI;
+      const angle = (y / braidLength) * totalAngle;
+
+      // Use auto-sync phase or manual phase
+      let phaseDeg;
+      if (useAutoPhase) {
+        phaseDeg = calculateAutoPhase(zigzagPhase, side);
+      } else {
+        phaseDeg = side === 'left' ? leftWallPhase : rightWallPhase;
+      }
+
+      const phaseOffset = (phaseDeg * Math.PI) / 180;
+
+      // Outer walls are ENVELOPE curves, not phase-shifted strands
+      // They define the outer boundary where the braid bulges.
+      // Use sin(angle * 1.5) for smooth envelope - PHASE ALIGNED with zigzag!
+      // 1.5 creates 3 bulges per 2π (matching 3-strand pattern)
+      const envelope = Math.sin(angle * 1.5 + phaseOffset);
+
+      // Let walls cross the centerline diagonally (removed Math.abs)
+      const amplitude = thickness * outerWallScale;
+      const base = (side === 'left' ? -1 : 1) * amplitude * envelope;
+      const separationOffset = wallSeparation / 2;
+      return side === 'left' ? base - separationOffset : base + separationOffset;
+    }
+
+    function generateBoundaries(params) {
+      const { braidLength, segmentAngleDelta } = params;
+      const boundaries = {
+        centerZigZag: [],
+        leftWall: [],
+        rightWall: []
+      };
+
+      // Sample boundary curves at regular intervals
+      const numSamples = Math.ceil(braidLength / 5); // Sample every 5px
+      for (let i = 0; i <= numSamples; i++) {
+        const y = (i / numSamples) * braidLength;
+        boundaries.centerZigZag.push({
+          y,
+          x: generateCenterZigZag(y, params)
+        });
+        boundaries.leftWall.push({
+          y,
+          x: generateOuterWall(y, 'left', params)
+        });
+        boundaries.rightWall.push({
+          y,
+          x: generateOuterWall(y, 'right', params)
+        });
+      }
+
+      return boundaries;
+    }
+
+    // ========================================
+    // Helper: Sample boundary curve with N substeps between y0 and y1
+    function sampleBoundaryCurve(boundary, y0, y1, numSteps) {
+      const samples = [];
+      for (let i = 0; i <= numSteps; i++) {
+        const t = i / Math.max(1, numSteps);
+        const y = y0 + (y1 - y0) * t;
+        samples.push(interpolateBoundaryAt(boundary, y));
+      }
+      return samples;
+    }
+
+    function collectSegmentFaces() {
+      const faces = [];
+      state.segments.forEach(segment => {
+        (segment.facePolygons || []).forEach(face => {
+          faces.push({
+            strandIndex: face.strandIndex,
+            polygons: face.polygons,
+            segment
+          });
+        });
+      });
+      return faces;
+    }
+
+    function buildContinuousFaces(segments, side) {
+      const faces = [];
+      let current = null;
+
+      const flush = () => {
+        if (!current || current.outer.length < 2 || current.center.length < 2) return;
+        const outerPoints = current.outer.map(p => [p.x, p.y]);
+        const centerPoints = current.center.map(p => [p.x, p.y]);
+        const poly = side === 'left'
+          ? [...outerPoints, ...centerPoints.slice().reverse()]
+          : [...centerPoints, ...outerPoints.slice().reverse()];
+        poly.push(poly[0]);
+        faces.push({
+          strandIndex: current.strandIndex,
+          polygons: [[poly]]
+        });
+        current = null;
+      };
+
+      segments.forEach(segment => {
+        if (!segment.faceMeta || !segment.debug) {
+          flush();
+          return;
+        }
+        const strandIndex = segment.faceMeta[side];
+        const samples = segment.debug.samples;
+        const outerSamples = side === 'left' ? samples.left : samples.right;
+        const centerSamples = samples.center;
+
+        if (!current || current.strandIndex !== strandIndex) {
+          flush();
+          current = {
+            strandIndex,
+            outer: [],
+            center: []
+          };
+        }
+
+        const outerSlice = current.outer.length === 0 ? outerSamples : outerSamples.slice(1);
+        const centerSlice = current.center.length === 0 ? centerSamples : centerSamples.slice(1);
+        current.outer.push(...outerSlice);
+        current.center.push(...centerSlice);
+      });
+
+      flush();
+      return faces;
+    }
+
+    // Stage 2 (NEW): Chevron Polygon Construction
+    // ========================================
+    function buildChevronPolygons(y0, y1, sortedStrands, boundaries, params) {
+      // Back strand (rank 2) is always hidden in this model
+      const backStrandIndex = sortedStrands[2].strandIndex;
+
+      // Determine left/right assignment by zigzag direction
+      const frontStrand = sortedStrands[0];
+      const middleStrand = sortedStrands[1];
+
+      let leftStrandIndex, rightStrandIndex;
+
+      // Check the zigzag's x-direction in this segment by sampling its start/end
+      const x0 = interpolateBoundaryAt(boundaries.centerZigZag, y0).x;
+      const x1 = interpolateBoundaryAt(boundaries.centerZigZag, y1).x;
+
+      if (x1 > x0) {
+        // Zigzag is moving RIGHT (forming '>')
+        rightStrandIndex = frontStrand.strandIndex;
+        leftStrandIndex = middleStrand.strandIndex;
+      } else {
+        // Zigzag is moving LEFT (forming '<')
+        leftStrandIndex = frontStrand.strandIndex;
+        rightStrandIndex = middleStrand.strandIndex;
+      }
+
+      const segmentHeight = Math.abs(y1 - y0);
+      const sampleCount = Math.max(4, Math.ceil(segmentHeight / 6));
+
+      const leftSamples = sampleBoundaryCurve(boundaries.leftWall, y0, y1, sampleCount);
+      const rightSamples = sampleBoundaryCurve(boundaries.rightWall, y0, y1, sampleCount);
+      const centerSamples = sampleBoundaryCurve(boundaries.centerZigZag, y0, y1, sampleCount);
+
+      // Detect extrema in all three curves
+      const centerExtrema = detectExtrema(centerSamples);
+      const leftExtrema = detectExtrema(leftSamples);
+      const rightExtrema = detectExtrema(rightSamples);
+
+      // Helper: Find nearest wall extremum to a zigzag extremum
+      const findNearestWallTrough = (zigzagExt, wallExtrema) => {
+        if (wallExtrema.length === 0) return null;
+
+        // Find the wall extremum closest in y-coordinate
+        let nearest = wallExtrema[0];
+        let minDist = Math.abs(wallExtrema[0].y - zigzagExt.y);
+
+        for (let i = 1; i < wallExtrema.length; i++) {
+          const dist = Math.abs(wallExtrema[i].y - zigzagExt.y);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = wallExtrema[i];
+          }
+        }
+
+        return nearest;
+      };
+
+      // Build polygons with diagonal rhombus geometry
+      let leftPoly, rightPoly;
+      const diagonalSamples = { left: [], right: [] };
+      const diagonalExtents = { left: null, right: null };
+
+      if (centerExtrema.length > 0) {
+        const zigzagExt = centerExtrema[0];
+
+        if (zigzagExt.x > 0) {
+          // Zigzag peaks RIGHT - connect to right wall trough
+          const wallExt = findNearestWallTrough(zigzagExt, rightExtrema);
+
+          if (wallExt) {
+            const diagonalResult = generateDiagonalSamples(zigzagExt, wallExt);
+            diagonalSamples.right = diagonalResult.points;
+            diagonalExtents.right = diagonalResult.extents;
+
+            // Debug: Log diagonal extents to verify vertical span
+            if (diagonalResult.points.length > 0) {
+              const ySpan = Math.abs(zigzagExt.y - wallExt.y);
+              if (ySpan < 0.1) {
+                console.warn('Degenerate diagonal detected:', {
+                  zigzag: { x: zigzagExt.x, y: zigzagExt.y },
+                  wall: { x: wallExt.x, y: wallExt.y },
+                  ySpan
+                });
+              }
+            }
+
+            // Build right polygon with diagonal
+            rightPoly = [
+              ...centerSamples.slice(0, zigzagExt.index + 1).map(p => [p.x, p.y]),
+              ...diagonalResult.points.slice(1).map(p => [p.x, p.y]),
+              ...rightSamples.slice(wallExt.index).reverse().map(p => [p.x, p.y])
+            ];
+
+            leftPoly = [
+              ...leftSamples.map(p => [p.x, p.y]),
+              ...centerSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+          } else {
+            // Fallback to parallel construction
+            rightPoly = [
+              ...centerSamples.map(p => [p.x, p.y]),
+              ...rightSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+            leftPoly = [
+              ...leftSamples.map(p => [p.x, p.y]),
+              ...centerSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+          }
+        } else {
+          // Zigzag peaks LEFT - connect to left wall trough
+          const wallExt = findNearestWallTrough(zigzagExt, leftExtrema);
+
+          if (wallExt) {
+            const diagonalResult = generateDiagonalSamples(zigzagExt, wallExt);
+            diagonalSamples.left = diagonalResult.points;
+            diagonalExtents.left = diagonalResult.extents;
+
+            // Build left polygon with diagonal
+            leftPoly = [
+              ...leftSamples.slice(0, wallExt.index + 1).map(p => [p.x, p.y]),
+              ...diagonalResult.points.map(p => [p.x, p.y]),
+              ...centerSamples.slice(zigzagExt.index).reverse().map(p => [p.x, p.y])
+            ];
+
+            rightPoly = [
+              ...centerSamples.map(p => [p.x, p.y]),
+              ...rightSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+          } else {
+            // Fallback to parallel construction
+            leftPoly = [
+              ...leftSamples.map(p => [p.x, p.y]),
+              ...centerSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+            rightPoly = [
+              ...centerSamples.map(p => [p.x, p.y]),
+              ...rightSamples.slice().reverse().map(p => [p.x, p.y])
+            ];
+          }
+        }
+      } else {
+        // No zigzag extremum - use standard parallel construction
+        leftPoly = [
+          ...leftSamples.map(p => [p.x, p.y]),
+          ...centerSamples.slice().reverse().map(p => [p.x, p.y])
+        ];
+
+        rightPoly = [
+          ...centerSamples.map(p => [p.x, p.y]),
+          ...rightSamples.slice().reverse().map(p => [p.x, p.y])
+        ];
+      }
+
+      leftPoly.push(leftPoly[0]);
+      rightPoly.push(rightPoly[0]);
+
+      const polygons = {
+        [leftStrandIndex]: [[leftPoly]],
+        [rightStrandIndex]: [[rightPoly]],
+        [backStrandIndex]: [] // Explicitly mark back strand as empty
+      };
+
+      const midIndex = Math.floor(centerSamples.length / 2);
+      const debug = {
+        y0,
+        y1,
+        samples: {
+          left: leftSamples,
+          center: centerSamples,
+          right: rightSamples
+        },
+        midPoints: {
+          center: centerSamples[midIndex],
+          left: leftSamples[midIndex],
+          right: rightSamples[midIndex]
+        },
+        slopes: {
+          center: centerSamples[centerSamples.length - 1].x - centerSamples[0].x,
+          left: leftSamples[leftSamples.length - 1].x - leftSamples[0].x,
+          right: rightSamples[rightSamples.length - 1].x - rightSamples[0].x
+        },
+        extrema: centerExtrema,
+        wallExtrema: { left: leftExtrema, right: rightExtrema },
+        diagonalSamples: diagonalSamples,
+        diagonalExtents: diagonalExtents  // Log start/end points of diagonals
+      };
+
+      const meta = {
+        left: leftStrandIndex,
+        right: rightStrandIndex
+      };
+
+      return { polygons, debug, meta };
+    }
+
+    // Helper: Interpolate boundary at specific y-coordinate
+    function interpolateBoundaryAt(boundary, targetY) {
+      // Clamp to boundary range
+      if (targetY <= boundary[0].y) return { x: boundary[0].x, y: targetY };
+      if (targetY >= boundary[boundary.length - 1].y) return { x: boundary[boundary.length - 1].x, y: targetY };
+
+      // Find bounding points
+      for (let i = 0; i < boundary.length - 1; i++) {
+        if (boundary[i].y <= targetY && boundary[i + 1].y >= targetY) {
+          const t = (targetY - boundary[i].y) / (boundary[i + 1].y - boundary[i].y);
+          return {
+            x: boundary[i].x + (boundary[i + 1].x - boundary[i].x) * t,
+            y: targetY
+          };
+        }
+      }
+
+      // Fallback
+      return boundary[0];
+    }
+
+    // Helper: Detect slope sign changes (zigzag extrema)
+    function detectExtrema(samples) {
+      const extrema = [];
+
+      if (samples.length < 3) return extrema;
+
+      for (let i = 1; i < samples.length - 1; i++) {
+        const prevDx = samples[i].x - samples[i - 1].x;
+        const nextDx = samples[i + 1].x - samples[i].x;
+
+        // Sign change detected (peak or trough)
+        if (prevDx * nextDx < 0) {
+          extrema.push({
+            index: i,
+            x: samples[i].x,
+            y: samples[i].y,
+            type: prevDx > 0 ? 'peak' : 'trough'
+          });
+        }
+      }
+
+      return extrema;
+    }
+
+    // Helper: Generate diagonal samples connecting wall trough to zigzag peak
+    function generateDiagonalSamples(zigzagExtremum, wallExtremum) {
+      // zigzagExtremum: {index, x, y, type} from center zigzag
+      // wallExtremum: {index, x, y, type} from wall samples (actual trough with different y)
+
+      const diagonalPoints = [];
+      const numDiagonalSamples = 4; // Number of interpolation points for the diagonal
+
+      // Generate interpolated points from wall trough → zigzag peak
+      // This creates a SLANTED line because wallExtremum.y ≠ zigzagExtremum.y
+      for (let i = 0; i <= numDiagonalSamples; i++) {
+        const t = i / numDiagonalSamples;
+        diagonalPoints.push({
+          x: wallExtremum.x + (zigzagExtremum.x - wallExtremum.x) * t,
+          y: wallExtremum.y + (zigzagExtremum.y - wallExtremum.y) * t
+        });
+      }
+
+      return {
+        points: diagonalPoints,
+        extents: {
+          wall: wallExtremum,
+          zigzag: zigzagExtremum
+        }
+      };
+    }
+
+
+    // ========================================
+    // Stage 4: Warp Transform
+    // ========================================
+    function createSineBackbone(amplitude, braidLength) {
+      return {
+        getPointAt(t) {
+          // t ∈ [0, 1]
+          const y = t * braidLength;
+          const x = amplitude * Math.sin(t * 2 * Math.PI * 2); // 2 cycles
+          return { x, y };
+        },
+
+        getTangentAt(t) {
+          const delta = 0.001;
+          const t0 = Math.max(0, t - delta);
+          const t1 = Math.min(1, t + delta);
+          const p0 = this.getPointAt(t0);
+          const p1 = this.getPointAt(t1);
+          const dx = p1.x - p0.x;
+          const dy = p1.y - p0.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          return { x: dx / len, y: dy / len };
+        }
+      };
+    }
+
+    function warpToBackbone(straightPolygon, params) {
+      const { braidLength } = params;
+      const backbonePath = state.backbonePath;
+
+      if (!backbonePath) {
+        return straightPolygon; // No warping
+      }
+
+      return straightPolygon.map(polygon => {
+        return polygon.map(ring => {
+          return ring.map(([x, y]) => {
+            // Normalize y to parameter t
+            const t = Math.max(0, Math.min(1, y / braidLength));
+
+            // Sample backbone
+            const P = backbonePath.getPointAt(t);
+            const tangent = backbonePath.getTangentAt(t);
+
+            // Normal perpendicular to tangent
+            const normal = { x: -tangent.y, y: tangent.x };
+
+            // Map: finalPoint = P(t) + x * N(t)
+            return [
+              P.x + x * normal.x,
+              P.y + x * normal.y
+            ];
+          });
+        });
+      });
+    }
+
+    // ========================================
+    // Rendering
+    // ========================================
+    function clearCanvas(ctx, width, height) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function renderBoundaries(ctx, boundaries, warp, params) {
+      if (!boundaries) return;
+
+      ctx.save();
+      const width = ctx.canvas.width;
+      const zoom = state.visualization.zoom;
+
+      // Apply zoom transform (same as renderFaces)
+      ctx.translate(width / 2, 50);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-width / 2 / zoom, -50 / zoom);
+      ctx.translate(width / 2 / zoom, 50 / zoom);
+
+      // Warp boundaries if needed
+      const warpBoundary = (boundary) => {
+        if (!warp || !state.backbonePath) return boundary;
+        return boundary.map(p => {
+          const t = Math.max(0, Math.min(1, p.y / params.braidLength));
+          const P = state.backbonePath.getPointAt(t);
+          const tangent = state.backbonePath.getTangentAt(t);
+          const normal = { x: -tangent.y, y: tangent.x };
+          return {
+            x: P.x + p.x * normal.x,
+            y: P.y + p.x * normal.y
+          };
+        });
+      };
+
+      const centerWarped = warpBoundary(boundaries.centerZigZag);
+      const leftWarped = warpBoundary(boundaries.leftWall);
+      const rightWarped = warpBoundary(boundaries.rightWall);
+
+      // Draw center zigzag (yellow)
+      ctx.strokeStyle = '#ffff44';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      centerWarped.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+
+      // Draw left wall (cyan)
+      ctx.strokeStyle = '#44ffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      leftWarped.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+
+      // Draw right wall (magenta)
+      ctx.strokeStyle = '#ff44ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      rightWarped.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function renderFaces(ctx, faces, warp, params) {
+      const { showWireframes, showZDepth, showStrandFaces, zoom } = state.visualization;
+      const width = ctx.canvas.width;
+      const height = ctx.canvas.height;
+
+      // Center the view
+      ctx.save();
+
+      // Apply zoom transform
+      ctx.translate(width / 2, 50);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-width / 2 / zoom, -50 / zoom);
+      ctx.translate(width / 2 / zoom, 50 / zoom);
+
+      faces.forEach(face => {
+        const polygons = face.polygons;
+
+        if (!polygons || polygons.length === 0) {
+          return; // No geometry to render
+        }
+
+        // Determine color
+        let color;
+        if (showZDepth && face.segment) {
+          const zValue = face.segment.strands.find(s => s.strandIndex === face.strandIndex)?.z ?? 0;
+          const zNorm = (zValue + 1) / 2;
+          const hue = 240 - zNorm * 120;
+          color = `hsl(${hue}, 80%, 50%)`;
+        } else {
+          color = STRAND_COLORS[face.strandIndex] || '#888';
+        }
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = showWireframes ? 1 : 0;
+
+        // Warp if needed
+        const finalPolygons = warp ? warpToBackbone(polygons, params) : polygons;
+
+        // Render each polygon
+        finalPolygons.forEach(polygon => {
+          ctx.beginPath();
+
+          polygon.forEach(ring => {
+            ring.forEach((point, i) => {
+              if (i === 0) ctx.moveTo(point[0], point[1]);
+              else ctx.lineTo(point[0], point[1]);
+            });
+            ctx.closePath();
+          });
+
+          // Only fill if showStrandFaces is enabled
+          if (showStrandFaces) {
+            ctx.fill('evenodd');
+          }
+          if (showWireframes) {
+            ctx.stroke();
+          }
+        });
+      });
+
+      if (!warp && state.visualization.showSegmentSamples) {
+        state.segments.forEach(segment => {
+          if (!segment.debug) return;
+          const { samples, midPoints, extrema, wallExtrema, diagonalSamples, diagonalExtents } = segment.debug;
+
+          const drawSamplePath = (sampleArr, color, lineWidth = 1) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            sampleArr.forEach((p, idx) => {
+              if (idx === 0) ctx.moveTo(p.x, p.y);
+              else ctx.lineTo(p.x, p.y);
+            });
+            ctx.stroke();
+          };
+
+          const drawPoint = (p, color, radius = 2.5) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+          };
+
+          // Draw boundary sample paths
+          drawSamplePath(samples.left, '#44ffff');
+          drawSamplePath(samples.center, '#ffff44');
+          drawSamplePath(samples.right, '#ff44ff');
+
+          // Draw diagonal samples (the rhombus "hooks") - thicker orange lines
+          if (diagonalSamples) {
+            if (diagonalSamples.left && diagonalSamples.left.length > 0) {
+              drawSamplePath(diagonalSamples.left, '#ff8800', 2); // Thicker orange
+            }
+            if (diagonalSamples.right && diagonalSamples.right.length > 0) {
+              drawSamplePath(diagonalSamples.right, '#ff8800', 2); // Thicker orange
+            }
+          }
+
+          // Draw midpoint markers
+          drawPoint(midPoints.left, '#44ffff');
+          drawPoint(midPoints.center, '#ffff44');
+          drawPoint(midPoints.right, '#ff44ff');
+
+          // Draw center extrema markers (peaks/troughs in red)
+          if (extrema && extrema.length > 0) {
+            extrema.forEach(ext => {
+              drawPoint(ext, '#ff0000', 4); // Larger red dots
+            });
+          }
+
+          // Draw wall extrema markers (smaller, matching wall colors)
+          if (wallExtrema) {
+            if (wallExtrema.left && wallExtrema.left.length > 0) {
+              wallExtrema.left.forEach(ext => {
+                drawPoint(ext, '#0088ff', 3); // Blue for left wall
+              });
+            }
+            if (wallExtrema.right && wallExtrema.right.length > 0) {
+              wallExtrema.right.forEach(ext => {
+                drawPoint(ext, '#ff0088', 3); // Pink for right wall
+              });
+            }
+          }
+
+          // Draw connecting lines from center to walls
+          ctx.strokeStyle = '#666';
+          ctx.beginPath();
+          ctx.moveTo(midPoints.center.x, midPoints.center.y);
+          ctx.lineTo(midPoints.left.x, midPoints.left.y);
+          ctx.moveTo(midPoints.center.x, midPoints.center.y);
+          ctx.lineTo(midPoints.right.x, midPoints.right.y);
+          ctx.stroke();
+        });
+      }
+
+      ctx.restore();
+    }
+
+    function render() {
+      const startTime = performance.now();
+
+      // Get canvases
+      const canvas1 = document.getElementById('canvas1');
+      const canvas2 = document.getElementById('canvas2');
+      const canvas3 = document.getElementById('canvas3');
+      const ctx1 = canvas1.getContext('2d');
+      const ctx2 = canvas2.getContext('2d');
+      const ctx3 = canvas3.getContext('2d');
+
+      // Clear all canvases
+      clearCanvas(ctx1, canvas1.width, canvas1.height);
+      clearCanvas(ctx2, canvas2.width, canvas2.height);
+      clearCanvas(ctx3, canvas3.width, canvas3.height);
+
+      // Panel 1: ONLY boundary curves (the structural skeleton)
+      if (state.visualization.showBoundaries) {
+        renderBoundaries(ctx1, state.boundaries, false, state.params);
+      }
+
+      const facesToRender = state.visualization.showContinuousFaces
+        ? state.continuousFaces || []
+        : collectSegmentFaces();
+
+      // Panel 2: Chevron polygons (straight)
+      renderFaces(ctx2, facesToRender, false, state.params);
+
+      // Panel 3: Warped (final result)
+      renderFaces(ctx3, facesToRender, true, state.params);
+      if (state.visualization.showBoundaries) {
+        renderBoundaries(ctx3, state.boundaries, true, state.params);
+      }
+
+      // Update stats
+      const endTime = performance.now();
+      document.getElementById('segmentCount').textContent = state.segments.length;
+      document.getElementById('polygonCount').textContent = state.segments.length * 3;
+      document.getElementById('extremaCount').textContent = state.debugStats.extremaCount || 0;
+      document.getElementById('renderTime').textContent = `${(endTime - startTime).toFixed(1)}ms`;
+      document.getElementById('avgCenterSlope').textContent = state.debugStats.avgCenterSlope.toFixed(2);
+      document.getElementById('avgWallSlope').textContent = state.debugStats.avgWallSlope.toFixed(2);
+    }
+
+    // ========================================
+    // Pipeline Orchestration
+    // ========================================
+    function regenerate() {
+      // Stage 1: Generate straight braid
+      state.segments = generateStraightBraid(state.params);
+
+      // Stage 1.5: Generate boundary curves (chevron construction)
+      state.boundaries = generateBoundaries(state.params);
+
+      // Stage 2 (NEW): Build chevron polygons for each segment
+      const totalAngle = state.params.frequency * 2 * Math.PI;
+      let centerSlopeAccum = 0;
+      let wallSlopeAccum = 0;
+      let slopeCount = 0;
+      let extremaCount = 0;
+
+      state.segments.forEach(segment => {
+        // Calculate y-range for this segment
+        const y0 = (segment.angleStart / totalAngle) * state.params.braidLength;
+        const y1 = (segment.angleEnd / totalAngle) * state.params.braidLength;
+
+        // Sort strands by z-depth for this segment
+        const sortedStrands = segment.strands.slice().sort((a, b) => b.z - a.z);
+
+        // Get the polygons for the visible strands
+        const { polygons: segmentPolygons, debug, meta } = buildChevronPolygons(y0, y1, sortedStrands, state.boundaries, state.params);
+
+        // Assign the generated polygon to the correct strand *for this segment*
+        segment.facePolygons = [];
+        segment.faceMeta = meta;
+        segment.strands.forEach(s => {
+          const poly = segmentPolygons[s.strandIndex];
+          if (poly && poly.length > 0) {
+            segment.facePolygons.push({
+              strandIndex: s.strandIndex,
+              polygons: poly,
+              segment
+            });
+          }
+        });
+        segment.debug = debug;
+
+        if (debug) {
+          centerSlopeAccum += Math.abs(debug.slopes.center);
+          // average both walls together
+          wallSlopeAccum += (Math.abs(debug.slopes.left) + Math.abs(debug.slopes.right)) / 2;
+          slopeCount += 1;
+
+          // Count extrema
+          if (debug.extrema) {
+            extremaCount += debug.extrema.length;
+          }
+        }
+      });
+
+      if (slopeCount > 0) {
+        state.debugStats.avgCenterSlope = centerSlopeAccum / slopeCount;
+        state.debugStats.avgWallSlope = wallSlopeAccum / slopeCount;
+      } else {
+        state.debugStats.avgCenterSlope = 0;
+        state.debugStats.avgWallSlope = 0;
+      }
+
+      state.debugStats.extremaCount = extremaCount;
+
+      state.continuousFaces = [
+        ...buildContinuousFaces(state.segments, 'left'),
+        ...buildContinuousFaces(state.segments, 'right')
+      ];
+
+      // Stage 4: Update backbone path if amplitude > 0
+      if (state.params.backboneAmplitude > 0) {
+        state.backbonePath = createSineBackbone(
+          state.params.backboneAmplitude,
+          state.params.braidLength
+        );
+        document.getElementById('phaseIndicator').textContent = 'Phase B';
+      } else {
+        state.backbonePath = null;
+        document.getElementById('phaseIndicator').textContent = 'Phase A';
+      }
+
+      // Render
+      render();
+    }
+
+    // ========================================
+    // UI Event Handlers
+    // ========================================
+    function setupControls() {
+      // Frequency
+      const frequencySlider = document.getElementById('frequency');
+      const frequencyValue = document.getElementById('frequencyValue');
+      frequencySlider.addEventListener('input', (e) => {
+        state.params.frequency = parseFloat(e.target.value);
+        frequencyValue.textContent = state.params.frequency.toFixed(1);
+        regenerate();
+      });
+
+      // Thickness
+      const thicknessSlider = document.getElementById('thickness');
+      const thicknessValue = document.getElementById('thicknessValue');
+      thicknessSlider.addEventListener('input', (e) => {
+        state.params.thickness = parseInt(e.target.value);
+        thicknessValue.textContent = state.params.thickness;
+        regenerate();
+      });
+
+      // Zigzag scale
+      const zigzagScaleSlider = document.getElementById('zigzagScale');
+      const zigzagScaleValue = document.getElementById('zigzagScaleValue');
+      zigzagScaleSlider.addEventListener('input', (e) => {
+        state.params.zigzagScale = parseFloat(e.target.value);
+        zigzagScaleValue.textContent = `${state.params.zigzagScale.toFixed(2)}×`;
+        regenerate();
+      });
+
+      // Outer wall scale
+      const outerWallScaleSlider = document.getElementById('outerWallScale');
+      const outerWallScaleValue = document.getElementById('outerWallScaleValue');
+      outerWallScaleSlider.addEventListener('input', (e) => {
+        state.params.outerWallScale = parseFloat(e.target.value);
+        outerWallScaleValue.textContent = `${state.params.outerWallScale.toFixed(2)}×`;
+        regenerate();
+      });
+
+      // Wall separation
+      const wallSeparationSlider = document.getElementById('wallSeparation');
+      const wallSeparationValue = document.getElementById('wallSeparationValue');
+      wallSeparationSlider.addEventListener('input', (e) => {
+        state.params.wallSeparation = parseInt(e.target.value);
+        wallSeparationValue.textContent = state.params.wallSeparation;
+        regenerate();
+      });
+
+      // Phase controls
+      const zigzagPhaseSlider = document.getElementById('zigzagPhase');
+      const zigzagPhaseValue = document.getElementById('zigzagPhaseValue');
+      zigzagPhaseSlider.addEventListener('input', (e) => {
+        state.params.zigzagPhase = parseInt(e.target.value);
+        zigzagPhaseValue.textContent = `${state.params.zigzagPhase}°`;
+        regenerate();
+      });
+
+      const leftWallPhaseSlider = document.getElementById('leftWallPhase');
+      const leftWallPhaseValue = document.getElementById('leftWallPhaseValue');
+      leftWallPhaseSlider.addEventListener('input', (e) => {
+        state.params.leftWallPhase = parseInt(e.target.value);
+        leftWallPhaseValue.textContent = `${state.params.leftWallPhase}°`;
+        regenerate();
+      });
+
+      const rightWallPhaseSlider = document.getElementById('rightWallPhase');
+      const rightWallPhaseValue = document.getElementById('rightWallPhaseValue');
+      rightWallPhaseSlider.addEventListener('input', (e) => {
+        state.params.rightWallPhase = parseInt(e.target.value);
+        rightWallPhaseValue.textContent = `${state.params.rightWallPhase}°`;
+        regenerate();
+      });
+
+      // Braid Length
+      const braidLengthSlider = document.getElementById('braidLength');
+      const braidLengthValue = document.getElementById('braidLengthValue');
+      braidLengthSlider.addEventListener('input', (e) => {
+        state.params.braidLength = parseInt(e.target.value);
+        braidLengthValue.textContent = state.params.braidLength;
+        regenerate();
+      });
+
+      // Segment Angle
+      const segmentAngleSlider = document.getElementById('segmentAngle');
+      const segmentAngleValue = document.getElementById('segmentAngleValue');
+      segmentAngleSlider.addEventListener('input', (e) => {
+        state.params.segmentAngleDelta = parseInt(e.target.value);
+        segmentAngleValue.textContent = state.params.segmentAngleDelta;
+        regenerate();
+      });
+
+      // Amplitude
+      const amplitudeSlider = document.getElementById('amplitude');
+      const amplitudeValue = document.getElementById('amplitudeValue');
+      amplitudeSlider.addEventListener('input', (e) => {
+        state.params.backboneAmplitude = parseInt(e.target.value);
+        amplitudeValue.textContent = state.params.backboneAmplitude;
+        regenerate();
+      });
+
+      // Zoom slider
+      const zoomSlider = document.getElementById('zoom');
+      const zoomValue = document.getElementById('zoomValue');
+      zoomSlider.addEventListener('input', (e) => {
+        state.visualization.zoom = parseFloat(e.target.value);
+        zoomValue.textContent = `${state.visualization.zoom.toFixed(2)}×`;
+        render();
+      });
+
+      // Auto-phase toggle
+      const autoPhaseCheckbox = document.getElementById('useAutoPhase');
+      autoPhaseCheckbox.addEventListener('change', (e) => {
+        state.params.useAutoPhase = e.target.checked;
+        regenerate();
+      });
+
+      // Strand faces toggle
+      const strandFacesCheckbox = document.getElementById('showStrandFaces');
+      strandFacesCheckbox.addEventListener('change', (e) => {
+        state.visualization.showStrandFaces = e.target.checked;
+        render();
+      });
+
+      // Wireframes toggle
+      const wireframesCheckbox = document.getElementById('showWireframes');
+      wireframesCheckbox.addEventListener('change', (e) => {
+        state.visualization.showWireframes = e.target.checked;
+        render();
+      });
+
+      // Z-depth toggle
+      const zDepthCheckbox = document.getElementById('showZDepth');
+      zDepthCheckbox.addEventListener('change', (e) => {
+        state.visualization.showZDepth = e.target.checked;
+        render();
+      });
+
+      // Boundaries toggle
+      const boundariesCheckbox = document.getElementById('showBoundaries');
+      boundariesCheckbox.addEventListener('change', (e) => {
+        state.visualization.showBoundaries = e.target.checked;
+        render();
+      });
+
+      // Segment sample toggle
+      const segmentSamplesCheckbox = document.getElementById('showSegmentSamples');
+      segmentSamplesCheckbox.addEventListener('change', (e) => {
+        state.visualization.showSegmentSamples = e.target.checked;
+        render();
+      });
+
+      // Continuous faces toggle
+      const continuousFacesCheckbox = document.getElementById('showContinuousFaces');
+      continuousFacesCheckbox.addEventListener('change', (e) => {
+        state.visualization.showContinuousFaces = e.target.checked;
+        render();
+      });
+    }
+
+    // ========================================
+    // Initialization
+    // ========================================
+    function init() {
+      setupControls();
+      regenerate();
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+
+</html>
