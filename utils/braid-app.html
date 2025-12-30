@@ -1552,19 +1552,6 @@
           // Get the tangent of the continuation line (diagRail) at the origin point
           const diagTangent = estimateRailTangent(diagRail, diagLengths, originParam);
 
-          // DEBUG: Log values for first fiber of first few pairs
-          if (pairIdx < 2 && i === 0) {
-            console.log(`[DEBUG] Pair ${pairIdx}, Fiber ${i}:`, {
-              arcTangentBlend,
-              arcLean,
-              diagTangent,
-              originPoint,
-              landingPoint,
-              diagRailLength: diagRail.length,
-              diagLengthsLength: diagLengths.length
-            });
-          }
-
           const gradientPower = clamp(params.bowGradient ?? 2.0, 0.5, 4);
           const shapedFactor = Math.pow(outernessFactor, gradientPower);
 
