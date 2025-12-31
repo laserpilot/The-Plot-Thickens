@@ -8,7 +8,11 @@ export default defineConfig({
   root: '.',
   server: {
     port: 3001,
-    open: true
+    open: true,
+    hmr: false,  // Disable hot module replacement to prevent unwanted reloads during long processing
+    watch: {
+      ignored: ['**/node_modules/**', '**/.git/**']
+    }
   },
   build: {
     outDir: 'dist',
