@@ -1414,16 +1414,16 @@ export function initUI(store, renderer) {
    * This updates all input fields to match the loaded config
    */
   function syncUIFromConfig(config) {
-    // Basic controls
-    if (modeSpecificInputs.baseOffset) modeSpecificInputs.baseOffset.value = config.baseOffset || 0.25;
-    if (modeSpecificInputs.minPasses) modeSpecificInputs.minPasses.value = config.minPasses || 1;
-    if (modeSpecificInputs.maxPasses) modeSpecificInputs.maxPasses.value = config.maxPasses || 10;
-    if (modeSpecificInputs.fillMode) modeSpecificInputs.fillMode.value = config.fillMode || 'offset';
-    if (modeSpecificInputs.envelope) modeSpecificInputs.envelope.value = config.envelope || 'sinTaperBoth';
-    if (modeSpecificInputs.curve) modeSpecificInputs.curve.value = config.curve || 'linear';
-    if (modeSpecificInputs.noise) modeSpecificInputs.noise.value = config.noise || 0;
-    if (modeSpecificInputs.noiseFrequency) modeSpecificInputs.noiseFrequency.value = config.noiseFrequency || 50;
-    if (modeSpecificInputs.sampleRate) modeSpecificInputs.sampleRate.value = config.sampleRate || 2;
+    // Basic controls (from fillInputs, not modeSpecificInputs)
+    if (fillInputs.baseOffset) fillInputs.baseOffset.value = config.baseOffset || 0.25;
+    if (fillInputs.minPasses) fillInputs.minPasses.value = config.minPasses || 1;
+    if (fillInputs.maxPasses) fillInputs.maxPasses.value = config.maxPasses || 10;
+    if (fillInputs.fillMode) fillInputs.fillMode.value = config.fillMode || 'offset';
+    if (fillInputs.envelope) fillInputs.envelope.value = config.envelope || 'sinTaperBoth';
+    if (fillInputs.curve) fillInputs.curve.value = config.curve || 'linear';
+    if (fillInputs.noise) fillInputs.noise.value = config.noise || 0;
+    if (fillInputs.noiseFrequency) fillInputs.noiseFrequency.value = config.noiseFrequency || 50;
+    if (fillInputs.sampleRate) fillInputs.sampleRate.value = config.sampleRate || 2;
 
     // Mode-specific controls
     if (config.fillMode === 'striped') {
