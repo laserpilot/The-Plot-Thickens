@@ -88,31 +88,39 @@ function extractBounds(svgEl) {
   const heightAttr = svgEl.getAttribute('height');
 
   // Parse viewBox for coordinate system (if present)
+  // IMPORTANT: Path coordinates are always in viewBox units, so we must use
+  // viewBox dimensions for bounds to ensure correct centering
   let vb = null;
   if (viewBox) {
     const [x, y, w, h] = viewBox.split(/\s+/).map(parseFloat);
     vb = { x, y, width: w, height: h };
   }
 
-  // Parse physical dimensions from width/height attributes (prioritize these!)
-  let width = widthAttr ? parseUnit(widthAttr) : null;
-  let height = heightAttr ? parseUnit(heightAttr) : null;
+  // Use viewBox dimensions for bounds since paths are in viewBox coordinates
+  // Only fall back to width/height attributes if no viewBox exists
+  let width, height, x, y;
 
-  // If width/height attributes are missing or unitless, fall back to viewBox dimensions
-  if (width === null && vb) width = vb.width;
-  if (height === null && vb) height = vb.height;
-
-  // Final fallback to defaults
-  width = width || 100;
-  height = height || 100;
+  if (vb) {
+    // Use viewBox dimensions - paths are in these coordinates
+    x = vb.x;
+    y = vb.y;
+    width = vb.width;
+    height = vb.height;
+  } else {
+    // No viewBox - use width/height attributes (convert units to user units)
+    x = 0;
+    y = 0;
+    width = widthAttr ? parseUnit(widthAttr) : 100;
+    height = heightAttr ? parseUnit(heightAttr) : 100;
+  }
 
   return {
-    x: vb ? vb.x : 0,
-    y: vb ? vb.y : 0,
+    x,
+    y,
     width,
     height,
-    cx: (vb ? vb.x : 0) + width / 2,
-    cy: (vb ? vb.y : 0) + height / 2
+    cx: x + width / 2,
+    cy: y + height / 2
   };
 }
 
