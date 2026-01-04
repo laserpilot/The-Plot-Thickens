@@ -96,6 +96,10 @@ class AttractorSystem {
       arcLengthSampleInterval: 5, // mm between samples for weight calculation
       minPasses: 1,
       maxPasses: 20,
+      // Influence calculation options
+      influenceCalcMode: 'average', // 'average' or 'maximum' - maximum gives stronger effect
+      minInfluenceThreshold: 0, // Only affect paths with max influence > this (0-1)
+      minCoveragePercent: 0, // Only affect paths with this % of points inside radius
     };
   }
 
@@ -201,21 +205,48 @@ class AttractorSystem {
       return this.config.minPasses;
     }
 
-    // Calculate average influence along the path
+    // Calculate influence along the path and gather statistics
     let totalInfluence = 0;
+    let maxInfluence = 0;
+    let pointsInRadius = 0;
+
     pathPoints.forEach(point => {
-      totalInfluence += this.calculateInfluenceAt(point.x, point.y);
+      const influence = this.calculateInfluenceAt(point.x, point.y);
+      totalInfluence += influence;
+      maxInfluence = Math.max(maxInfluence, influence);
+      if (influence > 0) pointsInRadius++;
     });
+
     const avgInfluence = totalInfluence / pathPoints.length;
+    const coveragePercent = (pointsInRadius / pathPoints.length) * 100;
+
+    // Apply path filtering if configured
+    if (this.config.minInfluenceThreshold > 0 && maxInfluence < this.config.minInfluenceThreshold) {
+      // Path doesn't meet minimum influence threshold - use minimum passes
+      return this.config.minPasses;
+    }
+
+    if (this.config.minCoveragePercent > 0 && coveragePercent < this.config.minCoveragePercent) {
+      // Path doesn't have enough coverage inside attractor radius - use minimum passes
+      return this.config.minPasses;
+    }
+
+    // Choose influence based on calculation mode
+    let effectiveInfluence;
+    if (this.config.influenceCalcMode === 'maximum') {
+      effectiveInfluence = maxInfluence;
+    } else {
+      effectiveInfluence = avgInfluence;
+    }
 
     // Map influence to weight
     let weight;
     if (this.config.mode === 'attract') {
       // Higher influence = more passes
-      weight = avgInfluence;
+      weight = effectiveInfluence;
     } else {
       // Repel mode: higher influence = fewer passes
-      weight = 1 - avgInfluence;
+      weight = 1 - effectiveInfluence;
     }
 
     // Apply blending with length-based weight if enabled
@@ -223,7 +254,7 @@ class AttractorSystem {
       // Calculate length-based weight (would need min/max from global context)
       // For now, use a simple approach: blend attractor weight with a baseline
       const baseline = 0.5; // Middle of the range
-      weight = baseline + (weight - baseline) * avgInfluence;
+      weight = baseline + (weight - baseline) * effectiveInfluence;
     }
 
     // Map to pass range

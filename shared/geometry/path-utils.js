@@ -21,6 +21,38 @@ function measurePathLength(pathData) {
 }
 
 /**
+ * Sample points along an SVG path at regular intervals
+ * @param {string} pathData - SVG path d attribute
+ * @param {number} sampleInterval - Distance between samples (default 5mm)
+ * @returns {Array<{x: number, y: number}>} Array of sampled points
+ */
+function samplePathPoints(pathData, sampleInterval = 5) {
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength <= 0) return [];
+
+    const points = [];
+    const numSamples = Math.max(2, Math.ceil(totalLength / sampleInterval));
+
+    for (let i = 0; i <= numSamples; i++) {
+      const t = (i / numSamples) * totalLength;
+      const point = getPointAtLength(absolutePath, t);
+
+      if (point && !isNaN(point.x) && !isNaN(point.y)) {
+        points.push({ x: point.x, y: point.y });
+      }
+    }
+
+    return points;
+  } catch (error) {
+    console.warn('Failed to sample path:', error.message);
+    return [];
+  }
+}
+
+/**
  * Smooth 1D noise generator using cubic interpolation
  * Produces genuinely smooth, continuous noise without discontinuities
  * @param {number} x - Input value
@@ -2978,6 +3010,7 @@ function generateCurlyFill(pathData, options = {}) {
 
 export {
   measurePathLength,
+  samplePathPoints,
   offsetPath,
   generatePasses,
   lengthToWeight,

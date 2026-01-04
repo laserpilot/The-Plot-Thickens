@@ -5,6 +5,7 @@
 import {
   generatePasses,
   measurePathLength,
+  samplePathPoints,
   lengthToWeight,
   getEnvelopePreset,
   generateShapeFill,
@@ -84,8 +85,9 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     // Calculate number of passes
     let passCount;
     if (attractorSystem) {
-      // Use attractor-based weight
-      passCount = Math.round(attractorSystem.calculatePathWeight(path.d, length));
+      // Use attractor-based weight - sample points along path for influence calculation
+      const pathPoints = samplePathPoints(path.d, attractorSystem.config.arcLengthSampleInterval || 5);
+      passCount = Math.round(attractorSystem.calculatePathWeight(pathPoints, length));
     } else {
       // Use length-based weight
       passCount = Math.round(lengthToWeight(

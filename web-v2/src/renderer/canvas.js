@@ -2,7 +2,7 @@
  * Canvas renderer for SVG preview
  */
 
-import { measurePathLength, lengthToWeight } from '../../../shared/geometry/path-utils.js';
+import { measurePathLength, samplePathPoints, lengthToWeight } from '../../../shared/geometry/path-utils.js';
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
 
 export function initRenderer(canvas, store) {
@@ -78,8 +78,8 @@ export function initRenderer(canvas, store) {
         const dy = coords.y - attractor.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Check if clicking within attractor center (use smaller radius for clicking)
-        if (dist < Math.min(radius * 0.2, 10)) {
+        // Check if clicking within attractor center (use reasonable radius for clicking)
+        if (dist < Math.min(radius * 0.5, 25)) {
           isDraggingAttractor = true;
           draggedAttractorIndex = i;
           canvas.style.cursor = 'grabbing';
@@ -140,7 +140,7 @@ export function initRenderer(canvas, store) {
         const dy = coords.y - attractor.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < Math.min(radius * 0.2, 10)) {
+        if (dist < Math.min(radius * 0.5, 25)) {
           hovering = true;
           break;
         }
@@ -449,7 +449,9 @@ export function initRenderer(canvas, store) {
       // Calculate weight (number of passes)
       let weight;
       if (attractorSystem) {
-        weight = attractorSystem.calculatePathWeight(pathData.d, length);
+        // Sample points along path for influence calculation
+        const pathPoints = samplePathPoints(pathData.d, attractorSystem.config.arcLengthSampleInterval || 5);
+        weight = attractorSystem.calculatePathWeight(pathPoints, length);
       } else {
         weight = lengthToWeight(length, minPasses, maxPasses, minLength, maxLength, config.curve || 'linear');
       }
