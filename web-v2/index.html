@@ -48,6 +48,17 @@
               <div class="accordion-content">
                 <h3>Load SVG</h3>
                 <input type="file" id="file-input" accept=".svg" />
+
+                <!-- Test SVG dropdown (populated dynamically if test_svgs folder exists) -->
+                <div id="test-svg-container" style="display: none; margin-top: 0.75rem;">
+                  <label style="display: block; margin-bottom: 0.25rem; font-size: 0.9em; color: #666;">
+                    Quick Load from test_svgs:
+                  </label>
+                  <select id="test-svg-dropdown" style="width: 100%; padding: 0.5rem; font-size: 0.9em;">
+                    <option value="">Select a test SVG...</option>
+                  </select>
+                </div>
+
                 <div id="file-info" class="info-box"></div>
               </div>
             </section>
@@ -852,6 +863,10 @@
                     <input type="checkbox" id="use-attractors" />
                     Enable Attractors
                   </label>
+                  <label>
+                    <input type="checkbox" id="exclude-unaffected-paths" />
+                    Exclude paths outside attractors
+                  </label>
                 </div>
 
                 <div class="info-box" id="attractor-info">
@@ -1111,6 +1126,21 @@
                         Paths will be grouped: <span id="bin-preview" style="font-family: monospace;">0-25%, 25-50%, 50-75%, 75-100%</span>
                       </div>
                     </label>
+                  </div>
+                </div>
+
+                <!-- Layer Preservation -->
+                <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(100, 100, 100, 0.05); border: 1px solid var(--border); border-radius: 4px;">
+                  <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="preserve-layers" style="margin-right: 0.5rem;" />
+                    <span>Preserve Input Layers</span>
+                  </label>
+                  <div class="info-box" style="display: block; margin-top: 0.5rem; font-size: 0.85em;">
+                    Maintains layer groupings from input SVG (Inkscape layers or &lt;g id="..."&gt; groups).
+                    Output will nest fills/outlines within original layer structure.
+                  </div>
+                  <div id="detected-layers-info" style="display: none; margin-top: 0.5rem; font-size: 0.85em; color: #666;">
+                    Detected layers: <span id="detected-layers-list" style="font-style: italic;"></span>
                   </div>
                 </div>
 

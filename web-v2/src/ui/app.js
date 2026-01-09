@@ -2,7 +2,7 @@
  * UI initialization and event handlers
  */
 
-import { loadSVGFile } from '../utils/svg-loader.js';
+import { loadSVGFile, loadSVGFromURL } from '../utils/svg-loader.js';
 import { processPaths } from '../utils/processor.js';
 import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.js';
 import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
@@ -37,6 +37,23 @@ function throttle(func, delay) {
       }, delay - timeSinceLastCall);
     }
   };
+}
+
+/**
+ * Update the detected layers display in the UI
+ */
+function updateDetectedLayersDisplay(layers) {
+  const layersInfo = document.getElementById('detected-layers-info');
+  const layersList = document.getElementById('detected-layers-list');
+
+  if (layers && layers.length > 0) {
+    layersInfo.style.display = 'block';
+    layersList.textContent = layers.join(', ');
+    console.log(`Detected ${layers.length} layers: ${layers.join(', ')}`);
+  } else {
+    layersInfo.style.display = 'none';
+    layersList.textContent = '';
+  }
 }
 
 /**
@@ -373,8 +390,12 @@ export function initUI(store, renderer) {
         svgBounds: svgData.bounds,
         originalPaths: svgData.paths,
         originalFilename: file.name,
-        originalSvgMetadata: svgData.metadata
+        originalSvgMetadata: svgData.metadata,
+        detectedLayers: svgData.layers || []
       });
+
+      // Update detected layers display
+      updateDetectedLayersDisplay(svgData.layers || []);
 
       updateProgress('Rendering preview...', 75);
 
@@ -388,6 +409,94 @@ export function initUI(store, renderer) {
       fileInfo.innerHTML = `<span style="color: #ff4444">Error: ${err.message}</span>`;
       console.error('SVG load error:', err);
       hideProgress();
+    }
+  });
+
+  // Test SVG dropdown - populate from test_svgs folder if it exists
+  const testSvgContainer = document.getElementById('test-svg-container');
+  const testSvgDropdown = document.getElementById('test-svg-dropdown');
+
+  async function populateTestSvgDropdown() {
+    try {
+      const response = await fetch('/api/test-svgs');
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (!data.exists || !data.files || data.files.length === 0) {
+        // No test_svgs folder or no files - keep dropdown hidden
+        return;
+      }
+
+      // Populate dropdown with SVG files
+      data.files.forEach(filename => {
+        const option = document.createElement('option');
+        option.value = filename;
+        option.textContent = filename;
+        testSvgDropdown.appendChild(option);
+      });
+
+      // Show the dropdown container
+      testSvgContainer.style.display = 'block';
+      console.log(`Found ${data.files.length} test SVGs`);
+    } catch (err) {
+      // Silently ignore - test_svgs folder doesn't exist or API not available
+      console.log('Test SVG folder not available');
+    }
+  }
+
+  // Populate dropdown on init
+  populateTestSvgDropdown();
+
+  // Handle test SVG selection
+  testSvgDropdown.addEventListener('change', async (e) => {
+    const filename = e.target.value;
+    if (!filename) return;
+
+    try {
+      fileInfo.textContent = 'Loading...';
+      showProgress(`Loading ${filename}...`, 0);
+
+      const svgData = await loadSVGFromURL(`/test_svgs/${encodeURIComponent(filename)}`);
+
+      console.log('Test SVG loaded:', {
+        paths: svgData.paths.length,
+        bounds: svgData.bounds
+      });
+
+      updateProgress(`Loaded ${svgData.paths.length} paths`, 50);
+
+      fileInfo.innerHTML = `
+        <strong>Loaded:</strong> ${filename}<br>
+        <strong>Paths:</strong> ${svgData.paths.length}<br>
+        <strong>Bounds:</strong> ${svgData.bounds.width.toFixed(1)} × ${svgData.bounds.height.toFixed(1)} mm
+      `;
+
+      store.setState({
+        svg: svgData.raw,
+        svgBounds: svgData.bounds,
+        originalPaths: svgData.paths,
+        originalFilename: filename,
+        originalSvgMetadata: svgData.metadata,
+        detectedLayers: svgData.layers || []
+      });
+
+      // Update detected layers display
+      updateDetectedLayersDisplay(svgData.layers || []);
+
+      updateProgress('Rendering preview...', 75);
+
+      renderer.render(svgData.paths, svgData.bounds);
+
+      showComplete(`Loaded ${svgData.paths.length} paths from ${filename}`);
+
+      // Reset dropdown to placeholder
+      testSvgDropdown.value = '';
+
+    } catch (err) {
+      fileInfo.innerHTML = `<span style="color: #ff4444">Error: ${err.message}</span>`;
+      console.error('Test SVG load error:', err);
+      hideProgress();
+      testSvgDropdown.value = '';
     }
   });
 
@@ -1137,6 +1246,17 @@ export function initUI(store, renderer) {
     });
   });
 
+  // Layer preservation controls
+  const preserveLayersCheckbox = document.getElementById('preserve-layers');
+
+  preserveLayersCheckbox.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    const config = store.getState('config');
+    store.setState({
+      config: { ...config, preserveLayers: enabled }
+    });
+  });
+
   // Function to show/hide mode-specific controls
   function updateFillModeControls(mode) {
     const stripedControls = document.getElementById('mode-striped-controls');
@@ -1630,7 +1750,8 @@ export function initUI(store, renderer) {
         originalPaths,
         originalSvgMetadata,
         outputSize,
-        config  // Pass full config for embedding in metadata
+        config,  // Pass full config for embedding in metadata
+        config.preserveLayers || false  // Preserve input layer structure
       );
 
       // Generate filename
@@ -1855,6 +1976,20 @@ export function initUI(store, renderer) {
 
     // Reprocess if enabled and have paths
     if (e.target.checked && store.getState('livePreview') && store.getState('originalPaths').length > 0) {
+      processPathsInternal();
+    }
+  });
+
+  // Exclude paths outside attractors checkbox
+  document.getElementById('exclude-unaffected-paths').addEventListener('change', (e) => {
+    const attractorConfig = store.getState('attractorConfig');
+    store.setState({
+      attractorConfig: { ...attractorConfig, excludeUnaffectedPaths: e.target.checked }
+    });
+    console.log(`Exclude unaffected paths ${e.target.checked ? 'enabled' : 'disabled'}`);
+
+    // Reprocess if attractors enabled and have paths
+    if (store.getState('useAttractors') && store.getState('livePreview') && store.getState('originalPaths').length > 0) {
       processPathsInternal();
     }
   });

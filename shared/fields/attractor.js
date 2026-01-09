@@ -100,6 +100,7 @@ class AttractorSystem {
       influenceCalcMode: 'average', // 'average' or 'maximum' - maximum gives stronger effect
       minInfluenceThreshold: 0, // Only affect paths with max influence > this (0-1)
       minCoveragePercent: 0, // Only affect paths with this % of points inside radius
+      excludeUnaffectedPaths: false, // When true, return 0 for paths with no influence (exclude from output)
     };
   }
 
@@ -219,6 +220,11 @@ class AttractorSystem {
 
     const avgInfluence = totalInfluence / pathPoints.length;
     const coveragePercent = (pointsInRadius / pathPoints.length) * 100;
+
+    // If excluding unaffected paths and this path has no influence, return 0 to signal exclusion
+    if (this.config.excludeUnaffectedPaths && maxInfluence === 0) {
+      return 0;  // Path will be excluded from output entirely
+    }
 
     // Apply path filtering if configured
     if (this.config.minInfluenceThreshold > 0 && maxInfluence < this.config.minInfluenceThreshold) {

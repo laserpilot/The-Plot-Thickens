@@ -72,6 +72,7 @@ const initialState = {
   originalPaths: [],
   processedPaths: [],
   originalFilename: null,
+  detectedLayers: [],  // Layers detected in input SVG
 
   // Sample mode
   isSampleMode: false,
@@ -189,7 +190,9 @@ const initialState = {
     outlineMaxLength: null, // Maximum path length to generate outlines (null = no maximum)
     // Length binning for SVG organization
     enableBinning: false,
-    binCount: 4
+    binCount: 4,
+    // Layer preservation
+    preserveLayers: false
   },
 
   // UI state
@@ -224,7 +227,8 @@ const initialState = {
     // Advanced filtering
     minInfluenceThreshold: 0,
     minCoveragePercent: 0,
-    influenceCalcMode: 'average'
+    influenceCalcMode: 'average',
+    excludeUnaffectedPaths: false
   }
 };
 

@@ -10,6 +10,15 @@ export async function loadSVGFile(file) {
   return parseSVG(text);
 }
 
+export async function loadSVGFromURL(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load SVG: ${response.statusText}`);
+  }
+  const text = await response.text();
+  return parseSVG(text);
+}
+
 export function parseSVG(svgText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, 'image/svg+xml');
@@ -38,10 +47,14 @@ export function parseSVG(svgText) {
     // Calculate path length for binning and outline filtering
     const length = measurePathLength(d);
 
+    // Detect parent layer/group for layer preservation
+    const layerId = findParentLayerId(pathEl);
+
     return {
       id: pathEl.id || `path-${index}`,
       d,
       length,  // Add length property for binning/filtering
+      layerId, // Layer/group identifier for layer preservation
       fill: pathEl.getAttribute('fill'),
       stroke: pathEl.getAttribute('stroke'),
       strokeWidth: pathEl.getAttribute('stroke-width'),
@@ -49,12 +62,47 @@ export function parseSVG(svgText) {
     };
   }).filter(p => p !== null); // Only valid paths
 
+  // Collect unique layer IDs for metadata
+  const layers = [...new Set(paths.map(p => p.layerId).filter(Boolean))];
+
   return {
     raw: svgText,
     bounds,
     paths,
-    metadata
+    metadata,
+    layers  // List of detected layer IDs
   };
+}
+
+/**
+ * Walk up DOM tree to find nearest named layer/group
+ * Priority: inkscape:label > id attribute > null (ungrouped)
+ * Only considers ancestor <g> elements, not the root <svg>
+ */
+function findParentLayerId(element) {
+  let current = element.parentElement;
+
+  while (current && current.tagName.toLowerCase() !== 'svg') {
+    if (current.tagName.toLowerCase() === 'g') {
+      // Check for Inkscape layer label first (highest priority)
+      const inkscapeLabel = current.getAttributeNS(
+        'http://www.inkscape.org/namespaces/inkscape',
+        'label'
+      );
+      if (inkscapeLabel) {
+        return inkscapeLabel;
+      }
+
+      // Fall back to id attribute
+      const id = current.getAttribute('id');
+      if (id) {
+        return id;
+      }
+    }
+    current = current.parentElement;
+  }
+
+  return null; // No named group found
 }
 
 /**

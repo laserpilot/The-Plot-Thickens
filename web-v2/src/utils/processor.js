@@ -46,7 +46,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       // Advanced filtering options
       minInfluenceThreshold: attractorConfig.minInfluenceThreshold || 0,
       minCoveragePercent: attractorConfig.minCoveragePercent || 0,
-      influenceCalcMode: attractorConfig.influenceCalcMode || 'average'
+      influenceCalcMode: attractorConfig.influenceCalcMode || 'average',
+      excludeUnaffectedPaths: attractorConfig.excludeUnaffectedPaths || false
     });
 
     // Add attractors
@@ -98,6 +99,11 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         maxLength,
         config.curve || 'linear'
       ));
+    }
+
+    // Skip paths with 0 passes (excluded by attractor system)
+    if (passCount === 0) {
+      continue;
     }
 
     // Get envelope function from config (default: flat)
@@ -204,6 +210,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           id: `${path.id || i}-shape-${shapeIndex}`,
           d: shapeData,
           originalIndex: i,
+          layerId: path.layerId,
           shapeIndex,
           fill: 'none',
           stroke: 'black',
@@ -268,6 +275,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           id: `${path.id || i}-stripe-${stripeIndex}`,
           d: stripeData,
           originalIndex: i,
+          layerId: path.layerId,
           stripeIndex,
           fill: 'none',
           stroke: 'black',
@@ -282,6 +290,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           id: `${path.id || i}-gap-${gapIndex}`,
           d: gapData,
           originalIndex: i,
+          layerId: path.layerId,
           stripeIndex: gapIndex,
           fill: 'none',
           stroke: 'red',
@@ -296,6 +305,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           id: `${path.id || i}-family3-${family3Index}`,
           d: family3Data,
           originalIndex: i,
+          layerId: path.layerId,
           stripeIndex: family3Index,
           fill: 'none',
           stroke: 'blue',
@@ -334,6 +344,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           id: `${path.id || i}-curly-${curlyIndex}`,
           d: curlyData,
           originalIndex: i,
+          layerId: path.layerId,
           curlyIndex,
           fill: 'none',
           stroke: 'black',
@@ -395,6 +406,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         id: `${path.id || i}-pass-${passIndex}`,
         d: passData,
         originalIndex: i,
+        layerId: path.layerId,
         passIndex,
         // SVG display attributes for rendering and export
         fill: 'none',
@@ -409,6 +421,7 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         id: `${path.id || i}-outline-${outlineIndex}`,
         d: outlineData,
         originalIndex: i,
+        layerId: path.layerId,
         isOutline: true,
         // SVG display attributes for rendering and export
         fill: 'none',
