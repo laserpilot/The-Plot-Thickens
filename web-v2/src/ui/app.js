@@ -8,6 +8,7 @@ import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.j
 import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
 import { initProgressPanel } from './progress-panel.js';
 import { initGlobalProgress, showProgress, updateProgress, hideProgress, showComplete } from '../utils/global-progress.js';
+import { DEFAULT_CONFIG } from '../state/store.js';
 
 /**
  * Throttle function to limit how often a function can be called
@@ -146,6 +147,10 @@ function buildCLICommand(config) {
     if (config.curlyMinWidth !== undefined && config.curlyMinWidth !== 0.5) parts.push(`--curly-min-width ${config.curlyMinWidth}`);
     if (config.curlyStrands !== undefined && config.curlyStrands !== 1) parts.push(`--curly-strands ${config.curlyStrands}`);
     if (config.curlyMaxWidth !== undefined && config.curlyMaxWidth !== 4.0) parts.push(`--curly-max-width ${config.curlyMaxWidth}`);
+    if (config.curlyLeanMode && config.curlyLeanMode !== 'none') parts.push(`--curly-lean-mode ${config.curlyLeanMode}`);
+    if (config.curlyLeanStrength !== undefined && config.curlyLeanStrength !== 0.5) parts.push(`--curly-lean-strength ${config.curlyLeanStrength}`);
+    if (config.curlyDynamicModulation !== undefined && config.curlyDynamicModulation !== 0) parts.push(`--curly-dynamic-modulation ${config.curlyDynamicModulation}`);
+    if (config.curlySlantAngle !== undefined && config.curlySlantAngle !== 0) parts.push(`--curly-slant-angle ${config.curlySlantAngle}`);
   }
 
   parts.push(`--sample-rate ${config.sampleRate}`);
@@ -701,7 +706,11 @@ export function initUI(store, renderer) {
     curlyLoopAmplitude: document.getElementById('curly-loop-amplitude'),
     curlyMinWidth: document.getElementById('curly-min-width'),
     curlyStrands: document.getElementById('curly-strands'),
-    curlyMaxWidth: document.getElementById('curly-max-width')
+    curlyMaxWidth: document.getElementById('curly-max-width'),
+    curlyLeanMode: document.getElementById('curly-lean-mode'),
+    curlyLeanStrength: document.getElementById('curly-lean-strength'),
+    curlyDynamicModulation: document.getElementById('curly-dynamic-modulation'),
+    curlySlantAngle: document.getElementById('curly-slant-angle')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -1561,6 +1570,16 @@ export function initUI(store, renderer) {
       if (modeSpecificInputs.shapeSpacing) modeSpecificInputs.shapeSpacing.value = config.shapeSpacing !== undefined ? config.shapeSpacing : 1.0;
       if (modeSpecificInputs.shapeMaxWidth) modeSpecificInputs.shapeMaxWidth.value = config.shapeMaxWidth !== undefined ? config.shapeMaxWidth : 3.0;
       if (modeSpecificInputs.shapeMinWidth) modeSpecificInputs.shapeMinWidth.value = config.shapeMinWidth !== undefined ? config.shapeMinWidth : 0.0;
+    } else if (config.fillMode === 'curly') {
+      if (modeSpecificInputs.curlyLoopFrequency) modeSpecificInputs.curlyLoopFrequency.value = config.curlyLoopFrequency !== undefined ? config.curlyLoopFrequency : 1.0;
+      if (modeSpecificInputs.curlyLoopAmplitude) modeSpecificInputs.curlyLoopAmplitude.value = config.curlyLoopAmplitude !== undefined ? config.curlyLoopAmplitude : 1.0;
+      if (modeSpecificInputs.curlyMinWidth) modeSpecificInputs.curlyMinWidth.value = config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.5;
+      if (modeSpecificInputs.curlyStrands) modeSpecificInputs.curlyStrands.value = config.curlyStrands !== undefined ? config.curlyStrands : 1;
+      if (modeSpecificInputs.curlyMaxWidth) modeSpecificInputs.curlyMaxWidth.value = config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 4.0;
+      if (modeSpecificInputs.curlyLeanMode) modeSpecificInputs.curlyLeanMode.value = config.curlyLeanMode || 'none';
+      if (modeSpecificInputs.curlyLeanStrength) modeSpecificInputs.curlyLeanStrength.value = config.curlyLeanStrength !== undefined ? config.curlyLeanStrength : 0.5;
+      if (modeSpecificInputs.curlyDynamicModulation) modeSpecificInputs.curlyDynamicModulation.value = config.curlyDynamicModulation !== undefined ? config.curlyDynamicModulation : 0;
+      if (modeSpecificInputs.curlySlantAngle) modeSpecificInputs.curlySlantAngle.value = config.curlySlantAngle !== undefined ? config.curlySlantAngle : 0;
     }
 
     // Update fill mode controls visibility
@@ -1648,6 +1667,29 @@ export function initUI(store, renderer) {
     }
     // Reset input so same file can be loaded again
     e.target.value = '';
+  });
+
+  // Reset to Defaults button
+  document.getElementById('btn-reset-config').addEventListener('click', () => {
+    if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+      // Create a fresh copy of the default config
+      const defaultConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+      // Update store with default config
+      store.setState({ config: defaultConfig });
+
+      // Sync all UI inputs
+      syncUIFromConfig(defaultConfig);
+
+      // Clear localStorage so defaults persist on refresh
+      localStorage.removeItem('plotterThickenerLastConfig');
+
+      // Reset the preset dropdown
+      document.getElementById('builtin-presets').value = '';
+
+      showPresetStatus('All settings reset to defaults', 'success');
+      console.log('Config reset to defaults');
+    }
   });
 
   // Built-in presets dropdown

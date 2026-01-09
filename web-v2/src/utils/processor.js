@@ -335,7 +335,11 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         noise: config.noise || 0,
         seed: null,
         sampleRate: config.sampleRate || 0.5,
-        pathId: `path-${i}`
+        pathId: `path-${i}`,
+        leanMode: config.curlyLeanMode || 'none',
+        leanStrength: config.curlyLeanStrength !== undefined ? config.curlyLeanStrength : 0.5,
+        dynamicModulation: config.curlyDynamicModulation !== undefined ? config.curlyDynamicModulation : 0,
+        slantAngle: config.curlySlantAngle !== undefined ? config.curlySlantAngle : 0
       });
 
       // Add each generated curly path

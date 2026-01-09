@@ -2886,7 +2886,11 @@ function generateCurlyFill(pathData, options = {}) {
     sampleRate = 0.5,         // mm between sample points
     noise = 0,
     seed = null,
-    pathId = 'path'
+    pathId = 'path',
+    leanMode = 'none',        // 'none', 'inside', 'outside' - lean into/out of turns
+    leanStrength = 0.5,       // 0-1, how much to lean
+    dynamicModulation = 0,    // 0-1, amplitude/phase variation along path
+    slantAngle = 0            // degrees, constant forward/backward tilt (works on straight lines)
   } = options;
 
   const paths = [];
@@ -2912,26 +2916,69 @@ function generateCurlyFill(pathData, options = {}) {
         break;
       }
 
-      // Calculate normal vector (perpendicular to path)
-      const nextDist = Math.min(dist + sampleRate * 0.1, totalLength);
-      const nextPoint = getPointAtLength(absolutePath, nextDist);
+      // Calculate tangent using centered, larger delta for stability
+      const delta = Math.min(sampleRate, totalLength * 0.01);
+      const prevDist = Math.max(0, dist - delta);
+      const nextDist = Math.min(totalLength, dist + delta);
+      const prevPt = getPointAtLength(absolutePath, prevDist);
+      const nextPt = getPointAtLength(absolutePath, nextDist);
 
-      if (nextPoint && !isNaN(nextPoint.x) && !isNaN(nextPoint.y)) {
-        const dx = nextPoint.x - point.x;
-        const dy = nextPoint.y - point.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
+      if (prevPt && nextPt && !isNaN(prevPt.x) && !isNaN(nextPt.x)) {
+        const dx = nextPt.x - prevPt.x;
+        const dy = nextPt.y - prevPt.y;
+        const len = Math.hypot(dx, dy);
 
-        if (len > 0) {
+        if (len > 1e-6) {
+          // Tangent is along the path direction
+          point.tx = dx / len;
+          point.ty = dy / len;
           // Normal is perpendicular to tangent
           point.nx = -dy / len;
           point.ny = dx / len;
         } else {
-          point.nx = 0;
-          point.ny = 1;
+          // Keep previous tangent if available
+          const prev = centerline[centerline.length - 1];
+          point.tx = prev?.tx ?? 1;
+          point.ty = prev?.ty ?? 0;
+          point.nx = prev?.nx ?? 0;
+          point.ny = prev?.ny ?? 1;
         }
       } else {
-        point.nx = 0;
-        point.ny = 1;
+        const prev = centerline[centerline.length - 1];
+        point.tx = prev?.tx ?? 1;
+        point.ty = prev?.ty ?? 0;
+        point.nx = prev?.nx ?? 0;
+        point.ny = prev?.ny ?? 1;
+      }
+
+      // Calculate turn signal using wider window for meaningful curvature
+      // Per-sample angles are tiny (<1°), so we look 5-10mm ahead/behind
+      const turnWindow = Math.max(5, sampleRate * 8);  // mm
+      const turnPrevDist = Math.max(0, dist - turnWindow);
+      const turnNextDist = Math.min(totalLength, dist + turnWindow);
+      const turnPrevPt = getPointAtLength(absolutePath, turnPrevDist);
+      const turnNextPt = getPointAtLength(absolutePath, turnNextDist);
+
+      if (turnPrevPt && turnNextPt) {
+        const turnDx = turnNextPt.x - turnPrevPt.x;
+        const turnDy = turnNextPt.y - turnPrevPt.y;
+        const turnLen = Math.hypot(turnDx, turnDy);
+
+        const windowTx = turnLen > 1e-6 ? turnDx / turnLen : point.tx;
+        const windowTy = turnLen > 1e-6 ? turnDy / turnLen : point.ty;
+
+        // Compare against previous point's tangent
+        const prevPoint = centerline[centerline.length - 1];
+        if (prevPoint?.tx !== undefined) {
+          const cross = prevPoint.tx * windowTy - prevPoint.ty * windowTx;
+          const dot = prevPoint.tx * windowTx + prevPoint.ty * windowTy;
+          const angle = Math.atan2(cross, dot);
+          point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);  // 0.1 rad ~ 6°
+        } else {
+          point.turn = 0;
+        }
+      } else {
+        point.turn = 0;
       }
 
       // Calculate envelope width at this position
@@ -2969,16 +3016,42 @@ function generateCurlyFill(pathData, options = {}) {
         // Calculate loop phase based on distance traveled
         // loopFrequency is loops per 10mm, so divide by 10 to get loops per mm
         const loopsPerMm = loopFrequency / 10;
-        const phase = (dist * loopsPerMm * Math.PI * 2) + strandPhase;
+        const basePhase = (dist * loopsPerMm * Math.PI * 2) + strandPhase;
 
-        // Calculate perpendicular offset using sine wave
-        // The sine wave creates the looping motion
-        const loopRadius = width * loopAmplitude * 0.5;
-        const offset = Math.sin(phase) * loopRadius;
+        // Dynamic modulation - adds organic variation to amplitude and phase
+        let ampMod = 1.0;
+        let phaseMod = 0;
+        if (dynamicModulation > 0) {
+          const modulationScale = 30;  // mm wavelength of modulation
+          const noiseSeed = seed !== null ? seed : pathId.length;
+          const mod = simpleNoise(dist / modulationScale, noiseSeed + 500);
+          ampMod = 1 + dynamicModulation * 0.5 * mod;    // +/- 50% at full strength
+          phaseMod = dynamicModulation * 0.6 * mod;      // +/- 0.6 radians
+        }
 
-        // Apply offset perpendicular to path
-        const x = point.x + point.nx * offset;
-        const y = point.y + point.ny * offset;
+        const phase = basePhase + phaseMod;
+
+        // Calculate loop offset using circular motion (sin + cos)
+        // This creates actual loop-de-loops instead of just wiggling
+        const loopRadius = width * loopAmplitude * 0.5 * ampMod;
+        const normalOffset = Math.sin(phase) * loopRadius;
+        const tangentScale = loopStyle === 'elliptical' ? 0.6 : 1.0;
+
+        // Slant: shear tangent by normal for constant tilt (works on straight lines)
+        const slant = Math.tan((slantAngle * Math.PI) / 180);
+        const tangentOffset = Math.cos(phase) * loopRadius * tangentScale + slant * normalOffset;
+
+        // Lean bias - shifts curls toward inside/outside of turns
+        // Scales with loopRadius so lean is proportional to curl size
+        let leanBias = 0;
+        if (leanMode !== 'none' && leanStrength > 0) {
+          const leanDir = leanMode === 'inside' ? 1 : -1;
+          leanBias = leanStrength * loopRadius * leanDir * (point.turn || 0);
+        }
+
+        // Apply offset in both normal and tangent directions
+        const x = point.x + point.nx * (normalOffset + leanBias) + point.tx * tangentOffset;
+        const y = point.y + point.ny * (normalOffset + leanBias) + point.ty * tangentOffset;
 
         // Add noise if specified
         let noiseOffsetX = 0;

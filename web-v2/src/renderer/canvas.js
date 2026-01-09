@@ -255,6 +255,18 @@ export function initRenderer(canvas, store) {
       drawPath(ctx, pathData);
     }
 
+    // Draw A3 landscape reference frame (420mm x 297mm)
+    // Scale A3 dimensions into viewBox coordinates if needed
+    const viewBoxToMM = currentBounds.viewBoxToMM || 1;
+    const a3Width = 420 / viewBoxToMM;   // A3 width in viewBox units
+    const a3Height = 297 / viewBoxToMM;  // A3 height in viewBox units
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1 / viewState.zoom;
+    ctx.setLineDash([5 / viewState.zoom, 5 / viewState.zoom]);
+    ctx.strokeRect(0, 0, a3Width, a3Height);
+    ctx.setLineDash([]);  // Reset to solid lines
+
     // Draw attractors
     if (attractors && attractors.length > 0) {
       const attractorConfig = store ? store.getState('attractorConfig') : { falloffRadius: 50 };
@@ -311,11 +323,15 @@ export function initRenderer(canvas, store) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fillRect(5, 5, 280, 75);
 
+    // Use actual document dimensions (mm) for display, not viewBox units
+    const docW = currentBounds.documentWidth || currentBounds.width;
+    const docH = currentBounds.documentHeight || currentBounds.height;
+
     ctx.fillStyle = '#333';
     ctx.font = '12px monospace';
     ctx.fillText(`Zoom: ${(viewState.zoom * 100).toFixed(0)}%`, 10, 20);
     ctx.fillText(`Paths: ${currentPaths.length}`, 10, 35);
-    ctx.fillText(`Bounds: ${currentBounds.width.toFixed(1)} x ${currentBounds.height.toFixed(1)} mm`, 10, 50);
+    ctx.fillText(`Document: ${docW.toFixed(1)} x ${docH.toFixed(1)} mm`, 10, 50);
     ctx.fillText(`Scale: ${baseScale.toFixed(3)}`, 10, 65);
     ctx.restore();
   }
@@ -442,6 +458,18 @@ export function initRenderer(canvas, store) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    // Draw A3 landscape reference frame (420mm x 297mm)
+    // Scale A3 dimensions into viewBox coordinates if needed
+    const viewBoxToMM = currentBounds.viewBoxToMM || 1;
+    const a3Width = 420 / viewBoxToMM;   // A3 width in viewBox units
+    const a3Height = 297 / viewBoxToMM;  // A3 height in viewBox units
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1 / viewState.zoom;
+    ctx.setLineDash([5 / viewState.zoom, 5 / viewState.zoom]);
+    ctx.strokeRect(0, 0, a3Width, a3Height);
+    ctx.setLineDash([]);  // Reset to solid lines
+
     // Draw each path with color-coded weight
     currentPaths.forEach((pathData, i) => {
       const length = lengths[i];
@@ -519,15 +547,20 @@ export function initRenderer(canvas, store) {
     // Draw info overlay
     ctx.save();
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.fillRect(5, 5, 280, 90);
+    ctx.fillRect(5, 5, 280, 105);
+
+    // Use actual document dimensions (mm) for display
+    const docW = currentBounds.documentWidth || currentBounds.width;
+    const docH = currentBounds.documentHeight || currentBounds.height;
 
     ctx.fillStyle = '#333';
     ctx.font = '12px monospace';
     ctx.fillText(`FAST PREVIEW MODE`, 10, 20);
     ctx.fillText(`Zoom: ${(viewState.zoom * 100).toFixed(0)}%`, 10, 35);
     ctx.fillText(`Paths: ${currentPaths.length}`, 10, 50);
-    ctx.fillText(`Range: ${minPasses}-${maxPasses} passes`, 10, 65);
-    ctx.fillText(`Green=min, Red=max`, 10, 80);
+    ctx.fillText(`Document: ${docW.toFixed(1)} x ${docH.toFixed(1)} mm`, 10, 65);
+    ctx.fillText(`Range: ${minPasses}-${maxPasses} passes`, 10, 80);
+    ctx.fillText(`Green=min, Red=max`, 10, 95);
     ctx.restore();
   }
 

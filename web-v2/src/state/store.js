@@ -154,6 +154,10 @@ const initialState = {
     curlyStrands: 1,            // number of parallel spring strands
     curlyStrandPhaseOffset: 0.5, // 0-1, phase offset between strands
     curlyMaxWidth: 4.0,         // maximum envelope width (mm)
+    curlyLeanMode: 'none',      // 'none', 'inside', 'outside' - lean into/out of turns
+    curlyLeanStrength: 0.5,     // 0-1, how much to lean
+    curlyDynamicModulation: 0,  // 0-1, amplitude/phase variation along path
+    curlySlantAngle: 0,         // degrees, constant forward/backward tilt (-60 to 60)
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',
@@ -233,3 +237,6 @@ const initialState = {
 };
 
 export const store = new Store(initialState);
+
+// Export default config for reset functionality
+export const DEFAULT_CONFIG = { ...initialState.config };

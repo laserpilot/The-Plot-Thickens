@@ -135,6 +135,10 @@ function extractBounds(svgEl) {
   const widthAttr = svgEl.getAttribute('width');
   const heightAttr = svgEl.getAttribute('height');
 
+  // Parse actual document dimensions from width/height attributes (in mm)
+  const docWidth = widthAttr ? parseUnit(widthAttr) : null;
+  const docHeight = heightAttr ? parseUnit(heightAttr) : null;
+
   // Parse viewBox for coordinate system (if present)
   // IMPORTANT: Path coordinates are always in viewBox units, so we must use
   // viewBox dimensions for bounds to ensure correct centering
@@ -158,8 +162,16 @@ function extractBounds(svgEl) {
     // No viewBox - use width/height attributes (convert units to user units)
     x = 0;
     y = 0;
-    width = widthAttr ? parseUnit(widthAttr) : 100;
-    height = heightAttr ? parseUnit(heightAttr) : 100;
+    width = docWidth || 100;
+    height = docHeight || 100;
+  }
+
+  // Calculate scale factor from viewBox to document (mm per viewBox unit)
+  // This is needed for accurate A3 reference frame positioning
+  let viewBoxToMM = 1;
+  if (vb && docWidth && docHeight) {
+    // Use average scale if aspect ratios differ slightly
+    viewBoxToMM = ((docWidth / vb.width) + (docHeight / vb.height)) / 2;
   }
 
   return {
@@ -168,7 +180,11 @@ function extractBounds(svgEl) {
     width,
     height,
     cx: x + width / 2,
-    cy: y + height / 2
+    cy: y + height / 2,
+    // Actual document dimensions in mm (for display and A3 reference)
+    documentWidth: docWidth || width,
+    documentHeight: docHeight || height,
+    viewBoxToMM
   };
 }
 
