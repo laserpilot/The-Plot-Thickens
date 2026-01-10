@@ -10,7 +10,8 @@ import {
   getEnvelopePreset,
   generateShapeFill,
   generateBarberPoleFill,
-  generateCurlyFill
+  generateCurlyFill,
+  generateMoireFill
 } from '../../../shared/geometry/path-utils.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
@@ -366,6 +367,78 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           strokeWidth: 0.1
         });
       });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
+    }
+
+    // Handle moiré mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'moire') {
+      const moireResult = generateMoireFill(path.d, {
+        moireMode: config.moireMode || 'spacing',
+        spacingA: config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0,
+        spacingDelta: config.moireSpacingDelta !== undefined ? config.moireSpacingDelta : 0.02,
+        phaseDriftWavelength: config.moirePhaseDriftWavelength !== undefined ? config.moirePhaseDriftWavelength : 80,
+        phaseDriftAmplitude: config.moirePhaseDriftAmplitude !== undefined ? config.moirePhaseDriftAmplitude : 0.2,
+        families: config.moireFamilies !== undefined ? config.moireFamilies : 2,
+        passesPerFamily: config.moirePassesPerFamily !== undefined ? config.moirePassesPerFamily : 5,
+        familyOffset: config.moireFamilyOffset !== undefined ? config.moireFamilyOffset : 0.5,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.moireMaxWidth !== undefined ? config.moireMaxWidth : 3.0,
+        minWidth: config.moireMinWidth !== undefined ? config.moireMinWidth : 0.0,
+        noise: config.noise || 0,
+        seed: null,
+        sampleRate: config.sampleRate || 0.5,
+        pathId: `path-${i}`,
+        samplingDrift: config.moireSamplingDrift || false,
+        samplingDriftWavelength: config.moireSamplingDriftWavelength !== undefined ? config.moireSamplingDriftWavelength : 100,
+        samplingDriftAmplitude: config.moireSamplingDriftAmplitude !== undefined ? config.moireSamplingDriftAmplitude : 0.5
+      });
+
+      // Add family A paths (black)
+      moireResult.familyA.forEach((pathData, pathIndex) => {
+        processed.push({
+          id: `${path.id || i}-moire-a-${pathIndex}`,
+          d: pathData,
+          originalIndex: i,
+          layerId: path.layerId,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1,
+          family: 'black'
+        });
+      });
+
+      // Add family B paths (red)
+      moireResult.familyB.forEach((pathData, pathIndex) => {
+        processed.push({
+          id: `${path.id || i}-moire-b-${pathIndex}`,
+          d: pathData,
+          originalIndex: i,
+          layerId: path.layerId,
+          fill: 'none',
+          stroke: 'red',
+          strokeWidth: 0.1,
+          family: 'red'
+        });
+      });
+
+      // Add family C paths (blue) if present
+      if (moireResult.familyC && moireResult.familyC.length > 0) {
+        moireResult.familyC.forEach((pathData, pathIndex) => {
+          processed.push({
+            id: `${path.id || i}-moire-c-${pathIndex}`,
+            d: pathData,
+            originalIndex: i,
+            layerId: path.layerId,
+            fill: 'none',
+            stroke: 'blue',
+            strokeWidth: 0.1,
+            family: 'blue'
+          });
+        });
+      }
 
       // Skip to next path (don't call generatePasses)
       continue;

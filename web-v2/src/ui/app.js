@@ -734,7 +734,21 @@ export function initUI(store, renderer) {
     curlyLeanMode: document.getElementById('curly-lean-mode'),
     curlyLeanStrength: document.getElementById('curly-lean-strength'),
     curlyDynamicModulation: document.getElementById('curly-dynamic-modulation'),
-    curlySlantAngle: document.getElementById('curly-slant-angle')
+    curlySlantAngle: document.getElementById('curly-slant-angle'),
+    // Moiré mode controls
+    moireMode: document.getElementById('moire-mode'),
+    moireSpacingA: document.getElementById('moire-spacing-a'),
+    moireSpacingDelta: document.getElementById('moire-spacing-delta'),
+    moirePhaseDriftWavelength: document.getElementById('moire-phase-drift-wavelength'),
+    moirePhaseDriftAmplitude: document.getElementById('moire-phase-drift-amplitude'),
+    moireFamilies: document.getElementById('moire-families'),
+    moirePassesPerFamily: document.getElementById('moire-passes-per-family'),
+    moireFamilyOffset: document.getElementById('moire-family-offset'),
+    moireMaxWidth: document.getElementById('moire-max-width'),
+    moireMinWidth: document.getElementById('moire-min-width'),
+    moireSamplingDrift: document.getElementById('moire-sampling-drift'),
+    moireSamplingDriftWavelength: document.getElementById('moire-sampling-drift-wavelength'),
+    moireSamplingDriftAmplitude: document.getElementById('moire-sampling-drift-amplitude')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -783,6 +797,18 @@ export function initUI(store, renderer) {
             [configKey]: value,
             fillModeOptions: { ...fillModeOptions, [configKey]: value }
           }
+        });
+      }
+      // Special handling for moiré spacing delta - convert percentage to ratio
+      else if (key === 'moireSpacingDelta') {
+        store.setState({
+          config: { ...config, moireSpacingDelta: value / 100 }
+        });
+      }
+      // Special handling for moiré families - convert string to number
+      else if (key === 'moireFamilies') {
+        store.setState({
+          config: { ...config, moireFamilies: parseInt(value, 10) }
         });
       } else {
         store.setState({
@@ -1300,6 +1326,7 @@ export function initUI(store, renderer) {
     const shapeFillControls = document.getElementById('mode-shape-fill-controls');
     const barberPoleControls = document.getElementById('mode-barber-pole-controls');
     const curlyControls = document.getElementById('mode-curly-controls');
+    const moireControls = document.getElementById('mode-moire-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
@@ -1310,6 +1337,7 @@ export function initUI(store, renderer) {
     shapeFillControls.style.display = 'none';
     barberPoleControls.style.display = 'none';
     curlyControls.style.display = 'none';
+    moireControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -1328,6 +1356,8 @@ export function initUI(store, renderer) {
       barberPoleControls.style.display = 'block';
     } else if (mode === 'curly') {
       curlyControls.style.display = 'block';
+    } else if (mode === 'moire') {
+      moireControls.style.display = 'block';
     }
   }
 
@@ -1604,6 +1634,21 @@ export function initUI(store, renderer) {
       if (modeSpecificInputs.curlyLeanStrength) modeSpecificInputs.curlyLeanStrength.value = config.curlyLeanStrength !== undefined ? config.curlyLeanStrength : 0.5;
       if (modeSpecificInputs.curlyDynamicModulation) modeSpecificInputs.curlyDynamicModulation.value = config.curlyDynamicModulation !== undefined ? config.curlyDynamicModulation : 0;
       if (modeSpecificInputs.curlySlantAngle) modeSpecificInputs.curlySlantAngle.value = config.curlySlantAngle !== undefined ? config.curlySlantAngle : 0;
+    } else if (config.fillMode === 'moire') {
+      if (modeSpecificInputs.moireMode) modeSpecificInputs.moireMode.value = config.moireMode || 'spacing';
+      if (modeSpecificInputs.moireSpacingA) modeSpecificInputs.moireSpacingA.value = config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0;
+      // Convert ratio to percentage for display
+      if (modeSpecificInputs.moireSpacingDelta) modeSpecificInputs.moireSpacingDelta.value = (config.moireSpacingDelta !== undefined ? config.moireSpacingDelta : 0.02) * 100;
+      if (modeSpecificInputs.moirePhaseDriftWavelength) modeSpecificInputs.moirePhaseDriftWavelength.value = config.moirePhaseDriftWavelength !== undefined ? config.moirePhaseDriftWavelength : 80;
+      if (modeSpecificInputs.moirePhaseDriftAmplitude) modeSpecificInputs.moirePhaseDriftAmplitude.value = config.moirePhaseDriftAmplitude !== undefined ? config.moirePhaseDriftAmplitude : 0.2;
+      if (modeSpecificInputs.moireFamilies) modeSpecificInputs.moireFamilies.value = config.moireFamilies !== undefined ? config.moireFamilies : 2;
+      if (modeSpecificInputs.moirePassesPerFamily) modeSpecificInputs.moirePassesPerFamily.value = config.moirePassesPerFamily !== undefined ? config.moirePassesPerFamily : 5;
+      if (modeSpecificInputs.moireFamilyOffset) modeSpecificInputs.moireFamilyOffset.value = config.moireFamilyOffset !== undefined ? config.moireFamilyOffset : 0.5;
+      if (modeSpecificInputs.moireMaxWidth) modeSpecificInputs.moireMaxWidth.value = config.moireMaxWidth !== undefined ? config.moireMaxWidth : 3.0;
+      if (modeSpecificInputs.moireMinWidth) modeSpecificInputs.moireMinWidth.value = config.moireMinWidth !== undefined ? config.moireMinWidth : 0.0;
+      if (modeSpecificInputs.moireSamplingDrift) modeSpecificInputs.moireSamplingDrift.checked = config.moireSamplingDrift || false;
+      if (modeSpecificInputs.moireSamplingDriftWavelength) modeSpecificInputs.moireSamplingDriftWavelength.value = config.moireSamplingDriftWavelength !== undefined ? config.moireSamplingDriftWavelength : 100;
+      if (modeSpecificInputs.moireSamplingDriftAmplitude) modeSpecificInputs.moireSamplingDriftAmplitude.value = config.moireSamplingDriftAmplitude !== undefined ? config.moireSamplingDriftAmplitude : 0.5;
     }
 
     // Update fill mode controls visibility

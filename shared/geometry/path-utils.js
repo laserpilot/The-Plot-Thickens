@@ -3081,6 +3081,234 @@ function generateCurlyFill(pathData, options = {}) {
   return paths;
 }
 
+/**
+ * Generate phase-locked moiré fill pattern
+ * Creates two (or more) nearly-parallel stroke families whose phase stays aligned
+ * along the path so the interference bands are stable, not chaotic.
+ *
+ * @param {string} pathData - SVG path d attribute
+ * @param {Object} options - Configuration options
+ * @returns {Object} { familyA: Array<string>, familyB: Array<string> } - Two arrays of SVG path data strings
+ */
+function generateMoireFill(pathData, options = {}) {
+  const {
+    // Core moiré parameters
+    moireMode = 'spacing',       // 'spacing' (classic moiré) or 'phase' (phase drift)
+    spacingA = 1.0,              // mm - spacing for family A
+    spacingDelta = 0.02,         // ratio - spacing difference for family B (0.02 = 2%)
+    phaseDriftWavelength = 80,   // mm - wavelength of phase drift oscillation
+    phaseDriftAmplitude = 0.2,   // mm - amplitude of phase drift
+    families = 2,                // number of stripe families (2 or 3)
+    passesPerFamily = 5,         // number of parallel strokes per family per side
+    familyOffset = 0.5,          // mm - perpendicular offset between families (0 = overlapping)
+    // Standard envelope/geometry parameters
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    sampleRate = 0.5,            // mm between sample points
+    noise = 0,
+    seed = null,
+    pathId = 'path',
+    // Optional sampling drift (alternative phase lock trick)
+    samplingDrift = false,       // use sampling origin drift instead of offset drift
+    samplingDriftWavelength = 100, // mm
+    samplingDriftAmplitude = 0.5,  // mm
+  } = options;
+
+  const familyA = [];
+  const familyB = [];
+  const familyC = [];
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return { familyA, familyB, familyC };
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+
+    // Calculate spacings for each family
+    const spacingB = moireMode === 'spacing'
+      ? spacingA * (1 + spacingDelta)  // Classic moiré: slight spacing difference
+      : spacingA;                       // Phase mode: same spacing
+
+    const spacingC = families >= 3
+      ? spacingA * (1 + spacingDelta * 2)  // Third family with 2x delta
+      : spacingA;
+
+    // Sample centerline with normals
+    function sampleCenterline(sOffset = 0) {
+      const centerline = [];
+
+      for (let dist = 0; dist <= totalLength; dist += sampleRate) {
+        // Apply sampling drift if enabled
+        let effectiveDist = dist;
+        if (samplingDrift && sOffset !== 0) {
+          const driftPhase = (2 * Math.PI * dist) / samplingDriftWavelength;
+          effectiveDist = dist + sOffset * samplingDriftAmplitude * Math.sin(driftPhase);
+          effectiveDist = Math.max(0, Math.min(totalLength, effectiveDist));
+        }
+
+        const point = getPointAtLength(absolutePath, effectiveDist);
+
+        if (!point || isNaN(point.x) || isNaN(point.y)) {
+          break;
+        }
+
+        // Calculate tangent using centered delta
+        const delta = Math.min(sampleRate, totalLength * 0.01);
+        const prevDist = Math.max(0, effectiveDist - delta);
+        const nextDist = Math.min(totalLength, effectiveDist + delta);
+        const prevPt = getPointAtLength(absolutePath, prevDist);
+        const nextPt = getPointAtLength(absolutePath, nextDist);
+
+        if (prevPt && nextPt && !isNaN(prevPt.x) && !isNaN(nextPt.x)) {
+          const dx = nextPt.x - prevPt.x;
+          const dy = nextPt.y - prevPt.y;
+          const len = Math.hypot(dx, dy);
+
+          if (len > 1e-6) {
+            point.tx = dx / len;
+            point.ty = dy / len;
+            point.nx = -dy / len;
+            point.ny = dx / len;
+          } else {
+            const prev = centerline[centerline.length - 1];
+            point.tx = prev?.tx ?? 1;
+            point.ty = prev?.ty ?? 0;
+            point.nx = prev?.nx ?? 0;
+            point.ny = prev?.ny ?? 1;
+          }
+        } else {
+          const prev = centerline[centerline.length - 1];
+          point.tx = prev?.tx ?? 1;
+          point.ty = prev?.ty ?? 0;
+          point.nx = prev?.nx ?? 0;
+          point.ny = prev?.ny ?? 1;
+        }
+
+        // Calculate envelope width at this position
+        const t = dist / totalLength;
+        const envelopeMultiplier = envelopeFn(pathId, t);
+        point.localWidth = minWidth + envelopeMultiplier * (maxWidth - minWidth);
+        point.distance = dist;
+
+        centerline.push(point);
+      }
+
+      return centerline;
+    }
+
+    // Generate offset paths for a family
+    function generateFamilyPaths(centerline, spacing, phaseOffset = 0, familyIndex = 0) {
+      const paths = [];
+
+      // Calculate base offset for this family (to separate families perpendicular to path)
+      // Family A: no offset, Family B: +familyOffset, Family C: -familyOffset
+      const familyBaseOffset = familyIndex === 0 ? 0 :
+                               familyIndex === 1 ? familyOffset :
+                               -familyOffset;
+
+      // Generate passes on both sides of centerline
+      for (let k = -passesPerFamily; k <= passesPerFamily; k++) {
+        if (k === 0) continue; // Skip centerline itself
+
+        const offsetPoints = [];
+
+        for (let i = 0; i < centerline.length; i++) {
+          const point = centerline[i];
+          const dist = point.distance;
+
+          // Calculate offset distance (add family base offset to separate families)
+          let offsetDist = k * spacing + familyBaseOffset;
+
+          // Apply phase drift in phase mode
+          if (moireMode === 'phase' && familyIndex > 0) {
+            const driftPhase = (2 * Math.PI * dist) / phaseDriftWavelength;
+            const phaseDrift = phaseDriftAmplitude * Math.sin(driftPhase + phaseOffset);
+            offsetDist += phaseDrift;
+          }
+
+          // Scale by envelope (keep strokes within envelope bounds)
+          const halfWidth = point.localWidth / 2;
+          const envelopeScale = halfWidth / (passesPerFamily * spacing);
+          if (envelopeScale < 1) {
+            offsetDist *= envelopeScale;
+          }
+
+          // Clamp to envelope bounds
+          offsetDist = Math.max(-halfWidth, Math.min(halfWidth, offsetDist));
+
+          // Apply offset along normal
+          let x = point.x + point.nx * offsetDist;
+          let y = point.y + point.ny * offsetDist;
+
+          // Add noise if specified
+          if (noise > 0) {
+            const noiseSeed = seed !== null ? seed : pathId.length;
+            const noiseX = simpleNoise(dist / 10 + k * 50 + familyIndex * 200, noiseSeed) * noise;
+            const noiseY = simpleNoise(dist / 10 + 1000 + k * 50 + familyIndex * 200, noiseSeed + 1) * noise;
+            x += noiseX;
+            y += noiseY;
+          }
+
+          offsetPoints.push({ x, y });
+        }
+
+        // Convert to SVG path
+        if (offsetPoints.length > 1) {
+          paths.push(pointsToPath(offsetPoints));
+        }
+      }
+
+      return paths;
+    }
+
+    // Generate family A (reference family, no drift)
+    const centerlineA = sampleCenterline(0);
+    if (centerlineA.length >= 2) {
+      familyA.push(...generateFamilyPaths(centerlineA, spacingA, 0, 0));
+    }
+
+    // Generate family B (with spacing difference or phase drift)
+    if (samplingDrift) {
+      // Use sampling drift: sample from different origin
+      const centerlineB = sampleCenterline(1);  // Offset multiplier
+      if (centerlineB.length >= 2) {
+        familyB.push(...generateFamilyPaths(centerlineB, spacingB, Math.PI / 4, 1));
+      }
+    } else {
+      // Use same centerline, different spacing/phase
+      if (centerlineA.length >= 2) {
+        familyB.push(...generateFamilyPaths(centerlineA, spacingB, Math.PI / 4, 1));
+      }
+    }
+
+    // Generate family C if 3 families requested
+    if (families >= 3) {
+      if (samplingDrift) {
+        const centerlineC = sampleCenterline(2);  // Larger offset multiplier
+        if (centerlineC.length >= 2) {
+          familyC.push(...generateFamilyPaths(centerlineC, spacingC, Math.PI / 2, 2));
+        }
+      } else {
+        if (centerlineA.length >= 2) {
+          familyC.push(...generateFamilyPaths(centerlineA, spacingC, Math.PI / 2, 2));
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error(`Error generating moiré fill for path ${pathId}:`, error);
+  }
+
+  return { familyA, familyB, familyC };
+}
+
 export {
   measurePathLength,
   samplePathPoints,
@@ -3099,4 +3327,5 @@ export {
   generateBarberPolePixelated,
   generateBarberPoleSmooth,
   generateCurlyFill,
+  generateMoireFill,
 };

@@ -158,6 +158,20 @@ const initialState = {
     curlyLeanStrength: 0.5,     // 0-1, how much to lean
     curlyDynamicModulation: 0,  // 0-1, amplitude/phase variation along path
     curlySlantAngle: 0,         // degrees, constant forward/backward tilt (-60 to 60)
+    // Moiré fill options
+    moireMode: 'spacing',       // 'spacing' (classic moiré) or 'phase' (phase drift)
+    moireSpacingA: 1.0,         // mm - spacing for family A
+    moireSpacingDelta: 0.02,    // ratio - spacing difference (0.02 = 2%)
+    moirePhaseDriftWavelength: 80, // mm - wavelength of phase drift oscillation
+    moirePhaseDriftAmplitude: 0.2, // mm - amplitude of phase drift
+    moireFamilies: 2,           // number of stripe families (2 or 3)
+    moirePassesPerFamily: 5,    // number of parallel strokes per family per side
+    moireFamilyOffset: 0.5,     // mm - perpendicular offset between families
+    moireMaxWidth: 3.0,         // maximum envelope width (mm)
+    moireMinWidth: 0.0,         // minimum envelope width (mm)
+    moireSamplingDrift: false,  // use sampling origin drift instead of offset drift
+    moireSamplingDriftWavelength: 100, // mm
+    moireSamplingDriftAmplitude: 0.5,  // mm
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',
