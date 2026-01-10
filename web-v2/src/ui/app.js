@@ -748,7 +748,24 @@ export function initUI(store, renderer) {
     moireMinWidth: document.getElementById('moire-min-width'),
     moireSamplingDrift: document.getElementById('moire-sampling-drift'),
     moireSamplingDriftWavelength: document.getElementById('moire-sampling-drift-wavelength'),
-    moireSamplingDriftAmplitude: document.getElementById('moire-sampling-drift-amplitude')
+    moireSamplingDriftAmplitude: document.getElementById('moire-sampling-drift-amplitude'),
+    // Woodgrain mode controls
+    woodgrainBands: document.getElementById('woodgrain-bands'),
+    woodgrainSpacing: document.getElementById('woodgrain-spacing'),
+    woodgrainDriftAmplitude: document.getElementById('woodgrain-drift-amplitude'),
+    woodgrainDriftWavelength: document.getElementById('woodgrain-drift-wavelength'),
+    woodgrainDriftFalloff: document.getElementById('woodgrain-drift-falloff'),
+    woodgrainMaxWidth: document.getElementById('woodgrain-max-width'),
+    woodgrainMinWidth: document.getElementById('woodgrain-min-width'),
+    // Contour echo mode controls
+    contourSpacing: document.getElementById('contour-spacing'),
+    contourMaxPasses: document.getElementById('contour-max-passes'),
+    contourNoiseMax: document.getElementById('contour-noise-max'),
+    contourNoiseMin: document.getElementById('contour-noise-min'),
+    contourNoiseFrequency: document.getElementById('contour-noise-frequency'),
+    contourSymmetric: document.getElementById('contour-symmetric'),
+    contourMaxWidth: document.getElementById('contour-max-width'),
+    contourMinWidth: document.getElementById('contour-min-width')
   };
 
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
@@ -1327,6 +1344,8 @@ export function initUI(store, renderer) {
     const barberPoleControls = document.getElementById('mode-barber-pole-controls');
     const curlyControls = document.getElementById('mode-curly-controls');
     const moireControls = document.getElementById('mode-moire-controls');
+    const woodgrainControls = document.getElementById('mode-woodgrain-controls');
+    const contourEchoControls = document.getElementById('mode-contour-echo-controls');
 
     // Hide all mode-specific controls
     stripedControls.style.display = 'none';
@@ -1338,6 +1357,8 @@ export function initUI(store, renderer) {
     barberPoleControls.style.display = 'none';
     curlyControls.style.display = 'none';
     moireControls.style.display = 'none';
+    woodgrainControls.style.display = 'none';
+    contourEchoControls.style.display = 'none';
 
     // Show relevant controls
     if (mode === 'striped') {
@@ -1358,6 +1379,10 @@ export function initUI(store, renderer) {
       curlyControls.style.display = 'block';
     } else if (mode === 'moire') {
       moireControls.style.display = 'block';
+    } else if (mode === 'woodgrain') {
+      woodgrainControls.style.display = 'block';
+    } else if (mode === 'contour-echo') {
+      contourEchoControls.style.display = 'block';
     }
   }
 
@@ -1649,6 +1674,23 @@ export function initUI(store, renderer) {
       if (modeSpecificInputs.moireSamplingDrift) modeSpecificInputs.moireSamplingDrift.checked = config.moireSamplingDrift || false;
       if (modeSpecificInputs.moireSamplingDriftWavelength) modeSpecificInputs.moireSamplingDriftWavelength.value = config.moireSamplingDriftWavelength !== undefined ? config.moireSamplingDriftWavelength : 100;
       if (modeSpecificInputs.moireSamplingDriftAmplitude) modeSpecificInputs.moireSamplingDriftAmplitude.value = config.moireSamplingDriftAmplitude !== undefined ? config.moireSamplingDriftAmplitude : 0.5;
+    } else if (config.fillMode === 'woodgrain') {
+      if (modeSpecificInputs.woodgrainBands) modeSpecificInputs.woodgrainBands.value = config.woodgrainBands !== undefined ? config.woodgrainBands : 8;
+      if (modeSpecificInputs.woodgrainSpacing) modeSpecificInputs.woodgrainSpacing.value = config.woodgrainSpacing !== undefined ? config.woodgrainSpacing : 1.0;
+      if (modeSpecificInputs.woodgrainDriftAmplitude) modeSpecificInputs.woodgrainDriftAmplitude.value = config.woodgrainDriftAmplitude !== undefined ? config.woodgrainDriftAmplitude : 0.5;
+      if (modeSpecificInputs.woodgrainDriftWavelength) modeSpecificInputs.woodgrainDriftWavelength.value = config.woodgrainDriftWavelength !== undefined ? config.woodgrainDriftWavelength : 60;
+      if (modeSpecificInputs.woodgrainDriftFalloff) modeSpecificInputs.woodgrainDriftFalloff.value = config.woodgrainDriftFalloff !== undefined ? config.woodgrainDriftFalloff : 0.5;
+      if (modeSpecificInputs.woodgrainMaxWidth) modeSpecificInputs.woodgrainMaxWidth.value = config.woodgrainMaxWidth !== undefined ? config.woodgrainMaxWidth : 5.0;
+      if (modeSpecificInputs.woodgrainMinWidth) modeSpecificInputs.woodgrainMinWidth.value = config.woodgrainMinWidth !== undefined ? config.woodgrainMinWidth : 0.0;
+    } else if (config.fillMode === 'contour-echo') {
+      if (modeSpecificInputs.contourSpacing) modeSpecificInputs.contourSpacing.value = config.contourSpacing !== undefined ? config.contourSpacing : 0.5;
+      if (modeSpecificInputs.contourMaxPasses) modeSpecificInputs.contourMaxPasses.value = config.contourMaxPasses !== undefined ? config.contourMaxPasses : 10;
+      if (modeSpecificInputs.contourNoiseMax) modeSpecificInputs.contourNoiseMax.value = config.contourNoiseMax !== undefined ? config.contourNoiseMax : 0.3;
+      if (modeSpecificInputs.contourNoiseMin) modeSpecificInputs.contourNoiseMin.value = config.contourNoiseMin !== undefined ? config.contourNoiseMin : 0.0;
+      if (modeSpecificInputs.contourNoiseFrequency) modeSpecificInputs.contourNoiseFrequency.value = config.contourNoiseFrequency !== undefined ? config.contourNoiseFrequency : 20;
+      if (modeSpecificInputs.contourSymmetric) modeSpecificInputs.contourSymmetric.checked = config.contourSymmetric !== undefined ? config.contourSymmetric : true;
+      if (modeSpecificInputs.contourMaxWidth) modeSpecificInputs.contourMaxWidth.value = config.contourMaxWidth !== undefined ? config.contourMaxWidth : 5.0;
+      if (modeSpecificInputs.contourMinWidth) modeSpecificInputs.contourMinWidth.value = config.contourMinWidth !== undefined ? config.contourMinWidth : 0.0;
     }
 
     // Update fill mode controls visibility
