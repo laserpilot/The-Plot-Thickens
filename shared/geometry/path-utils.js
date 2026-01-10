@@ -3309,6 +3309,328 @@ function generateMoireFill(pathData, options = {}) {
   return { familyA, familyB, familyC };
 }
 
+/**
+ * Generate woodgrain fill pattern
+ * Creates parallel strands that follow the path with synchronized slow drift,
+ * like wood grain viewed from a side cut. All strands share the same noise
+ * pattern so they bend together, with drift stronger near edges.
+ *
+ * @param {string} pathData - SVG path d attribute
+ * @param {Object} options - Configuration options
+ * @returns {Array<string>} Array of SVG path data strings (one per strand)
+ */
+function generateWoodgrainFill(pathData, options = {}) {
+  const {
+    // Woodgrain-specific parameters
+    bands = 8,                    // Number of parallel strands (6-12 typical)
+    spacing = 1.0,                // Base spacing between strands in mm (0.5-2)
+    driftAmplitude = 0.5,         // How much strands wander in mm (0.2-1)
+    driftWavelength = 60,         // How slowly they drift in mm (40-120)
+    driftFalloff = 0.5,           // Edge vs center drift strength (0.3-1)
+    // Standard envelope/geometry parameters
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    sampleRate = 0.5,             // mm between sample points
+    noise = 0,                    // Additional random noise
+    seed = null,
+    pathId = 'path'
+  } = options;
+
+  const paths = [];
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return paths;
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+
+    // Calculate effective seed from pathId if not provided
+    const effectiveSeed = seed !== null ? seed : pathId.length * 12345;
+
+    // Sample path to get centerline points with normals (same pattern as curly mode)
+    const centerline = [];
+
+    for (let dist = 0; dist <= totalLength; dist += sampleRate) {
+      const point = getPointAtLength(absolutePath, dist);
+
+      if (!point || isNaN(point.x) || isNaN(point.y)) {
+        break;
+      }
+
+      // Calculate tangent using centered, larger delta for stability
+      const delta = Math.min(sampleRate, totalLength * 0.01);
+      const prevDist = Math.max(0, dist - delta);
+      const nextDist = Math.min(totalLength, dist + delta);
+      const prevPt = getPointAtLength(absolutePath, prevDist);
+      const nextPt = getPointAtLength(absolutePath, nextDist);
+
+      if (prevPt && nextPt && !isNaN(prevPt.x) && !isNaN(nextPt.x)) {
+        const dx = nextPt.x - prevPt.x;
+        const dy = nextPt.y - prevPt.y;
+        const len = Math.hypot(dx, dy);
+
+        if (len > 1e-6) {
+          point.tx = dx / len;
+          point.ty = dy / len;
+          point.nx = -dy / len;  // Normal perpendicular to tangent
+          point.ny = dx / len;
+        } else {
+          const prev = centerline[centerline.length - 1];
+          point.tx = prev?.tx ?? 1;
+          point.ty = prev?.ty ?? 0;
+          point.nx = prev?.nx ?? 0;
+          point.ny = prev?.ny ?? 1;
+        }
+      } else {
+        const prev = centerline[centerline.length - 1];
+        point.tx = prev?.tx ?? 1;
+        point.ty = prev?.ty ?? 0;
+        point.nx = prev?.nx ?? 0;
+        point.ny = prev?.ny ?? 1;
+      }
+
+      // Calculate envelope half-width at this position
+      const t = dist / totalLength;
+      const envelopeMultiplier = envelopeFn(pathId, t);
+      point.localHalfWidth = (minWidth + envelopeMultiplier * (maxWidth - minWidth)) / 2;
+      point.distance = dist;
+
+      centerline.push(point);
+    }
+
+    if (centerline.length < 2) {
+      return paths;
+    }
+
+    // Calculate nominal half-width for normalization (use maximum envelope width)
+    const nominalHalfWidth = maxWidth / 2;
+
+    // Generate one path per strand
+    for (let k = 0; k < bands; k++) {
+      // Base offset: centered distribution across the width
+      // k=0 is at -(bands-1)/2 * spacing, k=bands-1 is at +(bands-1)/2 * spacing
+      const strandBaseOffset = (k - (bands - 1) / 2) * spacing;
+
+      // Edge factor: how far from center (0 at center, 1 at edges)
+      const edgeFactor = bands > 1
+        ? Math.abs(k - (bands - 1) / 2) / ((bands - 1) / 2)
+        : 0;
+
+      const strandPoints = [];
+
+      for (let i = 0; i < centerline.length; i++) {
+        const point = centerline[i];
+        const dist = point.distance;
+        const localHalfWidth = point.localHalfWidth;
+
+        // Skip if this strand's base offset exceeds current envelope width
+        if (Math.abs(strandBaseOffset) > localHalfWidth && localHalfWidth > 0) {
+          // Strand would be outside envelope - skip this point
+          // This creates natural termination when envelope narrows
+          continue;
+        }
+
+        // Synchronized drift - same noise value for all strands at this distance
+        const sharedDrift = simpleNoise(dist / driftWavelength, effectiveSeed) * driftAmplitude;
+
+        // Effective drift: stronger near edges, weaker near center
+        const effectiveDrift = sharedDrift * Math.pow(edgeFactor, driftFalloff);
+
+        // Scale offset by local width relative to nominal width
+        const widthScale = nominalHalfWidth > 0 ? localHalfWidth / nominalHalfWidth : 1;
+        const offset = (strandBaseOffset + effectiveDrift) * widthScale;
+
+        // Calculate final position
+        let x = point.x + point.nx * offset;
+        let y = point.y + point.ny * offset;
+
+        // Add additional noise if specified
+        if (noise > 0) {
+          const noiseOffsetX = simpleNoise(dist / 10 + k * 100, effectiveSeed + 1000) * noise;
+          const noiseOffsetY = simpleNoise(dist / 10 + k * 100 + 500, effectiveSeed + 2000) * noise;
+          x += noiseOffsetX;
+          y += noiseOffsetY;
+        }
+
+        strandPoints.push({ x, y });
+      }
+
+      // Convert points to SVG path
+      if (strandPoints.length > 1) {
+        paths.push(pointsToPath(strandPoints));
+      }
+    }
+
+  } catch (error) {
+    console.error(`Error generating woodgrain fill for path ${pathId}:`, error);
+  }
+
+  return paths;
+}
+
+/**
+ * Generate contour echo fill pattern
+ * Creates concentric inward offsets that echo the path shape,
+ * like topographic contour lines shrinking toward the center.
+ * Optional noise that decays per pass (fuzzy outer -> crisp inner).
+ *
+ * @param {string} pathData - SVG path d attribute
+ * @param {Object} options - Configuration options
+ * @returns {Array<string>} Array of SVG path data strings (one per contour ring)
+ */
+function generateContourEchoFill(pathData, options = {}) {
+  const {
+    // Contour-specific parameters
+    contourSpacing = 0.5,         // Distance between contour rings in mm (0.3-1)
+    maxPasses = 10,               // Maximum number of rings (5-20)
+    noiseMax = 0.3,               // Outer ring noise (fuzzy) in mm
+    noiseMin = 0.0,               // Inner ring noise (crisp) in mm
+    noiseFrequency = 20,          // Noise wavelength in mm
+    symmetric = true,             // Generate both +/- sides for each contour
+    // Standard envelope/geometry parameters
+    baseOffset = 0.25,
+    envelope = 'flat',
+    maxWidth = 3.0,
+    minWidth = 0.0,
+    sampleRate = 0.5,             // mm between sample points
+    seed = null,
+    pathId = 'path'
+  } = options;
+
+  const paths = [];
+
+  try {
+    const absolutePath = pathToAbsolute(pathData);
+    const totalLength = getTotalLength(absolutePath);
+
+    if (totalLength === 0) {
+      return paths;
+    }
+
+    // Get envelope function
+    const envelopeFn = getEnvelopePreset(envelope);
+    const effectiveSeed = seed !== null ? seed : pathId.length * 12345;
+
+    // Sample path to get centerline points with normals
+    const centerline = [];
+
+    for (let dist = 0; dist <= totalLength; dist += sampleRate) {
+      const point = getPointAtLength(absolutePath, dist);
+
+      if (!point || isNaN(point.x) || isNaN(point.y)) {
+        break;
+      }
+
+      // Calculate tangent and normal (same pattern as curly/woodgrain)
+      const delta = Math.min(sampleRate, totalLength * 0.01);
+      const prevDist = Math.max(0, dist - delta);
+      const nextDist = Math.min(totalLength, dist + delta);
+      const prevPt = getPointAtLength(absolutePath, prevDist);
+      const nextPt = getPointAtLength(absolutePath, nextDist);
+
+      if (prevPt && nextPt && !isNaN(prevPt.x) && !isNaN(nextPt.x)) {
+        const dx = nextPt.x - prevPt.x;
+        const dy = nextPt.y - prevPt.y;
+        const len = Math.hypot(dx, dy);
+
+        if (len > 1e-6) {
+          point.tx = dx / len;
+          point.ty = dy / len;
+          point.nx = -dy / len;
+          point.ny = dx / len;
+        } else {
+          const prev = centerline[centerline.length - 1];
+          point.tx = prev?.tx ?? 1;
+          point.ty = prev?.ty ?? 0;
+          point.nx = prev?.nx ?? 0;
+          point.ny = prev?.ny ?? 1;
+        }
+      } else {
+        const prev = centerline[centerline.length - 1];
+        point.tx = prev?.tx ?? 1;
+        point.ty = prev?.ty ?? 0;
+        point.nx = prev?.nx ?? 0;
+        point.ny = prev?.ny ?? 1;
+      }
+
+      // Calculate envelope half-width at this position
+      const t = dist / totalLength;
+      const envelopeMultiplier = envelopeFn(pathId, t);
+      point.localHalfWidth = (minWidth + envelopeMultiplier * (maxWidth - minWidth)) / 2;
+      point.distance = dist;
+
+      centerline.push(point);
+    }
+
+    if (centerline.length < 2) {
+      return paths;
+    }
+
+    // Generate contour rings from outside to inside
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const insetAmount = pass * contourSpacing;
+
+      // Calculate noise level for this pass (linear interpolation: fuzzy -> crisp)
+      const passRatio = maxPasses > 1 ? pass / (maxPasses - 1) : 0;
+      const noiseLevel = noiseMax + passRatio * (noiseMin - noiseMax);
+
+      // Generate both positive and negative side contours if symmetric
+      const sides = symmetric ? [1, -1] : [1];
+
+      for (const side of sides) {
+        const contourPoints = [];
+        let hasValidPoints = false;
+
+        for (let i = 0; i < centerline.length; i++) {
+          const point = centerline[i];
+          const dist = point.distance;
+          const localHalfWidth = point.localHalfWidth;
+
+          // Check if this inset still fits within the envelope
+          if (insetAmount > localHalfWidth) {
+            // Contour has collapsed at this point - skip
+            continue;
+          }
+
+          // Calculate offset from centerline
+          const contourBaseOffset = (localHalfWidth - insetAmount) * side;
+
+          // Add noise (decreases for inner passes)
+          let noiseOffset = 0;
+          if (noiseLevel > 0) {
+            noiseOffset = simpleNoise(dist / noiseFrequency, effectiveSeed + pass * 1000 + side * 500) * noiseLevel;
+          }
+
+          const offset = contourBaseOffset + noiseOffset * side;
+
+          const x = point.x + point.nx * offset;
+          const y = point.y + point.ny * offset;
+
+          contourPoints.push({ x, y });
+          hasValidPoints = true;
+        }
+
+        // Only add path if we have enough valid points
+        if (contourPoints.length > 1 && hasValidPoints) {
+          paths.push(pointsToPath(contourPoints));
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error(`Error generating contour echo fill for path ${pathId}:`, error);
+  }
+
+  return paths;
+}
+
 export {
   measurePathLength,
   samplePathPoints,
@@ -3328,4 +3650,6 @@ export {
   generateBarberPoleSmooth,
   generateCurlyFill,
   generateMoireFill,
+  generateWoodgrainFill,
+  generateContourEchoFill,
 };
