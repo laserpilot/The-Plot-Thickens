@@ -11,7 +11,9 @@ import {
   generateShapeFill,
   generateBarberPoleFill,
   generateCurlyFill,
-  generateMoireFill
+  generateMoireFill,
+  generateWoodgrainFill,
+  generateContourEchoFill
 } from '../../../shared/geometry/path-utils.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
@@ -439,6 +441,76 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           });
         });
       }
+
+      // Skip to next path (don't call generatePasses)
+      continue;
+    }
+
+    // Handle woodgrain mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'woodgrain') {
+      const woodgrainPaths = generateWoodgrainFill(path.d, {
+        bands: config.woodgrainBands !== undefined ? config.woodgrainBands : 8,
+        spacing: config.woodgrainSpacing !== undefined ? config.woodgrainSpacing : 1.0,
+        driftAmplitude: config.woodgrainDriftAmplitude !== undefined ? config.woodgrainDriftAmplitude : 0.5,
+        driftWavelength: config.woodgrainDriftWavelength !== undefined ? config.woodgrainDriftWavelength : 60,
+        driftFalloff: config.woodgrainDriftFalloff !== undefined ? config.woodgrainDriftFalloff : 0.5,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.woodgrainMaxWidth !== undefined ? config.woodgrainMaxWidth : 5.0,
+        minWidth: config.woodgrainMinWidth !== undefined ? config.woodgrainMinWidth : 0.0,
+        noise: config.noise || 0,
+        seed: null,
+        sampleRate: config.sampleRate || 0.5,
+        pathId: `path-${i}`
+      });
+
+      // Add each generated woodgrain path
+      woodgrainPaths.forEach((pathData, pathIndex) => {
+        processed.push({
+          id: `${path.id || i}-woodgrain-${pathIndex}`,
+          d: pathData,
+          originalIndex: i,
+          layerId: path.layerId,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
+    }
+
+    // Handle contour-echo mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'contour-echo') {
+      const contourPaths = generateContourEchoFill(path.d, {
+        contourSpacing: config.contourSpacing !== undefined ? config.contourSpacing : 0.5,
+        maxPasses: config.contourMaxPasses !== undefined ? config.contourMaxPasses : 10,
+        noiseMax: config.contourNoiseMax !== undefined ? config.contourNoiseMax : 0.3,
+        noiseMin: config.contourNoiseMin !== undefined ? config.contourNoiseMin : 0.0,
+        noiseFrequency: config.contourNoiseFrequency !== undefined ? config.contourNoiseFrequency : 20,
+        symmetric: config.contourSymmetric !== undefined ? config.contourSymmetric : true,
+        baseOffset: config.baseOffset,
+        envelope: config.envelope || 'flat',
+        maxWidth: config.contourMaxWidth !== undefined ? config.contourMaxWidth : 5.0,
+        minWidth: config.contourMinWidth !== undefined ? config.contourMinWidth : 0.0,
+        seed: null,
+        sampleRate: config.sampleRate || 0.5,
+        pathId: `path-${i}`
+      });
+
+      // Add each generated contour path
+      contourPaths.forEach((pathData, pathIndex) => {
+        processed.push({
+          id: `${path.id || i}-contour-${pathIndex}`,
+          d: pathData,
+          originalIndex: i,
+          layerId: path.layerId,
+          fill: 'none',
+          stroke: 'black',
+          strokeWidth: 0.1
+        });
+      });
 
       // Skip to next path (don't call generatePasses)
       continue;
