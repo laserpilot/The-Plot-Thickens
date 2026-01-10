@@ -9,6 +9,11 @@ import { generateSampleShapes, getSampleDescription } from '../utils/sample-shap
 import { initProgressPanel } from './progress-panel.js';
 import { initGlobalProgress, showProgress, updateProgress, hideProgress, showComplete } from '../utils/global-progress.js';
 import { DEFAULT_CONFIG } from '../state/store.js';
+import { PathLengthHistogram } from './histogram.js';
+
+// Module-level histogram instance and path lengths cache
+let pathLengthHistogram = null;
+let currentPathLengths = [];
 
 /**
  * Throttle function to limit how often a function can be called
@@ -199,6 +204,9 @@ function updateCLICommandDisplay(config) {
 }
 
 export function initUI(store, renderer) {
+  // Initialize path length histogram
+  pathLengthHistogram = new PathLengthHistogram('path-length-histogram', 'path-length-histogram-container');
+
   // Shared path processing function
   const processPathsInternal = async () => {
     const originalPaths = store.getState('originalPaths');
@@ -408,6 +416,11 @@ export function initUI(store, renderer) {
       console.log('Calling renderer.render()...');
       renderer.render(svgData.paths, svgData.bounds);
 
+      // Update path length histogram
+      currentPathLengths = svgData.paths.map(p => p.length);
+      const config = store.getState('config');
+      pathLengthHistogram.update(currentPathLengths, config.minLength || 0, config.maxLength || 0);
+
       showComplete(`Loaded ${svgData.paths.length} paths from ${file.name}`);
 
     } catch (err) {
@@ -491,6 +504,11 @@ export function initUI(store, renderer) {
       updateProgress('Rendering preview...', 75);
 
       renderer.render(svgData.paths, svgData.bounds);
+
+      // Update path length histogram
+      currentPathLengths = svgData.paths.map(p => p.length);
+      const config = store.getState('config');
+      pathLengthHistogram.update(currentPathLengths, config.minLength || 0, config.maxLength || 0);
 
       showComplete(`Loaded ${svgData.paths.length} paths from ${filename}`);
 
@@ -649,6 +667,12 @@ export function initUI(store, renderer) {
       // If fill mode changed, show/hide mode-specific controls
       if (key === 'fillMode') {
         updateFillModeControls(value);
+      }
+
+      // Update histogram if length thresholds changed
+      if ((key === 'minLength' || key === 'maxLength') && currentPathLengths.length > 0) {
+        const updatedConfig = store.getState('config');
+        pathLengthHistogram.update(currentPathLengths, updatedConfig.minLength || 0, updatedConfig.maxLength || 0);
       }
 
       // Update CLI command display
