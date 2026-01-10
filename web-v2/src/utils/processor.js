@@ -83,6 +83,17 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       const path = paths[i];
       const length = lengths[i];
 
+    // Skip paths below minLength threshold - pass through unchanged
+    if (config.minLength && config.minLength > 0 && length < config.minLength) {
+      processed.push({
+        original: path,
+        processed: [{ d: path.d, stroke: path.stroke || 'black', strokeWidth: 0.1 }],
+        passCount: 0,
+        length
+      });
+      continue;
+    }
+
     // Calculate number of passes
     let passCount;
     if (attractorSystem) {
@@ -90,15 +101,15 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       const pathPoints = samplePathPoints(path.d, attractorSystem.config.arcLengthSampleInterval || 5);
       passCount = Math.round(attractorSystem.calculatePathWeight(pathPoints, length));
     } else {
-      // Use length-based weight
-      passCount = Math.round(lengthToWeight(
-        length,
-        config.minPasses,
-        config.maxPasses,
+      // Use length-based weight (config object format)
+      passCount = lengthToWeight(length, {
         minLength,
         maxLength,
-        config.curve || 'linear'
-      ));
+        minPasses: config.minPasses,
+        maxPasses: config.maxPasses,
+        curve: config.curve || 'linear',
+        exponent: config.exponent || 2
+      });
     }
 
     // Skip paths with 0 passes (excluded by attractor system)
