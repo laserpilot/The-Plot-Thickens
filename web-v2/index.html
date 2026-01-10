@@ -134,6 +134,8 @@
                       <option value="barber-pole">Barber Pole</option>
                       <option value="curly">Curly</option>
                       <option value="moire">Moiré</option>
+                      <option value="woodgrain">Woodgrain</option>
+                      <option value="contour-echo">Contour Echo</option>
                     </select>
                   </label>
 
@@ -805,6 +807,124 @@
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
                     <strong>Tip:</strong> For classic moiré, use spacing mode with 1-3% delta. For controlled bands, use phase mode. Keep spacing tight (0.6-1.2mm) for subtle interference. Families are rendered in different colors for plotter pen separation.
+                  </div>
+                </div>
+
+                <!-- Woodgrain Fill Mode Controls -->
+                <div id="mode-woodgrain-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Woodgrain Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates parallel strands that follow the path with synchronized slow drift, like wood grain viewed from a side cut. All strands share the same drift pattern, bending together organically.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Number of Bands
+                      <input type="number" id="woodgrain-bands" step="1" min="3" max="20" value="8" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Number of parallel strands (6-12 typical)</div>
+                    </label>
+
+                    <label>
+                      Spacing (mm)
+                      <input type="number" id="woodgrain-spacing" step="0.1" min="0.2" max="3.0" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Base spacing between strands</div>
+                    </label>
+
+                    <label>
+                      Drift Amplitude (mm)
+                      <input type="number" id="woodgrain-drift-amplitude" step="0.1" min="0" max="2.0" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much strands wander side-to-side</div>
+                    </label>
+
+                    <label>
+                      Drift Wavelength (mm)
+                      <input type="number" id="woodgrain-drift-wavelength" step="5" min="10" max="200" value="60" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How slowly the drift oscillates (higher = slower)</div>
+                    </label>
+
+                    <label>
+                      Edge Drift Falloff
+                      <input type="range" id="woodgrain-drift-falloff" min="0" max="1" step="0.1" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">0 = uniform drift, 1 = edges drift more than center</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="woodgrain-max-width" step="0.5" min="1.0" max="15" value="5.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum width at widest envelope point</div>
+                    </label>
+
+                    <label>
+                      Min Width (mm)
+                      <input type="number" id="woodgrain-min-width" step="0.1" min="0" max="5" value="0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum width at tapered ends</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Use sinTaperBoth envelope for natural wood grain that tapers at ends. Higher band count with lower spacing creates denser grain. The drift wavelength controls how "wavy" the grain appears.
+                  </div>
+                </div>
+
+                <!-- Contour Echo Fill Mode Controls -->
+                <div id="mode-contour-echo-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Contour Echo Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Creates concentric inward offsets that echo the path shape, like topographic contour lines. Outer contours can be fuzzy while inner contours become crisp.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Contour Spacing (mm)
+                      <input type="number" id="contour-spacing" step="0.1" min="0.2" max="2.0" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance between contour rings</div>
+                    </label>
+
+                    <label>
+                      Max Contour Passes
+                      <input type="number" id="contour-max-passes" step="1" min="2" max="30" value="10" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum number of contour rings</div>
+                    </label>
+
+                    <label>
+                      Outer Noise (mm)
+                      <input type="number" id="contour-noise-max" step="0.05" min="0" max="1.0" value="0.3" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Noise amplitude for outermost contour (fuzzy)</div>
+                    </label>
+
+                    <label>
+                      Inner Noise (mm)
+                      <input type="number" id="contour-noise-min" step="0.05" min="0" max="1.0" value="0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Noise amplitude for innermost contour (crisp)</div>
+                    </label>
+
+                    <label>
+                      Noise Frequency (mm)
+                      <input type="number" id="contour-noise-frequency" step="5" min="5" max="100" value="20" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Wavelength of noise wiggle</div>
+                    </label>
+
+                    <label>
+                      <input type="checkbox" id="contour-symmetric" checked />
+                      Symmetric
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Generate contours on both sides of path</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="contour-max-width" step="0.5" min="1.0" max="15" value="5.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum width at widest envelope point</div>
+                    </label>
+
+                    <label>
+                      Min Width (mm)
+                      <input type="number" id="contour-min-width" step="0.1" min="0" max="5" value="0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Minimum width at tapered ends</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Set outer noise higher than inner noise for a "fuzzy to crisp" effect. Smaller contour spacing creates denser topographic appearance. Works best with sinTaperBoth envelope for gradual termination.
                   </div>
                 </div>
 
