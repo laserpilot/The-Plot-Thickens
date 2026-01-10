@@ -172,6 +172,23 @@ const initialState = {
     moireSamplingDrift: false,  // use sampling origin drift instead of offset drift
     moireSamplingDriftWavelength: 100, // mm
     moireSamplingDriftAmplitude: 0.5,  // mm
+    // Woodgrain fill options
+    woodgrainBands: 8,              // number of parallel strands (6-12 typical)
+    woodgrainSpacing: 1.0,          // mm - base spacing between strands
+    woodgrainDriftAmplitude: 0.5,   // mm - how much strands wander
+    woodgrainDriftWavelength: 60,   // mm - how slowly they drift (40-120)
+    woodgrainDriftFalloff: 0.5,     // 0-1 - edge vs center drift strength
+    woodgrainMaxWidth: 5.0,         // mm - maximum envelope width
+    woodgrainMinWidth: 0.0,         // mm - minimum envelope width
+    // Contour echo fill options
+    contourSpacing: 0.5,            // mm - distance between contour rings
+    contourMaxPasses: 10,           // maximum number of rings (5-20)
+    contourNoiseMax: 0.3,           // mm - outer ring noise (fuzzy)
+    contourNoiseMin: 0.0,           // mm - inner ring noise (crisp)
+    contourNoiseFrequency: 20,      // mm - noise wavelength
+    contourSymmetric: true,         // generate both sides
+    contourMaxWidth: 5.0,           // mm - maximum envelope width
+    contourMinWidth: 0.0,           // mm - minimum envelope width
     // Focus blur configuration
     focusBlur: {
       lightMode: 'directional',
