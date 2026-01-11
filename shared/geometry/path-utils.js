@@ -3632,13 +3632,29 @@ function generateContourEchoFill(pathData, options = {}) {
 }
 
 export {
+  // Core path utilities
   measurePathLength,
   samplePathPoints,
   offsetPath,
-  generatePasses,
   lengthToWeight,
+
+  // Path parsing and measurement (needed by fill modules)
+  pathToAbsolute,
+  getTotalLength,
+  getPointAtLength,
+
+  // Envelope system
   getEnvelopePreset,
   EnvelopePresets,
+
+  // Helpers used by fill modules
+  simpleNoise,
+  pointsToPath,
+
+  // Main pass generator
+  generatePasses,
+
+  // Individual fill generators
   generateCrosshatchFill,
   generateStipplingFill,
   generateHatchGradientFill,
