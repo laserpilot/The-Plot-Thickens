@@ -111,8 +111,8 @@ export function processPathsWithProgress(
       ));
     }
 
-    // Get envelope function for normal mode
-    const envelope = getEnvelopePreset('sinTaperBoth');
+    // Get envelope function for normal mode (use config envelope, not hardcoded)
+    const envelope = getEnvelopePreset(config.envelope || 'sinTaperBoth');
 
     // Prepare mode-specific options
     let modeOptions = config.fillModeOptions || null;
@@ -338,12 +338,17 @@ export function processPathsWithProgress(
         strandPhaseOffset: config.curlyStrandPhaseOffset !== undefined ? config.curlyStrandPhaseOffset : 0.5,
         baseOffset: config.baseOffset,
         envelope: config.envelope || 'flat',
-        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 3.0,
-        minWidth: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.0,
+        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 4.0,
+        minWidth: 0.0,  // Envelope minWidth should always be 0, curlyMinWidth is for threshold
         noise: config.noise || 0,
         seed: null,
         sampleRate: config.sampleRate || 0.5,
-        pathId: `path-${i}`
+        pathId: `path-${i}`,
+        leanMode: config.curlyLeanMode || 'none',
+        leanStrength: config.curlyLeanStrength !== undefined ? Number(config.curlyLeanStrength) : 0.5,
+        dynamicModulation: config.curlyDynamicModulation !== undefined ? Number(config.curlyDynamicModulation) : 0,
+        slantAngle: config.curlySlantAngle !== undefined ? Number(config.curlySlantAngle) : 0,
+        unitScale: 1.0  // Server assumes mm coordinates; add scaling if viewBox differs
       });
 
       // Add each generated curly path

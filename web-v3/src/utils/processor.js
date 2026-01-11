@@ -29,6 +29,7 @@ import { AttractorSystem } from '../../../shared/fields/attractor.js';
  * @returns {Object} {paths: processed paths, detectedMinLength, detectedMaxLength}
  */
 export async function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null, progressCallback = null) {
+  console.log('=== processPaths called ===', { pathCount: paths?.length, hasViewBox: !!viewBox, viewBox });
   const processed = [];
 
   // Set up attractor system if attractors provided
@@ -63,6 +64,26 @@ export async function processPaths(paths, config, attractors = [], attractorConf
 
   // Measure all path lengths first for relative scaling
   const lengths = paths.map(p => measurePathLength(p.d));
+
+  // Scale factor: convert mm to viewBox units
+  // viewBoxToMM = mm per viewBox unit, so we divide mm values by this to get viewBox units
+  // If no viewBox info available, assume 1:1 (viewBox units are mm)
+  const mmToViewBox = viewBox?.viewBoxToMM ? (1 / viewBox.viewBoxToMM) : 1;
+
+  // Debug logging for scale factor verification
+  const loopFreqForDebug = config.curlyLoopFrequency || 1.0;
+  const loopPeriodMmForDebug = 10 / loopFreqForDebug;
+  const maxSampleRateForDebug = loopPeriodMmForDebug / 20;  // 20 samples per loop
+  const effectiveSampleRateForDebug = Math.min(config.sampleRate || 0.5, maxSampleRateForDebug);
+  console.log('Scale factors:', {
+    viewBoxToMM: viewBox?.viewBoxToMM,
+    mmToViewBox,
+    curlyLoopFrequency: loopFreqForDebug,
+    loopPeriodMm: loopPeriodMmForDebug,
+    configSampleRate: config.sampleRate,
+    effectiveSampleRate: effectiveSampleRateForDebug,
+    pointsPerLoop: loopPeriodMmForDebug / effectiveSampleRateForDebug
+  });
 
   // Use config overrides if provided (non-zero), otherwise auto-detect
   const minLength = (config.minLength && config.minLength > 0)
@@ -127,13 +148,14 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     let modeOptions = config.fillModeOptions || {};
 
     // Add noise gradient parameters to mode options (works for offset, striped, spiral modes)
+    // Scale mm-based noise values to viewBox units
     modeOptions = {
       ...modeOptions,
       noiseGradientMode: config.noiseGradientMode || 'flat',
-      noiseMin: config.noiseMin || 0.05,
-      noiseMax: config.noiseMax || 0.4,
-      freqMin: config.freqMin || 50,
-      freqMax: config.freqMax || 10,
+      noiseMin: (config.noiseMin || 0.05) * mmToViewBox,
+      noiseMax: (config.noiseMax || 0.4) * mmToViewBox,
+      freqMin: (config.freqMin || 50) * mmToViewBox,
+      freqMax: (config.freqMax || 10) * mmToViewBox,
       gradientCurve: config.gradientCurve || 'linear'
     };
 
@@ -151,15 +173,15 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       modeOptions = {
         ...(modeOptions || {}),
         angles: config.crosshatchAngles || [45, 135],
-        spacing: config.crosshatchSpacing || 1.0,
-        // Add organic parameters if configured
+        spacing: (config.crosshatchSpacing || 1.0) * mmToViewBox,
+        // Add organic parameters if configured - scale mm-based values
         organic: config.crosshatchOrganic ? {
           enabled: true,
-          wiggle: config.crosshatchOrganic.wiggle || 0,
-          wiggleFreq: config.crosshatchOrganic.wiggleFreq || 0,
+          wiggle: (config.crosshatchOrganic.wiggle || 0) * mmToViewBox,
+          wiggleFreq: (config.crosshatchOrganic.wiggleFreq || 0) * mmToViewBox,
           angleJitter: config.crosshatchOrganic.angleJitter || 0,
           lengthJitter: config.crosshatchOrganic.lengthJitter || 0,
-          positionJitter: config.crosshatchOrganic.positionJitter || 0,
+          positionJitter: (config.crosshatchOrganic.positionJitter || 0) * mmToViewBox,
           spacingJitter: config.crosshatchOrganic.spacingJitter || 0
         } : { enabled: false }
       };
@@ -174,11 +196,11 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         lightAngle: focusBlur.lightAngle || 45,
         lightPosX: focusBlur.lightPosX || 50,
         lightPosY: focusBlur.lightPosY || 50,
-        falloffRadius: focusBlur.falloffRadius || 150,
-        noiseMin: focusBlur.noiseMin || 0.05,
-        noiseMax: focusBlur.noiseMax || 0.6,
-        freqMin: focusBlur.freqMin || 100,
-        freqMax: focusBlur.freqMax || 10,
+        falloffRadius: (focusBlur.falloffRadius || 150) * mmToViewBox,
+        noiseMin: (focusBlur.noiseMin || 0.05) * mmToViewBox,
+        noiseMax: (focusBlur.noiseMax || 0.6) * mmToViewBox,
+        freqMin: (focusBlur.freqMin || 100) * mmToViewBox,
+        freqMax: (focusBlur.freqMax || 10) * mmToViewBox,
         modulatePasses: focusBlur.modulatePasses || false,
         passesMin: focusBlur.passesMin || 1.0,
         passesMax: focusBlur.passesMax || 1.5,
@@ -192,12 +214,12 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       modeOptions = {
         ...(modeOptions || {}),
         angles: hatchGradient.angles || [0, 45, 90],
-        spacing: hatchGradient.spacing || 1.0,
+        spacing: (hatchGradient.spacing || 1.0) * mmToViewBox,
         lightMode: hatchGradient.lightMode || 'directional',
         lightAngle: hatchGradient.lightAngle || 45,
         lightPosX: hatchGradient.lightPosX || 25,
         lightPosY: hatchGradient.lightPosY || 25,
-        falloffRadius: hatchGradient.falloffRadius || 100,
+        falloffRadius: (hatchGradient.falloffRadius || 100) * mmToViewBox,
         lightStrength: hatchGradient.lightStrength || 0.8,
         baseWeight: hatchGradient.baseWeight || 0.2,
         shadowSoftness: hatchGradient.shadowSoftness || 0.5,
@@ -210,11 +232,11 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       const shapePaths = generateShapeFill(path.d, {
         shapeType: config.shapeType || 'circle',
         shapeFillMode: config.shapeFillMode || 'filled',
-        shapeSpacing: config.shapeSpacing !== undefined ? config.shapeSpacing : 1.0,
-        baseOffset: config.baseOffset,
+        shapeSpacing: (config.shapeSpacing !== undefined ? config.shapeSpacing : 1.0) * mmToViewBox,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.shapeMaxWidth !== undefined ? config.shapeMaxWidth : 3.0,
-        minWidth: config.shapeMinWidth !== undefined ? config.shapeMinWidth : 0.0,
+        maxWidth: (config.shapeMaxWidth !== undefined ? config.shapeMaxWidth : 3.0) * mmToViewBox,
+        minWidth: (config.shapeMinWidth !== undefined ? config.shapeMinWidth : 0.0) * mmToViewBox,
         pathId: `path-${i}`
       });
 
@@ -246,13 +268,13 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         twistRateMode: config.twistRateMode || 'inverse',
         occlusionMode: config.occlusionMode || 'smooth',
         minOcclusion: config.minOcclusion !== undefined ? config.minOcclusion : 0.0,
-        baseOffset: config.baseOffset,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.barberPoleMaxWidth !== undefined ? config.barberPoleMaxWidth : 3.0,
-        minWidth: config.barberPoleMinWidth !== undefined ? config.barberPoleMinWidth : 0.0,
-        stripeHeight: config.stripeHeight !== undefined ? config.stripeHeight : null,
+        maxWidth: (config.barberPoleMaxWidth !== undefined ? config.barberPoleMaxWidth : 3.0) * mmToViewBox,
+        minWidth: (config.barberPoleMinWidth !== undefined ? config.barberPoleMinWidth : 0.0) * mmToViewBox,
+        stripeHeight: config.stripeHeight !== null && config.stripeHeight !== undefined ? config.stripeHeight * mmToViewBox : null,
         stripeGapRatio: config.stripeGapRatio !== undefined ? config.stripeGapRatio : 1.0,
-        lineSpacing: config.lineSpacing !== undefined ? config.lineSpacing : 0.3,
+        lineSpacing: (config.lineSpacing !== undefined ? config.lineSpacing : 0.3) * mmToViewBox,
         stripeTaperEdgeSharpness: config.stripeTaperEdgeSharpness !== undefined ? config.stripeTaperEdgeSharpness : 1.0,
         stripeTaperMiddleAngle: config.stripeTaperMiddleAngle !== undefined ? config.stripeTaperMiddleAngle : 1.0,
         tipAngle: config.tipAngle !== undefined ? config.tipAngle : 0,
@@ -263,9 +285,9 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         braidTightness: config.braidTightness !== undefined ? config.braidTightness : 1.0,
         braidOcclusionThreshold: config.braidOcclusionThreshold !== undefined ? config.braidOcclusionThreshold : 0.5,
         visibleFamilies: config.visibleFamilies || null,
-        noise: config.noise || 0,
+        noise: (config.noise || 0) * mmToViewBox,
         seed: null,
-        sampleRate: config.sampleRate || 0.5,
+        sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
         pathId: `path-${i}`
       });
 
@@ -334,26 +356,37 @@ export async function processPaths(paths, config, attractors = [], attractorConf
 
     // Handle curly mode separately (doesn't use generatePasses)
     if (config.fillMode === 'curly') {
+      // Calculate adaptive sample rate to ensure smooth curves
+      // Need at least 20 samples per loop to avoid Nyquist aliasing
+      const minSamplesPerLoop = 20;
+      const loopFreq = config.curlyLoopFrequency !== undefined ? config.curlyLoopFrequency : 1.0;
+      const loopPeriodMm = 10 / loopFreq;  // mm per loop
+      const maxSampleRateMm = loopPeriodMm / minSamplesPerLoop;
+      const effectiveSampleRate = Math.min(config.sampleRate || 0.5, maxSampleRateMm);
+
       const curlyPaths = generateCurlyFill(path.d, {
-        loopFrequency: config.curlyLoopFrequency !== undefined ? config.curlyLoopFrequency : 1.0,
+        // loopFrequency is "loops per 10mm" - scale to "loops per 10 viewBox units"
+        loopFrequency: loopFreq / mmToViewBox,
         loopAmplitude: config.curlyLoopAmplitude !== undefined ? config.curlyLoopAmplitude : 1.0,
         overlap: config.curlyOverlap !== undefined ? config.curlyOverlap : 0.3,
-        minWidthThreshold: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.5,
+        // Scale mm parameters to viewBox units
+        minWidthThreshold: (config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.5) * mmToViewBox,
         loopStyle: config.curlyLoopStyle || 'circular',
         strands: config.curlyStrands !== undefined ? config.curlyStrands : 1,
         strandPhaseOffset: config.curlyStrandPhaseOffset !== undefined ? config.curlyStrandPhaseOffset : 0.5,
-        baseOffset: config.baseOffset,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 3.0,
-        minWidth: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.0,
-        noise: config.noise || 0,
+        maxWidth: (config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 4.0) * mmToViewBox,
+        minWidth: 0.0,
+        noise: (config.noise || 0) * mmToViewBox,
         seed: null,
-        sampleRate: config.sampleRate || 0.5,
+        sampleRate: effectiveSampleRate * mmToViewBox,  // Use adaptive rate for smooth curves
         pathId: `path-${i}`,
         leanMode: config.curlyLeanMode || 'none',
-        leanStrength: config.curlyLeanStrength !== undefined ? config.curlyLeanStrength : 0.5,
-        dynamicModulation: config.curlyDynamicModulation !== undefined ? config.curlyDynamicModulation : 0,
-        slantAngle: config.curlySlantAngle !== undefined ? config.curlySlantAngle : 0
+        leanStrength: config.curlyLeanStrength !== undefined ? Number(config.curlyLeanStrength) : 0.5,
+        dynamicModulation: config.curlyDynamicModulation !== undefined ? Number(config.curlyDynamicModulation) : 0,
+        slantAngle: config.curlySlantAngle !== undefined ? Number(config.curlySlantAngle) : 0,
+        unitScale: mmToViewBox  // scale factor for internal mm-based constants
       });
 
       // Add each generated curly path
@@ -378,24 +411,24 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     if (config.fillMode === 'moire') {
       const moireResult = generateMoireFill(path.d, {
         moireMode: config.moireMode || 'spacing',
-        spacingA: config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0,
+        spacingA: (config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0) * mmToViewBox,
         spacingDelta: config.moireSpacingDelta !== undefined ? config.moireSpacingDelta : 0.02,
-        phaseDriftWavelength: config.moirePhaseDriftWavelength !== undefined ? config.moirePhaseDriftWavelength : 80,
-        phaseDriftAmplitude: config.moirePhaseDriftAmplitude !== undefined ? config.moirePhaseDriftAmplitude : 0.2,
+        phaseDriftWavelength: (config.moirePhaseDriftWavelength !== undefined ? config.moirePhaseDriftWavelength : 80) * mmToViewBox,
+        phaseDriftAmplitude: (config.moirePhaseDriftAmplitude !== undefined ? config.moirePhaseDriftAmplitude : 0.2) * mmToViewBox,
         families: config.moireFamilies !== undefined ? config.moireFamilies : 2,
         passesPerFamily: config.moirePassesPerFamily !== undefined ? config.moirePassesPerFamily : 5,
-        familyOffset: config.moireFamilyOffset !== undefined ? config.moireFamilyOffset : 0.5,
-        baseOffset: config.baseOffset,
+        familyOffset: (config.moireFamilyOffset !== undefined ? config.moireFamilyOffset : 0.5) * mmToViewBox,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.moireMaxWidth !== undefined ? config.moireMaxWidth : 3.0,
-        minWidth: config.moireMinWidth !== undefined ? config.moireMinWidth : 0.0,
-        noise: config.noise || 0,
+        maxWidth: (config.moireMaxWidth !== undefined ? config.moireMaxWidth : 3.0) * mmToViewBox,
+        minWidth: (config.moireMinWidth !== undefined ? config.moireMinWidth : 0.0) * mmToViewBox,
+        noise: (config.noise || 0) * mmToViewBox,
         seed: null,
-        sampleRate: config.sampleRate || 0.5,
+        sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
         pathId: `path-${i}`,
         samplingDrift: config.moireSamplingDrift || false,
-        samplingDriftWavelength: config.moireSamplingDriftWavelength !== undefined ? config.moireSamplingDriftWavelength : 100,
-        samplingDriftAmplitude: config.moireSamplingDriftAmplitude !== undefined ? config.moireSamplingDriftAmplitude : 0.5
+        samplingDriftWavelength: (config.moireSamplingDriftWavelength !== undefined ? config.moireSamplingDriftWavelength : 100) * mmToViewBox,
+        samplingDriftAmplitude: (config.moireSamplingDriftAmplitude !== undefined ? config.moireSamplingDriftAmplitude : 0.5) * mmToViewBox
       });
 
       // Add family A paths (black)
@@ -450,17 +483,17 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     if (config.fillMode === 'woodgrain') {
       const woodgrainPaths = generateWoodgrainFill(path.d, {
         bands: config.woodgrainBands !== undefined ? config.woodgrainBands : 8,
-        spacing: config.woodgrainSpacing !== undefined ? config.woodgrainSpacing : 1.0,
-        driftAmplitude: config.woodgrainDriftAmplitude !== undefined ? config.woodgrainDriftAmplitude : 0.5,
-        driftWavelength: config.woodgrainDriftWavelength !== undefined ? config.woodgrainDriftWavelength : 60,
+        spacing: (config.woodgrainSpacing !== undefined ? config.woodgrainSpacing : 1.0) * mmToViewBox,
+        driftAmplitude: (config.woodgrainDriftAmplitude !== undefined ? config.woodgrainDriftAmplitude : 0.5) * mmToViewBox,
+        driftWavelength: (config.woodgrainDriftWavelength !== undefined ? config.woodgrainDriftWavelength : 60) * mmToViewBox,
         driftFalloff: config.woodgrainDriftFalloff !== undefined ? config.woodgrainDriftFalloff : 0.5,
-        baseOffset: config.baseOffset,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.woodgrainMaxWidth !== undefined ? config.woodgrainMaxWidth : 5.0,
-        minWidth: config.woodgrainMinWidth !== undefined ? config.woodgrainMinWidth : 0.0,
-        noise: config.noise || 0,
+        maxWidth: (config.woodgrainMaxWidth !== undefined ? config.woodgrainMaxWidth : 5.0) * mmToViewBox,
+        minWidth: (config.woodgrainMinWidth !== undefined ? config.woodgrainMinWidth : 0.0) * mmToViewBox,
+        noise: (config.noise || 0) * mmToViewBox,
         seed: null,
-        sampleRate: config.sampleRate || 0.5,
+        sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
         pathId: `path-${i}`
       });
 
@@ -484,18 +517,18 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     // Handle contour-echo mode separately (doesn't use generatePasses)
     if (config.fillMode === 'contour-echo') {
       const contourPaths = generateContourEchoFill(path.d, {
-        contourSpacing: config.contourSpacing !== undefined ? config.contourSpacing : 0.5,
+        contourSpacing: (config.contourSpacing !== undefined ? config.contourSpacing : 0.5) * mmToViewBox,
         maxPasses: config.contourMaxPasses !== undefined ? config.contourMaxPasses : 10,
-        noiseMax: config.contourNoiseMax !== undefined ? config.contourNoiseMax : 0.3,
-        noiseMin: config.contourNoiseMin !== undefined ? config.contourNoiseMin : 0.0,
-        noiseFrequency: config.contourNoiseFrequency !== undefined ? config.contourNoiseFrequency : 20,
+        noiseMax: (config.contourNoiseMax !== undefined ? config.contourNoiseMax : 0.3) * mmToViewBox,
+        noiseMin: (config.contourNoiseMin !== undefined ? config.contourNoiseMin : 0.0) * mmToViewBox,
+        noiseFrequency: (config.contourNoiseFrequency !== undefined ? config.contourNoiseFrequency : 20) * mmToViewBox,
         symmetric: config.contourSymmetric !== undefined ? config.contourSymmetric : true,
-        baseOffset: config.baseOffset,
+        baseOffset: (config.baseOffset || 0.25) * mmToViewBox,
         envelope: config.envelope || 'flat',
-        maxWidth: config.contourMaxWidth !== undefined ? config.contourMaxWidth : 5.0,
-        minWidth: config.contourMinWidth !== undefined ? config.contourMinWidth : 0.0,
+        maxWidth: (config.contourMaxWidth !== undefined ? config.contourMaxWidth : 5.0) * mmToViewBox,
+        minWidth: (config.contourMinWidth !== undefined ? config.contourMinWidth : 0.0) * mmToViewBox,
         seed: null,
-        sampleRate: config.sampleRate || 0.5,
+        sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
         pathId: `path-${i}`
       });
 
@@ -536,23 +569,24 @@ export async function processPaths(paths, config, attractors = [], attractorConf
 
     // Generate offset passes for this path
     // Note: generatePasses expects individual parameters, not an object
+    // Scale mm-based parameters to viewBox units
     const result = generatePasses(
       path.d,                 // pathData
       passCount,              // passes (number)
-      config.baseOffset,      // baseOffset
-      config.noise,           // noise
+      (config.baseOffset || 0.25) * mmToViewBox,      // baseOffset
+      (config.noise || 0) * mmToViewBox,           // noise
       null,                   // seed (auto-generate)
       `path-${i}`,           // pathId
       envelope,               // offsetEnvelope
       true,                   // useNormalMode
-      config.noiseFrequency,  // noiseFrequency
-      config.sampleRate,      // sampleRate
+      (config.noiseFrequency || 50) * mmToViewBox,  // noiseFrequency
+      (config.sampleRate || 2) * mmToViewBox,      // sampleRate
       config.fillMode || 'offset',  // fillMode
       modeOptions,            // crosshatchOptions (or mode-specific options)
       config.addOutline || false,  // extractOutline
       config.stripeFilled || 1,  // stripeFilled
       config.stripeEmpty || 1,   // stripeEmpty
-      config.outlineOffset || 0.25,  // outlineOffset
+      (config.outlineOffset || 0.25) * mmToViewBox,  // outlineOffset
       scaledOutlinePasses        // outlinePasses (scaled by path length)
     );
 

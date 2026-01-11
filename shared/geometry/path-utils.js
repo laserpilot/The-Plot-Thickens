@@ -2890,7 +2890,8 @@ function generateCurlyFill(pathData, options = {}) {
     leanMode = 'none',        // 'none', 'inside', 'outside' - lean into/out of turns
     leanStrength = 0.5,       // 0-1, how much to lean
     dynamicModulation = 0,    // 0-1, amplitude/phase variation along path
-    slantAngle = 0            // degrees, constant forward/backward tilt (works on straight lines)
+    slantAngle = 0,           // degrees, constant forward/backward tilt (works on straight lines)
+    unitScale = 1.0           // scale factor for mm-based internal constants (viewBox units / mm)
   } = options;
 
   const paths = [];
@@ -2953,7 +2954,7 @@ function generateCurlyFill(pathData, options = {}) {
 
       // Calculate turn signal using wider window for meaningful curvature
       // Per-sample angles are tiny (<1°), so we look 5-10mm ahead/behind
-      const turnWindow = Math.max(5, sampleRate * 8);  // mm
+      const turnWindow = Math.max(5 * unitScale, sampleRate * 8);  // scaled mm
       const turnPrevDist = Math.max(0, dist - turnWindow);
       const turnNextDist = Math.min(totalLength, dist + turnWindow);
       const turnPrevPt = getPointAtLength(absolutePath, turnPrevDist);
@@ -3022,7 +3023,7 @@ function generateCurlyFill(pathData, options = {}) {
         let ampMod = 1.0;
         let phaseMod = 0;
         if (dynamicModulation > 0) {
-          const modulationScale = 30;  // mm wavelength of modulation
+          const modulationScale = 30 * unitScale;  // scaled mm wavelength of modulation
           const noiseSeed = seed !== null ? seed : pathId.length;
           const mod = simpleNoise(dist / modulationScale, noiseSeed + 500);
           ampMod = 1 + dynamicModulation * 0.5 * mod;    // +/- 50% at full strength
@@ -3058,8 +3059,9 @@ function generateCurlyFill(pathData, options = {}) {
         let noiseOffsetY = 0;
         if (noise > 0) {
           const noiseSeed = seed !== null ? seed : pathId.length;
-          noiseOffsetX = simpleNoise(dist / 10 + strandIdx * 100, noiseSeed) * noise;
-          noiseOffsetY = simpleNoise(dist / 10 + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
+          const noiseScale = 10 * unitScale;  // scale noise wavelength
+          noiseOffsetX = simpleNoise(dist / noiseScale + strandIdx * 100, noiseSeed) * noise;
+          noiseOffsetY = simpleNoise(dist / noiseScale + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
         }
 
         curlyPoints.push({

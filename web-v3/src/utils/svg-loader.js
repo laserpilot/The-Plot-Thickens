@@ -125,8 +125,8 @@ function parseUnit(value) {
     case 'pt': return num * 25.4 / 72;
     case 'pc': return num * 25.4 / 6;
     case 'px': return num * 25.4 / 96;  // CSS px at 96 DPI
-    case '': return num;  // Unitless - assume user units
-    default: return num;
+    case '': return num * 25.4 / 96;  // Unitless = pixels per SVG spec (96 DPI)
+    default: return num * 25.4 / 96;  // Unknown unit, treat as px
   }
 }
 

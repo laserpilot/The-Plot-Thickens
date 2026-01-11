@@ -344,8 +344,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         strandPhaseOffset: config.curlyStrandPhaseOffset !== undefined ? config.curlyStrandPhaseOffset : 0.5,
         baseOffset: config.baseOffset,
         envelope: config.envelope || 'flat',
-        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 3.0,
-        minWidth: config.curlyMinWidth !== undefined ? config.curlyMinWidth : 0.0,
+        maxWidth: config.curlyMaxWidth !== undefined ? config.curlyMaxWidth : 4.0,
+        minWidth: 0.0,  // Envelope minWidth should always be 0, curlyMinWidth is for threshold
         noise: config.noise || 0,
         seed: null,
         sampleRate: config.sampleRate || 0.5,

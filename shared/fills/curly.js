@@ -75,6 +75,7 @@ export function generate(pathData, options = {}) {
     noise = 0,
     seed = null,
     pathId = 'path',
+    unitScale = 1.0,  // scale factor for mm-based internal constants (viewBox units / mm)
   } = options;
 
   // Resolve curly-prefixed vs non-prefixed options
@@ -148,7 +149,7 @@ export function generate(pathData, options = {}) {
       }
 
       // Calculate turn signal using wider window for meaningful curvature
-      const turnWindow = Math.max(5, sampleRate * 8);
+      const turnWindow = Math.max(5 * unitScale, sampleRate * 8);
       const turnPrevDist = Math.max(0, dist - turnWindow);
       const turnNextDist = Math.min(totalLength, dist + turnWindow);
       const turnPrevPt = getPointAtLength(absolutePath, turnPrevDist);
@@ -216,7 +217,7 @@ export function generate(pathData, options = {}) {
         let ampMod = 1.0;
         let phaseMod = 0;
         if (resolvedDynamicModulation > 0) {
-          const modulationScale = 30;
+          const modulationScale = 30 * unitScale;  // scaled mm wavelength
           const noiseSeed = seed !== null ? seed : pathId.length;
           const mod = simpleNoise(dist / modulationScale, noiseSeed + 500);
           ampMod = 1 + resolvedDynamicModulation * 0.5 * mod;
@@ -250,8 +251,9 @@ export function generate(pathData, options = {}) {
         let noiseOffsetY = 0;
         if (noise > 0) {
           const noiseSeed = seed !== null ? seed : pathId.length;
-          noiseOffsetX = simpleNoise(dist / 10 + strandIdx * 100, noiseSeed) * noise;
-          noiseOffsetY = simpleNoise(dist / 10 + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
+          const noiseScale = 10 * unitScale;  // scale noise wavelength
+          noiseOffsetX = simpleNoise(dist / noiseScale + strandIdx * 100, noiseSeed) * noise;
+          noiseOffsetY = simpleNoise(dist / noiseScale + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
         }
 
         curlyPoints.push({
