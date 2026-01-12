@@ -107,14 +107,21 @@ export async function processPaths(paths, config, attractors = [], attractorConf
       const path = paths[i];
       const length = lengths[i];
 
-    // Skip paths below minLength threshold - pass through unchanged
+    // Skip paths below minLength threshold
     if (config.minLength && config.minLength > 0 && length < config.minLength) {
-      processed.push({
-        original: path,
-        processed: [{ d: path.d, stroke: path.stroke || 'black', strokeWidth: 0.1 }],
-        passCount: 0,
-        length
-      });
+      // If keepShortPaths is enabled, preserve as single unfilled stroke
+      if (config.keepShortPaths) {
+        processed.push({
+          id: `${path.id || i}-short`,
+          d: path.d,
+          originalIndex: i,
+          layerId: path.layerId,
+          fill: 'none',
+          stroke: path.stroke || 'black',
+          strokeWidth: 0.1,
+          isShortPath: true
+        });
+      }
       continue;
     }
 

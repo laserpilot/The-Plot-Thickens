@@ -251,20 +251,42 @@ export function processPathsWithProgress(
         pathId: `path-${i}`
       });
 
-      // Handle result - {familyA, familyB, familyC?}
-      const moirePaths = [
-        ...(moireResult.familyA || []),
-        ...(moireResult.familyB || []),
-        ...(moireResult.familyC || [])
-      ];
-
-      moirePaths.forEach((moireData, moireIndex) => {
+      // Handle result - {familyA, familyB, familyC?} with different colors per family
+      // Family A - black
+      (moireResult.familyA || []).forEach((d, idx) => {
         processed.push({
-          id: `${path.id || i}-moire-${moireIndex}`,
-          d: moireData,
+          id: `${path.id || i}-moire-a-${idx}`,
+          d,
           originalIndex: i,
           fill: 'none',
           stroke: 'black',
+          family: 'familyA',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Family B - red
+      (moireResult.familyB || []).forEach((d, idx) => {
+        processed.push({
+          id: `${path.id || i}-moire-b-${idx}`,
+          d,
+          originalIndex: i,
+          fill: 'none',
+          stroke: 'red',
+          family: 'familyB',
+          strokeWidth: 0.1
+        });
+      });
+
+      // Family C - blue (if present)
+      (moireResult.familyC || []).forEach((d, idx) => {
+        processed.push({
+          id: `${path.id || i}-moire-c-${idx}`,
+          d,
+          originalIndex: i,
+          fill: 'none',
+          stroke: 'blue',
+          family: 'familyC',
           strokeWidth: 0.1
         });
       });

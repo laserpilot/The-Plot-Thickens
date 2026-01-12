@@ -245,13 +245,14 @@ export function initRenderer(canvas, store) {
     ctx.scale(baseScale * viewState.zoom, baseScale * viewState.zoom);
     ctx.translate(-currentBounds.cx, -currentBounds.cy);
 
-    // Draw paths - black on white for plotter preview
-    ctx.strokeStyle = '#000000';
+    // Draw paths - respect path stroke colors for plotter preview
     ctx.lineWidth = 0.5 / viewState.zoom;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     for (const pathData of currentPaths) {
+      // Use path's stroke color if specified, otherwise default to black
+      ctx.strokeStyle = pathData.stroke || '#000000';
       drawPath(ctx, pathData);
     }
 

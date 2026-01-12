@@ -686,6 +686,25 @@ export function initUI(store, renderer) {
     });
   });
 
+  // Keep short paths checkbox
+  const keepShortPathsCheckbox = document.getElementById('keep-short-paths');
+  if (keepShortPathsCheckbox) {
+    keepShortPathsCheckbox.addEventListener('change', (e) => {
+      const config = store.getState('config');
+      store.setState({
+        config: { ...config, keepShortPaths: e.target.checked }
+      });
+
+      // Update CLI command display
+      updateCLICommandDisplay(store.getState('config'));
+
+      // Auto-process if live preview is enabled
+      if (store.getState('livePreview')) {
+        throttledProcess();
+      }
+    });
+  }
+
   // Fill mode-specific controls
   const modeSpecificInputs = {
     stripeFilled: document.getElementById('stripe-filled'),
@@ -1632,6 +1651,10 @@ export function initUI(store, renderer) {
     if (fillInputs.noise) fillInputs.noise.value = config.noise || 0;
     if (fillInputs.noiseFrequency) fillInputs.noiseFrequency.value = config.noiseFrequency || 50;
     if (fillInputs.sampleRate) fillInputs.sampleRate.value = config.sampleRate || 2;
+
+    // Length thresholding checkbox
+    const keepShortPathsCheckbox = document.getElementById('keep-short-paths');
+    if (keepShortPathsCheckbox) keepShortPathsCheckbox.checked = config.keepShortPaths || false;
 
     // Mode-specific controls
     if (config.fillMode === 'striped') {

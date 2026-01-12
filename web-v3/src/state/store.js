@@ -105,6 +105,7 @@ const baseConfig = {
   // Length thresholding
   minLength: 0,  // 0 = auto-detect
   maxLength: 0,  // 0 = auto-detect
+  keepShortPaths: false,  // Keep paths below minLength as single strokes
   // Fill mode options placeholder
   fillModeOptions: null,
   // Crosshatch organic settings (nested object, not in registry)
