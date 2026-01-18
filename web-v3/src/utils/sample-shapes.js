@@ -52,6 +52,68 @@ function triangle(cx, cy, size) {
 }
 
 /**
+ * Generate a wavy line path (sine wave)
+ * @param {number} startX - Starting X coordinate
+ * @param {number} startY - Starting Y coordinate (center of wave)
+ * @param {number} length - Total horizontal length
+ * @param {number} amplitude - Wave height (peak to center)
+ * @param {number} wavelength - Distance for one full wave cycle
+ * @param {number} segments - Number of line segments per wavelength (smoothness)
+ * @returns {string} SVG path data (open path)
+ */
+function wavyLine(startX, startY, length, amplitude, wavelength, segments = 16) {
+  const points = [];
+  const totalSegments = Math.ceil((length / wavelength) * segments);
+  const dx = length / totalSegments;
+
+  for (let i = 0; i <= totalSegments; i++) {
+    const x = startX + i * dx;
+    const phase = (i * dx / wavelength) * Math.PI * 2;
+    const y = startY + Math.sin(phase) * amplitude;
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+
+  return 'M ' + points.join(' L ');
+}
+
+/**
+ * Generate a zigzag line path (sharp peaks)
+ * @param {number} startX - Starting X coordinate
+ * @param {number} startY - Starting Y coordinate (center of zigzag)
+ * @param {number} length - Total horizontal length
+ * @param {number} amplitude - Zigzag height (peak to center)
+ * @param {number} wavelength - Distance for one full zigzag cycle
+ * @returns {string} SVG path data (open path)
+ */
+function zigzagLine(startX, startY, length, amplitude, wavelength) {
+  const points = [];
+  const cycles = length / wavelength;
+  const quarterWave = wavelength / 4;
+
+  let x = startX;
+  points.push(`${x},${startY}`);
+
+  for (let i = 0; i < cycles; i++) {
+    // Up peak
+    x += quarterWave;
+    points.push(`${x.toFixed(2)},${(startY - amplitude).toFixed(2)}`);
+    // Center
+    x += quarterWave;
+    points.push(`${x.toFixed(2)},${startY.toFixed(2)}`);
+    // Down peak
+    x += quarterWave;
+    points.push(`${x.toFixed(2)},${(startY + amplitude).toFixed(2)}`);
+    // Center
+    x += quarterWave;
+    if (x <= startX + length) {
+      points.push(`${x.toFixed(2)},${startY.toFixed(2)}`);
+    }
+  }
+
+  return 'M ' + points.join(' L ');
+}
+
+/**
  * Generate a star path
  * @param {number} cx - Center X
  * @param {number} cy - Center Y
@@ -200,6 +262,49 @@ export function generateSampleShapes(type, size = 50, complexity = 'medium') {
       break;
     }
 
+    case 'wavy': {
+      // Array of wavy open paths with varying wavelengths and amplitudes
+      // Great for testing curvature-based effects
+      const lineLength = size * 1.8;
+      const startX = center - lineLength / 2;
+      const rowSpacing = size * 0.25;
+      const numRows = Math.min(count, 10);
+
+      // Different wave configurations: [wavelength, amplitude, type]
+      const waveConfigs = [
+        { wavelength: 8, amplitude: 3, type: 'sine', label: 'tight-small' },
+        { wavelength: 15, amplitude: 6, type: 'sine', label: 'tight-medium' },
+        { wavelength: 25, amplitude: 10, type: 'sine', label: 'medium' },
+        { wavelength: 40, amplitude: 12, type: 'sine', label: 'gentle' },
+        { wavelength: 60, amplitude: 15, type: 'sine', label: 'lazy' },
+        { wavelength: 12, amplitude: 8, type: 'zigzag', label: 'zigzag-tight' },
+        { wavelength: 25, amplitude: 10, type: 'zigzag', label: 'zigzag-medium' },
+        { wavelength: 20, amplitude: 4, type: 'sine', label: 'shallow' },
+        { wavelength: 20, amplitude: 15, type: 'sine', label: 'deep' },
+        { wavelength: 35, amplitude: 8, type: 'sine', label: 'wide-shallow' },
+      ];
+
+      const startY = center - (numRows - 1) * rowSpacing / 2;
+
+      for (let i = 0; i < numRows && i < waveConfigs.length; i++) {
+        const config = waveConfigs[i];
+        const y = startY + i * rowSpacing;
+
+        if (config.type === 'zigzag') {
+          paths.push({
+            id: `wavy-${config.label}`,
+            d: zigzagLine(startX, y, lineLength, config.amplitude, config.wavelength)
+          });
+        } else {
+          paths.push({
+            id: `wavy-${config.label}`,
+            d: wavyLine(startX, y, lineLength, config.amplitude, config.wavelength)
+          });
+        }
+      }
+      break;
+    }
+
     default:
       // Default to concentric circles
       paths.push(...concentricShapes(
@@ -239,7 +344,8 @@ export function getSampleDescription(type, complexity) {
     triangle: 'Concentric triangles',
     star: 'Concentric stars',
     grid: '3x3 grid of varying circles',
-    mixed: 'Mixed shapes with variety'
+    mixed: 'Mixed shapes with variety',
+    wavy: 'Wavy lines (open paths, various wavelengths)'
   };
 
   return `${descriptions[type] || 'Test shapes'} (${counts[complexity] || counts.medium} paths)`;

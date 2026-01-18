@@ -84,6 +84,7 @@
                       <option value="star">Star</option>
                       <option value="grid">Grid (3x3)</option>
                       <option value="mixed">Mixed Shapes</option>
+                      <option value="wavy">Wavy Lines (open paths)</option>
                     </select>
                   </label>
 
@@ -707,6 +708,44 @@
                     </label>
                   </div>
 
+                  <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.95rem;">
+                    Compression/Expansion (Tonal Variation)
+                  </h4>
+                  <div class="info-box" style="display: block; margin-bottom: 0.75rem; font-size: 0.85em;">
+                    Modulate loop density. Compressed = tighter = darker. Expanded = looser = lighter.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Compression Mode
+                      <select id="curly-compression-mode">
+                        <option value="none">None</option>
+                        <option value="curvature">Curvature (darker at turns)</option>
+                        <option value="periodic">Periodic (wave pattern)</option>
+                        <option value="both">Both</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Source of tonal modulation</div>
+                    </label>
+
+                    <label>
+                      Compression Amount
+                      <input type="range" id="curly-compression-amount" min="0" max="1" step="0.1" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Intensity of compression effect (0-1)</div>
+                    </label>
+
+                    <label>
+                      Periodic Wavelength (mm)
+                      <input type="number" id="curly-periodic-wavelength" step="5" min="10" max="200" value="50" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Distance between compression peaks</div>
+                    </label>
+
+                    <label>
+                      <input type="checkbox" id="curly-compression-invert" />
+                      Invert (expand at curves/peaks instead)
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Flip which areas are compressed vs expanded</div>
+                    </label>
+                  </div>
+
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
                     <strong>Tip:</strong> Try sinTaperBoth envelope for springs that tighten at the ends. Multiple strands create a braided effect. Higher frequency = tighter coils, lower = lazy loops.
                   </div>
@@ -946,6 +985,7 @@
 
                 <div class="action-buttons">
                   <button id="btn-process">Process Paths</button>
+                  <button id="btn-cancel-processing" disabled style="opacity: 0.5;">Cancel</button>
                   <button id="btn-reset-preview">Reset to Original</button>
                 </div>
               </div>

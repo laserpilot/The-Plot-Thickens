@@ -15,6 +15,9 @@ import { PathLengthHistogram } from './histogram.js';
 let pathLengthHistogram = null;
 let currentPathLengths = [];
 
+// AbortController for cancelling processing
+let processingAbortController = null;
+
 /**
  * Throttle function to limit how often a function can be called
  * @param {Function} func - Function to throttle
@@ -216,6 +219,10 @@ export function initUI(store, renderer) {
       return;
     }
 
+    // Create new AbortController for this processing run
+    processingAbortController = new AbortController();
+    const cancelBtn = document.getElementById('btn-cancel-processing');
+
     try {
       store.setState({ processing: true, configDirty: false });
 
@@ -230,6 +237,12 @@ export function initUI(store, renderer) {
         processHeaderBtn.disabled = true;
       }
 
+      // Enable cancel button
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.style.opacity = '1';
+      }
+
       showProgress(`Processing ${originalPaths.length} paths...`, 0);
       console.log('Processing paths with config:', config);
 
@@ -241,7 +254,7 @@ export function initUI(store, renderer) {
       // Get viewBox for focus blur mode
       const viewBox = store.getState('svgBounds');
 
-      // Process with or without attractors, with progress callback
+      // Process with or without attractors, with progress callback and abort signal
       const result = await processPaths(
         originalPaths,
         config,
@@ -252,7 +265,8 @@ export function initUI(store, renderer) {
           // Update progress bar during processing
           const percent = Math.floor((current / total) * 100);
           updateProgress(`Processing ${current} / ${total} paths (${percent}%)...`, percent);
-        }
+        },
+        processingAbortController.signal
       );
 
       store.setState({
@@ -289,9 +303,15 @@ export function initUI(store, renderer) {
       }
 
     } catch (err) {
-      console.error('Processing error:', err);
+      // Handle cancellation differently from other errors
+      if (err.name === 'AbortError') {
+        console.log('Processing was cancelled');
+        showComplete('Processing cancelled');
+      } else {
+        console.error('Processing error:', err);
+        hideProgress();
+      }
       store.setState({ processing: false });
-      hideProgress();
 
       // Remove visual feedback on error from both buttons
       const processBtn = document.getElementById('btn-process');
@@ -302,6 +322,13 @@ export function initUI(store, renderer) {
         processHeaderBtn.classList.remove('processing');
         processHeaderBtn.disabled = false;
       }
+    } finally {
+      // Always disable cancel button when done
+      if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.style.opacity = '0.5';
+      }
+      processingAbortController = null;
     }
   };
 
@@ -754,6 +781,10 @@ export function initUI(store, renderer) {
     curlyLeanStrength: document.getElementById('curly-lean-strength'),
     curlyDynamicModulation: document.getElementById('curly-dynamic-modulation'),
     curlySlantAngle: document.getElementById('curly-slant-angle'),
+    curlyCompressionMode: document.getElementById('curly-compression-mode'),
+    curlyCompressionAmount: document.getElementById('curly-compression-amount'),
+    curlyPeriodicWavelength: document.getElementById('curly-periodic-wavelength'),
+    curlyCompressionInvert: document.getElementById('curly-compression-invert'),
     // Moiré mode controls
     moireMode: document.getElementById('moire-mode'),
     moireSpacingA: document.getElementById('moire-spacing-a'),
@@ -1473,6 +1504,16 @@ export function initUI(store, renderer) {
   const processHeaderBtn = document.getElementById('btn-process-header');
   if (processHeaderBtn) {
     processHeaderBtn.addEventListener('click', handleProcessClick);
+  }
+
+  // Cancel processing
+  const cancelBtn = document.getElementById('btn-cancel-processing');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      if (processingAbortController) {
+        processingAbortController.abort();
+      }
+    });
   }
 
   // Reset to original

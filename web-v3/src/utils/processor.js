@@ -10,11 +10,13 @@ import {
   getEnvelopePreset,
   generateShapeFill,
   generateBarberPoleFill,
-  generateCurlyFill,
   generateMoireFill,
   generateWoodgrainFill,
   generateContourEchoFill
 } from '../../../shared/geometry/path-utils.js';
+
+// Import curly from the fills registry (has compression support)
+import { generate as generateCurlyFill } from '../../../shared/fills/curly.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
 
@@ -26,9 +28,10 @@ import { AttractorSystem } from '../../../shared/fields/attractor.js';
  * @param {Object} attractorConfig - Optional attractor configuration
  * @param {Object} viewBox - Optional viewBox for focus blur (required for focus-blur mode)
  * @param {Function} progressCallback - Optional callback(current, total) for progress updates
+ * @param {AbortSignal} signal - Optional AbortSignal for cancellation
  * @returns {Object} {paths: processed paths, detectedMinLength, detectedMaxLength}
  */
-export async function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null, progressCallback = null) {
+export async function processPaths(paths, config, attractors = [], attractorConfig = null, viewBox = null, progressCallback = null, signal = null) {
   console.log('=== processPaths called ===', { pathCount: paths?.length, hasViewBox: !!viewBox, viewBox });
   const processed = [];
 
@@ -393,6 +396,10 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         leanStrength: config.curlyLeanStrength !== undefined ? Number(config.curlyLeanStrength) : 0.5,
         dynamicModulation: config.curlyDynamicModulation !== undefined ? Number(config.curlyDynamicModulation) : 0,
         slantAngle: config.curlySlantAngle !== undefined ? Number(config.curlySlantAngle) : 0,
+        compressionMode: config.curlyCompressionMode || 'none',
+        compressionAmount: config.curlyCompressionAmount !== undefined ? Number(config.curlyCompressionAmount) : 0.5,
+        periodicWavelength: config.curlyPeriodicWavelength !== undefined ? config.curlyPeriodicWavelength : 50,
+        compressionInvert: config.curlyCompressionInvert || false,
         unitScale: mmToViewBox  // scale factor for internal mm-based constants
       });
 
@@ -640,6 +647,12 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     // Yield to browser to keep UI responsive
     // Use setTimeout with 10ms delay to ensure browser has time to paint UI updates
     await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Check for cancellation after each chunk
+    if (signal && signal.aborted) {
+      console.log('Processing cancelled by user');
+      throw new DOMException('Processing cancelled', 'AbortError');
+    }
   }
 
   console.log(`Processed ${paths.length} source paths into ${processed.length} offset paths`);

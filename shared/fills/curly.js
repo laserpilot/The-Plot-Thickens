@@ -29,6 +29,10 @@ export const defaults = {
   curlyLeanStrength: 0.5,       // 0-1, how much to lean
   curlyDynamicModulation: 0,    // 0-1, amplitude/phase variation along path
   curlySlantAngle: 0,           // degrees, constant forward/backward tilt (-60 to 60)
+  curlyCompressionMode: 'none', // 'none', 'curvature', 'periodic', 'both' - tonal modulation
+  curlyCompressionAmount: 0.5,  // 0-1, intensity of compression effect
+  curlyPeriodicWavelength: 50,  // mm - wavelength of periodic compression cycle
+  curlyCompressionInvert: false, // flip compression/expansion direction
 };
 
 /**
@@ -53,6 +57,10 @@ export function generate(pathData, options = {}) {
     leanStrength = defaults.curlyLeanStrength,
     dynamicModulation = defaults.curlyDynamicModulation,
     slantAngle = defaults.curlySlantAngle,
+    compressionMode = defaults.curlyCompressionMode,
+    compressionAmount = defaults.curlyCompressionAmount,
+    periodicWavelength = defaults.curlyPeriodicWavelength,
+    compressionInvert = defaults.curlyCompressionInvert,
     // Aliased options (support both curly* and non-prefixed names)
     curlyLoopFrequency,
     curlyLoopAmplitude,
@@ -66,6 +74,10 @@ export function generate(pathData, options = {}) {
     curlyLeanStrength,
     curlyDynamicModulation,
     curlySlantAngle,
+    curlyCompressionMode,
+    curlyCompressionAmount,
+    curlyPeriodicWavelength,
+    curlyCompressionInvert,
     // Common geometry options
     baseOffset = 0.25,
     envelope = 'flat',
@@ -89,6 +101,10 @@ export function generate(pathData, options = {}) {
   const resolvedLeanStrength = curlyLeanStrength ?? leanStrength;
   const resolvedDynamicModulation = curlyDynamicModulation ?? dynamicModulation;
   const resolvedSlantAngle = curlySlantAngle ?? slantAngle;
+  const resolvedCompressionMode = curlyCompressionMode ?? compressionMode;
+  const resolvedCompressionAmount = curlyCompressionAmount ?? compressionAmount;
+  const resolvedPeriodicWavelength = curlyPeriodicWavelength ?? periodicWavelength;
+  const resolvedCompressionInvert = curlyCompressionInvert ?? compressionInvert;
 
   const paths = [];
 
@@ -148,31 +164,41 @@ export function generate(pathData, options = {}) {
         point.ny = prev?.ny ?? 1;
       }
 
-      // Calculate turn signal using wider window for meaningful curvature
+      // Calculate turn signal by comparing tangents before/after current point
+      // This properly measures curvature by detecting direction change across the point
       const turnWindow = Math.max(5 * unitScale, sampleRate * 8);
       const turnPrevDist = Math.max(0, dist - turnWindow);
       const turnNextDist = Math.min(totalLength, dist + turnWindow);
-      const turnPrevPt = getPointAtLength(absolutePath, turnPrevDist);
-      const turnNextPt = getPointAtLength(absolutePath, turnNextDist);
 
-      if (turnPrevPt && turnNextPt) {
-        const turnDx = turnNextPt.x - turnPrevPt.x;
-        const turnDy = turnNextPt.y - turnPrevPt.y;
-        const turnLen = Math.hypot(turnDx, turnDy);
+      // Get tangent at the "before" position
+      const pDelta = Math.min(sampleRate, turnWindow * 0.5);
+      const pPrev = getPointAtLength(absolutePath, Math.max(0, turnPrevDist - pDelta));
+      const pNext = getPointAtLength(absolutePath, Math.min(totalLength, turnPrevDist + pDelta));
 
-        const windowTx = turnLen > 1e-6 ? turnDx / turnLen : point.tx;
-        const windowTy = turnLen > 1e-6 ? turnDy / turnLen : point.ty;
+      // Get tangent at the "after" position
+      const nPrev = getPointAtLength(absolutePath, Math.max(0, turnNextDist - pDelta));
+      const nNext = getPointAtLength(absolutePath, Math.min(totalLength, turnNextDist + pDelta));
 
-        // Compare against previous point's tangent
-        const prevPoint = centerline[centerline.length - 1];
-        if (prevPoint?.tx !== undefined) {
-          const cross = prevPoint.tx * windowTy - prevPoint.ty * windowTx;
-          const dot = prevPoint.tx * windowTx + prevPoint.ty * windowTy;
-          const angle = Math.atan2(cross, dot);
-          point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);
-        } else {
-          point.turn = 0;
-        }
+      if (pPrev && pNext && nPrev && nNext) {
+        // Tangent at before position
+        const taPrevX = pNext.x - pPrev.x;
+        const taPrevY = pNext.y - pPrev.y;
+        const taPrevLen = Math.hypot(taPrevX, taPrevY);
+        const taX = taPrevLen > 1e-6 ? taPrevX / taPrevLen : point.tx;
+        const taY = taPrevLen > 1e-6 ? taPrevY / taPrevLen : point.ty;
+
+        // Tangent at after position
+        const tbNextX = nNext.x - nPrev.x;
+        const tbNextY = nNext.y - nPrev.y;
+        const tbNextLen = Math.hypot(tbNextX, tbNextY);
+        const tbX = tbNextLen > 1e-6 ? tbNextX / tbNextLen : point.tx;
+        const tbY = tbNextLen > 1e-6 ? tbNextY / tbNextLen : point.ty;
+
+        // Compare the two tangents - this measures actual curvature
+        const cross = taX * tbY - taY * tbX;
+        const dot = taX * tbX + taY * tbY;
+        const angle = Math.atan2(cross, dot);
+        point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);
       } else {
         point.turn = 0;
       }
@@ -211,7 +237,31 @@ export function generate(pathData, options = {}) {
 
         // Calculate loop phase based on distance traveled
         const loopsPerMm = resolvedLoopFrequency / 10;
-        const basePhase = (dist * loopsPerMm * Math.PI * 2) + strandPhase;
+
+        // Compression modulation - tighter loops = darker, looser = lighter
+        let compressionFactor = 1.0;
+
+        if (resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both') {
+          // Use magnitude of turn signal (curves get compressed)
+          const curvatureSignal = Math.abs(point.turn || 0);
+          compressionFactor *= 1 + resolvedCompressionAmount * curvatureSignal;
+        }
+
+        if (resolvedCompressionMode === 'periodic' || resolvedCompressionMode === 'both') {
+          // Sine wave creates rhythmic compression bands
+          const periodicPhase = (2 * Math.PI * dist) / (resolvedPeriodicWavelength * unitScale);
+          const periodicSignal = Math.sin(periodicPhase);
+          compressionFactor *= 1 + resolvedCompressionAmount * 0.5 * periodicSignal;
+        }
+
+        if (resolvedCompressionInvert) {
+          // Flip: compressed becomes expanded, vice versa
+          compressionFactor = 2 - compressionFactor;
+        }
+
+        // Apply compression to effective frequency
+        const modulatedLoopsPerMm = loopsPerMm * compressionFactor;
+        const basePhase = (dist * modulatedLoopsPerMm * Math.PI * 2) + strandPhase;
 
         // Dynamic modulation - adds organic variation to amplitude and phase
         let ampMod = 1.0;
@@ -290,4 +340,8 @@ export const schema = {
   curlyLeanStrength: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Lean Strength' },
   curlyDynamicModulation: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Dynamic Modulation' },
   curlySlantAngle: { type: 'number', min: -60, max: 60, step: 5, label: 'Slant Angle', unit: 'degrees' },
+  curlyCompressionMode: { type: 'select', options: ['none', 'curvature', 'periodic', 'both'], label: 'Compression Mode' },
+  curlyCompressionAmount: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Compression Amount' },
+  curlyPeriodicWavelength: { type: 'number', min: 10, max: 200, step: 5, label: 'Periodic Wavelength', unit: 'mm' },
+  curlyCompressionInvert: { type: 'checkbox', label: 'Invert Compression' },
 };
