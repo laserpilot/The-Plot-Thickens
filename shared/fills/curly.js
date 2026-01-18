@@ -165,45 +165,44 @@ export function generate(pathData, options = {}) {
       }
 
       // Calculate turn signal only when curvature-based compression is enabled
-      // This is expensive (4 extra getPointAtLength calls per sample) so skip when not needed
+      // Optimized: only 2 getPointAtLength calls instead of 4
       const needsCurvature = resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both' ||
                              resolvedLeanMode !== 'none';
 
       if (needsCurvature) {
-        // Compare tangents before/after current point to measure curvature
-        const turnWindow = Math.max(5 * unitScale, sampleRate * 8);
+        // Compare tangents at two window positions using vectors through current point
+        const turnWindow = Math.max(2 * unitScale, sampleRate * 4);  // smaller window for responsiveness
         const turnPrevDist = Math.max(0, dist - turnWindow);
         const turnNextDist = Math.min(totalLength, dist + turnWindow);
 
-        // Get tangent at the "before" position
-        const pDelta = Math.min(sampleRate, turnWindow * 0.5);
-        const pPrev = getPointAtLength(absolutePath, Math.max(0, turnPrevDist - pDelta));
-        const pNext = getPointAtLength(absolutePath, Math.min(totalLength, turnPrevDist + pDelta));
+        const prevPt = getPointAtLength(absolutePath, turnPrevDist);
+        const nextPt = getPointAtLength(absolutePath, turnNextDist);
+        const currPt = point;  // already have this
 
-        // Get tangent at the "after" position
-        const nPrev = getPointAtLength(absolutePath, Math.max(0, turnNextDist - pDelta));
-        const nNext = getPointAtLength(absolutePath, Math.min(totalLength, turnNextDist + pDelta));
+        if (prevPt && nextPt) {
+          // Vector from prev to current
+          const v1x = currPt.x - prevPt.x;
+          const v1y = currPt.y - prevPt.y;
+          const v1len = Math.hypot(v1x, v1y);
 
-        if (pPrev && pNext && nPrev && nNext) {
-          // Tangent at before position
-          const taPrevX = pNext.x - pPrev.x;
-          const taPrevY = pNext.y - pPrev.y;
-          const taPrevLen = Math.hypot(taPrevX, taPrevY);
-          const taX = taPrevLen > 1e-6 ? taPrevX / taPrevLen : point.tx;
-          const taY = taPrevLen > 1e-6 ? taPrevY / taPrevLen : point.ty;
+          // Vector from current to next
+          const v2x = nextPt.x - currPt.x;
+          const v2y = nextPt.y - currPt.y;
+          const v2len = Math.hypot(v2x, v2y);
 
-          // Tangent at after position
-          const tbNextX = nNext.x - nPrev.x;
-          const tbNextY = nNext.y - nPrev.y;
-          const tbNextLen = Math.hypot(tbNextX, tbNextY);
-          const tbX = tbNextLen > 1e-6 ? tbNextX / tbNextLen : point.tx;
-          const tbY = tbNextLen > 1e-6 ? tbNextY / tbNextLen : point.ty;
+          if (v1len > 1e-6 && v2len > 1e-6) {
+            // Normalize
+            const t1x = v1x / v1len, t1y = v1y / v1len;
+            const t2x = v2x / v2len, t2y = v2y / v2len;
 
-          // Compare the two tangents - this measures actual curvature
-          const cross = taX * tbY - taY * tbX;
-          const dot = taX * tbX + taY * tbY;
-          const angle = Math.atan2(cross, dot);
-          point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);
+            // Angle between them - lower threshold (0.03 rad ≈ 1.7°) for sensitivity on gentle curves
+            const cross = t1x * t2y - t1y * t2x;
+            const dot = t1x * t2x + t1y * t2y;
+            const angle = Math.atan2(cross, dot);
+            point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.03);
+          } else {
+            point.turn = 0;
+          }
         } else {
           point.turn = 0;
         }
