@@ -223,100 +223,145 @@ export function generate(pathData, options = {}) {
       return paths;
     }
 
+    // Base loop frequency
+    const loopsPerMm = resolvedLoopFrequency / 10;
+
     // Generate curly paths (one per strand)
     for (let strandIdx = 0; strandIdx < resolvedStrands; strandIdx++) {
       const strandPhase = strandIdx * resolvedStrandPhaseOffset * Math.PI * 2;
       const curlyPoints = [];
 
+      // Phase integration state - for smooth, continuous phase across compression changes
+      let accumulatedPhase = strandPhase;
+      let prevCompressionFactor = 1.0;
+      let prevEffectiveLoopsPerMm = loopsPerMm;
+      let prevDist = 0;
+
       for (let i = 0; i < centerline.length; i++) {
         const point = centerline[i];
+        const nextPoint = centerline[i + 1];
         const width = point.localWidth;
         const dist = point.distance;
 
         // If width is below threshold, follow centerline
         if (width < resolvedMinWidthThreshold) {
-          curlyPoints.push({
-            x: point.x,
-            y: point.y
-          });
+          curlyPoints.push({ x: point.x, y: point.y });
+          prevDist = dist;
           continue;
         }
 
-        // Calculate loop phase based on distance traveled
-        const loopsPerMm = resolvedLoopFrequency / 10;
-
-        // Compression modulation - tighter loops = darker, looser = lighter
-        let compressionFactor = 1.0;
-
+        // Compute raw compression factor
+        let rawCompression = 1.0;
         if (resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both') {
-          // Use magnitude of turn signal (curves get compressed)
-          const curvatureSignal = Math.abs(point.turn || 0);
-          compressionFactor *= 1 + resolvedCompressionAmount * curvatureSignal;
+          rawCompression *= 1 + resolvedCompressionAmount * Math.abs(point.turn || 0);
         }
-
         if (resolvedCompressionMode === 'periodic' || resolvedCompressionMode === 'both') {
-          // Sine wave creates rhythmic compression bands
           const periodicPhase = (2 * Math.PI * dist) / (resolvedPeriodicWavelength * unitScale);
-          const periodicSignal = Math.sin(periodicPhase);
-          compressionFactor *= 1 + resolvedCompressionAmount * 0.5 * periodicSignal;
+          rawCompression *= 1 + resolvedCompressionAmount * 0.5 * Math.sin(periodicPhase);
         }
-
         if (resolvedCompressionInvert) {
-          // Flip: compressed becomes expanded, vice versa
-          compressionFactor = 2 - compressionFactor;
+          rawCompression = 2 - rawCompression;
         }
 
-        // Apply compression to effective frequency
-        const modulatedLoopsPerMm = loopsPerMm * compressionFactor;
-        const basePhase = (dist * modulatedLoopsPerMm * Math.PI * 2) + strandPhase;
+        // Smooth compression to avoid abrupt changes, clamp to sane range
+        const compressionFactor = Math.max(0.2, Math.min(5.0,
+          0.5 * prevCompressionFactor + 0.5 * rawCompression));
+        prevCompressionFactor = compressionFactor;
 
-        // Dynamic modulation - adds organic variation to amplitude and phase
-        let ampMod = 1.0;
-        let phaseMod = 0;
-        if (resolvedDynamicModulation > 0) {
-          const modulationScale = 30 * unitScale;  // scaled mm wavelength
-          const noiseSeed = seed !== null ? seed : pathId.length;
-          const mod = simpleNoise(dist / modulationScale, noiseSeed + 500);
-          ampMod = 1 + resolvedDynamicModulation * 0.5 * mod;
-          phaseMod = resolvedDynamicModulation * 0.6 * mod;
+        // Determine how many sub-samples needed for this segment
+        // Target ~8 samples per loop even at high compression
+        const effectiveLoopsPerMm = loopsPerMm * compressionFactor;
+        const segmentLength = nextPoint ? (nextPoint.distance - dist) : sampleRate;
+        const loopsInSegment = effectiveLoopsPerMm * segmentLength;
+        const subSamples = Math.max(1, Math.ceil(loopsInSegment * 8));
+
+        for (let sub = 0; sub < subSamples; sub++) {
+          const t = sub / subSamples;  // 0 to just under 1
+          const subDist = dist + t * segmentLength;
+
+          // Interpolate point properties when between centerline samples
+          let interpPoint;
+          if (nextPoint && t > 0) {
+            interpPoint = {
+              x: point.x + t * (nextPoint.x - point.x),
+              y: point.y + t * (nextPoint.y - point.y),
+              tx: point.tx + t * (nextPoint.tx - point.tx),
+              ty: point.ty + t * (nextPoint.ty - point.ty),
+              nx: point.nx + t * (nextPoint.nx - point.nx),
+              ny: point.ny + t * (nextPoint.ny - point.ny),
+            };
+            // Normalize interpolated tangent/normal
+            const tLen = Math.hypot(interpPoint.tx, interpPoint.ty);
+            if (tLen > 1e-6) { interpPoint.tx /= tLen; interpPoint.ty /= tLen; }
+            const nLen = Math.hypot(interpPoint.nx, interpPoint.ny);
+            if (nLen > 1e-6) { interpPoint.nx /= nLen; interpPoint.ny /= nLen; }
+          } else {
+            interpPoint = point;
+          }
+
+          // Integrate phase using average of current/previous effective frequency
+          const avgLoopsPerMm = 0.5 * (prevEffectiveLoopsPerMm + effectiveLoopsPerMm);
+          const distDelta = subDist - prevDist;
+          accumulatedPhase += avgLoopsPerMm * distDelta * Math.PI * 2;
+          prevDist = subDist;
+          prevEffectiveLoopsPerMm = effectiveLoopsPerMm;
+
+          // Dynamic modulation - adds organic variation to amplitude and phase
+          let ampMod = 1.0;
+          let phaseMod = 0;
+          if (resolvedDynamicModulation > 0) {
+            const modulationScale = 30 * unitScale;
+            const noiseSeed = seed !== null ? seed : pathId.length;
+            const mod = simpleNoise(subDist / modulationScale, noiseSeed + 500);
+            ampMod = 1 + resolvedDynamicModulation * 0.5 * mod;
+            phaseMod = resolvedDynamicModulation * 0.6 * mod;
+          }
+
+          const phase = accumulatedPhase + phaseMod;
+
+          // Interpolate width for sub-samples
+          const interpWidth = nextPoint
+            ? point.localWidth + t * (nextPoint.localWidth - point.localWidth)
+            : point.localWidth;
+
+          // Calculate loop offset using circular motion
+          const loopRadius = interpWidth * resolvedLoopAmplitude * 0.5 * ampMod;
+          const normalOffset = Math.sin(phase) * loopRadius;
+          const tangentScale = resolvedLoopStyle === 'elliptical' ? 0.6 : 1.0;
+
+          // Slant: shear tangent by normal for constant tilt
+          const slant = Math.tan((resolvedSlantAngle * Math.PI) / 180);
+          const tangentOffset = Math.cos(phase) * loopRadius * tangentScale + slant * normalOffset;
+
+          // Lean bias - shifts curls toward inside/outside of turns
+          let leanBias = 0;
+          if (resolvedLeanMode !== 'none' && resolvedLeanStrength > 0) {
+            const interpTurn = nextPoint
+              ? point.turn + t * ((nextPoint.turn ?? point.turn) - point.turn)
+              : (point.turn || 0);
+            const leanDir = resolvedLeanMode === 'inside' ? 1 : -1;
+            leanBias = resolvedLeanStrength * loopRadius * leanDir * interpTurn;
+          }
+
+          // Apply offset in both normal and tangent directions
+          const x = interpPoint.x + interpPoint.nx * (normalOffset + leanBias) + interpPoint.tx * tangentOffset;
+          const y = interpPoint.y + interpPoint.ny * (normalOffset + leanBias) + interpPoint.ty * tangentOffset;
+
+          // Add noise if specified
+          let noiseOffsetX = 0;
+          let noiseOffsetY = 0;
+          if (noise > 0) {
+            const noiseSeed = seed !== null ? seed : pathId.length;
+            const noiseScale = 10 * unitScale;
+            noiseOffsetX = simpleNoise(subDist / noiseScale + strandIdx * 100, noiseSeed) * noise;
+            noiseOffsetY = simpleNoise(subDist / noiseScale + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
+          }
+
+          curlyPoints.push({
+            x: x + noiseOffsetX,
+            y: y + noiseOffsetY
+          });
         }
-
-        const phase = basePhase + phaseMod;
-
-        // Calculate loop offset using circular motion
-        const loopRadius = width * resolvedLoopAmplitude * 0.5 * ampMod;
-        const normalOffset = Math.sin(phase) * loopRadius;
-        const tangentScale = resolvedLoopStyle === 'elliptical' ? 0.6 : 1.0;
-
-        // Slant: shear tangent by normal for constant tilt
-        const slant = Math.tan((resolvedSlantAngle * Math.PI) / 180);
-        const tangentOffset = Math.cos(phase) * loopRadius * tangentScale + slant * normalOffset;
-
-        // Lean bias - shifts curls toward inside/outside of turns
-        let leanBias = 0;
-        if (resolvedLeanMode !== 'none' && resolvedLeanStrength > 0) {
-          const leanDir = resolvedLeanMode === 'inside' ? 1 : -1;
-          leanBias = resolvedLeanStrength * loopRadius * leanDir * (point.turn || 0);
-        }
-
-        // Apply offset in both normal and tangent directions
-        const x = point.x + point.nx * (normalOffset + leanBias) + point.tx * tangentOffset;
-        const y = point.y + point.ny * (normalOffset + leanBias) + point.ty * tangentOffset;
-
-        // Add noise if specified
-        let noiseOffsetX = 0;
-        let noiseOffsetY = 0;
-        if (noise > 0) {
-          const noiseSeed = seed !== null ? seed : pathId.length;
-          const noiseScale = 10 * unitScale;  // scale noise wavelength
-          noiseOffsetX = simpleNoise(dist / noiseScale + strandIdx * 100, noiseSeed) * noise;
-          noiseOffsetY = simpleNoise(dist / noiseScale + 1000 + strandIdx * 100, noiseSeed + 1) * noise;
-        }
-
-        curlyPoints.push({
-          x: x + noiseOffsetX,
-          y: y + noiseOffsetY
-        });
       }
 
       // Convert points to SVG path
