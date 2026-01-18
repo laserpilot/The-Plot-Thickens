@@ -164,41 +164,49 @@ export function generate(pathData, options = {}) {
         point.ny = prev?.ny ?? 1;
       }
 
-      // Calculate turn signal by comparing tangents before/after current point
-      // This properly measures curvature by detecting direction change across the point
-      const turnWindow = Math.max(5 * unitScale, sampleRate * 8);
-      const turnPrevDist = Math.max(0, dist - turnWindow);
-      const turnNextDist = Math.min(totalLength, dist + turnWindow);
+      // Calculate turn signal only when curvature-based compression is enabled
+      // This is expensive (4 extra getPointAtLength calls per sample) so skip when not needed
+      const needsCurvature = resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both' ||
+                             resolvedLeanMode !== 'none';
 
-      // Get tangent at the "before" position
-      const pDelta = Math.min(sampleRate, turnWindow * 0.5);
-      const pPrev = getPointAtLength(absolutePath, Math.max(0, turnPrevDist - pDelta));
-      const pNext = getPointAtLength(absolutePath, Math.min(totalLength, turnPrevDist + pDelta));
+      if (needsCurvature) {
+        // Compare tangents before/after current point to measure curvature
+        const turnWindow = Math.max(5 * unitScale, sampleRate * 8);
+        const turnPrevDist = Math.max(0, dist - turnWindow);
+        const turnNextDist = Math.min(totalLength, dist + turnWindow);
 
-      // Get tangent at the "after" position
-      const nPrev = getPointAtLength(absolutePath, Math.max(0, turnNextDist - pDelta));
-      const nNext = getPointAtLength(absolutePath, Math.min(totalLength, turnNextDist + pDelta));
+        // Get tangent at the "before" position
+        const pDelta = Math.min(sampleRate, turnWindow * 0.5);
+        const pPrev = getPointAtLength(absolutePath, Math.max(0, turnPrevDist - pDelta));
+        const pNext = getPointAtLength(absolutePath, Math.min(totalLength, turnPrevDist + pDelta));
 
-      if (pPrev && pNext && nPrev && nNext) {
-        // Tangent at before position
-        const taPrevX = pNext.x - pPrev.x;
-        const taPrevY = pNext.y - pPrev.y;
-        const taPrevLen = Math.hypot(taPrevX, taPrevY);
-        const taX = taPrevLen > 1e-6 ? taPrevX / taPrevLen : point.tx;
-        const taY = taPrevLen > 1e-6 ? taPrevY / taPrevLen : point.ty;
+        // Get tangent at the "after" position
+        const nPrev = getPointAtLength(absolutePath, Math.max(0, turnNextDist - pDelta));
+        const nNext = getPointAtLength(absolutePath, Math.min(totalLength, turnNextDist + pDelta));
 
-        // Tangent at after position
-        const tbNextX = nNext.x - nPrev.x;
-        const tbNextY = nNext.y - nPrev.y;
-        const tbNextLen = Math.hypot(tbNextX, tbNextY);
-        const tbX = tbNextLen > 1e-6 ? tbNextX / tbNextLen : point.tx;
-        const tbY = tbNextLen > 1e-6 ? tbNextY / tbNextLen : point.ty;
+        if (pPrev && pNext && nPrev && nNext) {
+          // Tangent at before position
+          const taPrevX = pNext.x - pPrev.x;
+          const taPrevY = pNext.y - pPrev.y;
+          const taPrevLen = Math.hypot(taPrevX, taPrevY);
+          const taX = taPrevLen > 1e-6 ? taPrevX / taPrevLen : point.tx;
+          const taY = taPrevLen > 1e-6 ? taPrevY / taPrevLen : point.ty;
 
-        // Compare the two tangents - this measures actual curvature
-        const cross = taX * tbY - taY * tbX;
-        const dot = taX * tbX + taY * tbY;
-        const angle = Math.atan2(cross, dot);
-        point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);
+          // Tangent at after position
+          const tbNextX = nNext.x - nPrev.x;
+          const tbNextY = nNext.y - nPrev.y;
+          const tbNextLen = Math.hypot(tbNextX, tbNextY);
+          const tbX = tbNextLen > 1e-6 ? tbNextX / tbNextLen : point.tx;
+          const tbY = tbNextLen > 1e-6 ? tbNextY / tbNextLen : point.ty;
+
+          // Compare the two tangents - this measures actual curvature
+          const cross = taX * tbY - taY * tbX;
+          const dot = taX * tbX + taY * tbY;
+          const angle = Math.atan2(cross, dot);
+          point.turn = Math.sign(angle) * Math.min(1, Math.abs(angle) / 0.1);
+        } else {
+          point.turn = 0;
+        }
       } else {
         point.turn = 0;
       }
