@@ -397,7 +397,8 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         dynamicModulation: config.curlyDynamicModulation !== undefined ? Number(config.curlyDynamicModulation) : 0,
         slantAngle: config.curlySlantAngle !== undefined ? Number(config.curlySlantAngle) : 0,
         compressionMode: config.curlyCompressionMode || 'none',
-        compressionAmount: config.curlyCompressionAmount !== undefined ? Number(config.curlyCompressionAmount) : 0.5,
+        compressionAmount: config.curlyCompressionAmount !== undefined ? Number(config.curlyCompressionAmount) : 1.0,
+        curvatureSensitivity: config.curlyCurvatureSensitivity !== undefined ? Number(config.curlyCurvatureSensitivity) : 1.0,
         periodicWavelength: config.curlyPeriodicWavelength !== undefined ? config.curlyPeriodicWavelength : 50,
         compressionInvert: config.curlyCompressionInvert || false,
         unitScale: mmToViewBox  // scale factor for internal mm-based constants

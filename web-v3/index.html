@@ -729,8 +729,14 @@
 
                     <label>
                       Compression Amount
-                      <input type="range" id="curly-compression-amount" min="0" max="1" step="0.1" value="0.5" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Intensity of compression effect (0-1)</div>
+                      <input type="range" id="curly-compression-amount" min="0" max="3" step="0.1" value="1" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Intensity of compression effect (0-3, higher = more dramatic)</div>
+                    </label>
+
+                    <label>
+                      Curvature Sensitivity
+                      <input type="range" id="curly-curvature-sensitivity" min="0.5" max="5" step="0.5" value="1" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Detection window size (smaller = more local/responsive)</div>
                     </label>
 
                     <label>
@@ -986,6 +992,7 @@
                 <div class="action-buttons">
                   <button id="btn-process">Process Paths</button>
                   <button id="btn-cancel-processing" disabled style="opacity: 0.5;">Cancel</button>
+                  <button id="btn-show-config" title="Show current configuration">📋 Config</button>
                   <button id="btn-reset-preview">Reset to Original</button>
                 </div>
               </div>
@@ -1549,6 +1556,22 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Config Modal -->
+  <div id="config-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Current Configuration</h3>
+        <button id="config-modal-close" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="config-json" readonly rows="25" style="width: 100%; font-family: monospace; font-size: 12px; background: #1a1a2e; color: #eee; border: 1px solid #333; padding: 0.5rem;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="config-copy">Copy to Clipboard</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

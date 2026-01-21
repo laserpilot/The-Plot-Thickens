@@ -30,9 +30,10 @@ export const defaults = {
   curlyDynamicModulation: 0,    // 0-1, amplitude/phase variation along path
   curlySlantAngle: 0,           // degrees, constant forward/backward tilt (-60 to 60)
   curlyCompressionMode: 'none', // 'none', 'curvature', 'periodic', 'both' - tonal modulation
-  curlyCompressionAmount: 0.5,  // 0-1, intensity of compression effect
+  curlyCompressionAmount: 1.0,  // 0-3, intensity of compression effect (higher = more dramatic)
   curlyPeriodicWavelength: 50,  // mm - wavelength of periodic compression cycle
   curlyCompressionInvert: false, // flip compression/expansion direction
+  curlyCurvatureSensitivity: 1.0, // 0.5-5, scales curvature detection window
 };
 
 /**
@@ -61,6 +62,7 @@ export function generate(pathData, options = {}) {
     compressionAmount = defaults.curlyCompressionAmount,
     periodicWavelength = defaults.curlyPeriodicWavelength,
     compressionInvert = defaults.curlyCompressionInvert,
+    curvatureSensitivity = defaults.curlyCurvatureSensitivity,
     // Aliased options (support both curly* and non-prefixed names)
     curlyLoopFrequency,
     curlyLoopAmplitude,
@@ -78,6 +80,7 @@ export function generate(pathData, options = {}) {
     curlyCompressionAmount,
     curlyPeriodicWavelength,
     curlyCompressionInvert,
+    curlyCurvatureSensitivity,
     // Common geometry options
     baseOffset = 0.25,
     envelope = 'flat',
@@ -105,6 +108,7 @@ export function generate(pathData, options = {}) {
   const resolvedCompressionAmount = curlyCompressionAmount ?? compressionAmount;
   const resolvedPeriodicWavelength = curlyPeriodicWavelength ?? periodicWavelength;
   const resolvedCompressionInvert = curlyCompressionInvert ?? compressionInvert;
+  const resolvedCurvatureSensitivity = curlyCurvatureSensitivity ?? curvatureSensitivity;
 
   const paths = [];
 
@@ -171,7 +175,9 @@ export function generate(pathData, options = {}) {
 
       if (needsCurvature) {
         // Compare tangents at two window positions using vectors through current point
-        const turnWindow = Math.max(2 * unitScale, sampleRate * 4);  // smaller window for responsiveness
+        // User-controllable sensitivity: smaller = more local/responsive, larger = smoother
+        const baseTurnWindow = Math.max(2 * unitScale, sampleRate * 4);
+        const turnWindow = baseTurnWindow * resolvedCurvatureSensitivity;
         const turnPrevDist = Math.max(0, dist - turnWindow);
         const turnNextDist = Math.min(totalLength, dist + turnWindow);
 
@@ -253,7 +259,11 @@ export function generate(pathData, options = {}) {
         // Compute raw compression factor
         let rawCompression = 1.0;
         if (resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both') {
-          rawCompression *= 1 + resolvedCompressionAmount * Math.abs(point.turn || 0);
+          // Boost curvature signal with sqrt for better response on gentle curves
+          // 3x multiplier for more dramatic effect (slider goes 0-3)
+          const curvatureSignal = Math.abs(point.turn || 0);
+          const boostedCurvature = Math.pow(curvatureSignal, 0.5);
+          rawCompression *= 1 + resolvedCompressionAmount * 3 * boostedCurvature;
         }
         if (resolvedCompressionMode === 'periodic' || resolvedCompressionMode === 'both') {
           const periodicPhase = (2 * Math.PI * dist) / (resolvedPeriodicWavelength * unitScale);
@@ -393,7 +403,8 @@ export const schema = {
   curlyDynamicModulation: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Dynamic Modulation' },
   curlySlantAngle: { type: 'number', min: -60, max: 60, step: 5, label: 'Slant Angle', unit: 'degrees' },
   curlyCompressionMode: { type: 'select', options: ['none', 'curvature', 'periodic', 'both'], label: 'Compression Mode' },
-  curlyCompressionAmount: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Compression Amount' },
+  curlyCompressionAmount: { type: 'number', min: 0, max: 3, step: 0.1, label: 'Compression Amount' },
   curlyPeriodicWavelength: { type: 'number', min: 10, max: 200, step: 5, label: 'Periodic Wavelength', unit: 'mm' },
   curlyCompressionInvert: { type: 'checkbox', label: 'Invert Compression' },
+  curlyCurvatureSensitivity: { type: 'number', min: 0.5, max: 5, step: 0.5, label: 'Curvature Sensitivity' },
 };

@@ -783,6 +783,7 @@ export function initUI(store, renderer) {
     curlySlantAngle: document.getElementById('curly-slant-angle'),
     curlyCompressionMode: document.getElementById('curly-compression-mode'),
     curlyCompressionAmount: document.getElementById('curly-compression-amount'),
+    curlyCurvatureSensitivity: document.getElementById('curly-curvature-sensitivity'),
     curlyPeriodicWavelength: document.getElementById('curly-periodic-wavelength'),
     curlyCompressionInvert: document.getElementById('curly-compression-invert'),
     // Moiré mode controls
@@ -1512,6 +1513,50 @@ export function initUI(store, renderer) {
     cancelBtn.addEventListener('click', () => {
       if (processingAbortController) {
         processingAbortController.abort();
+      }
+    });
+  }
+
+  // Config modal
+  const configModal = document.getElementById('config-modal');
+  const configJson = document.getElementById('config-json');
+  const btnShowConfig = document.getElementById('btn-show-config');
+  const btnConfigCopy = document.getElementById('config-copy');
+  const btnConfigClose = document.getElementById('config-modal-close');
+
+  if (btnShowConfig) {
+    btnShowConfig.addEventListener('click', () => {
+      const config = store.getState('config');
+      configJson.value = JSON.stringify(config, null, 2);
+      configModal.style.display = 'flex';
+    });
+  }
+
+  if (btnConfigClose) {
+    btnConfigClose.addEventListener('click', () => {
+      configModal.style.display = 'none';
+    });
+  }
+
+  if (configModal) {
+    configModal.addEventListener('click', (e) => {
+      if (e.target === configModal) {
+        configModal.style.display = 'none';
+      }
+    });
+  }
+
+  if (btnConfigCopy) {
+    btnConfigCopy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(configJson.value);
+        btnConfigCopy.textContent = 'Copied!';
+        setTimeout(() => btnConfigCopy.textContent = 'Copy to Clipboard', 2000);
+      } catch (err) {
+        configJson.select();
+        document.execCommand('copy');
+        btnConfigCopy.textContent = 'Copied!';
+        setTimeout(() => btnConfigCopy.textContent = 'Copy to Clipboard', 2000);
       }
     });
   }
