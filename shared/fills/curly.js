@@ -30,7 +30,7 @@ export const defaults = {
   curlyDynamicModulation: 0,    // 0-1, amplitude/phase variation along path
   curlySlantAngle: 0,           // degrees, constant forward/backward tilt (-60 to 60)
   curlyCompressionMode: 'none', // 'none', 'curvature', 'periodic', 'both' - tonal modulation
-  curlyCompressionAmount: 1.0,  // 0-3, intensity of compression effect (higher = more dramatic)
+  curlyCompressionAmount: 0.5,  // 0-1, intensity of compression effect
   curlyPeriodicWavelength: 50,  // mm - wavelength of periodic compression cycle
   curlyCompressionInvert: false, // flip compression/expansion direction
   curlyCurvatureSensitivity: 1.0, // 0.5-5, scales curvature detection window
@@ -257,25 +257,29 @@ export function generate(pathData, options = {}) {
         }
 
         // Compute raw compression factor
+        // Higher compression = tighter loops (more ink density = darker)
         let rawCompression = 1.0;
         if (resolvedCompressionMode === 'curvature' || resolvedCompressionMode === 'both') {
-          // Boost curvature signal with sqrt for better response on gentle curves
-          // 3x multiplier for more dramatic effect (slider goes 0-3)
+          // Linear response for more predictable control
           const curvatureSignal = Math.abs(point.turn || 0);
-          const boostedCurvature = Math.pow(curvatureSignal, 0.5);
-          rawCompression *= 1 + resolvedCompressionAmount * 3 * boostedCurvature;
+          rawCompression *= 1 + resolvedCompressionAmount * curvatureSignal;
         }
         if (resolvedCompressionMode === 'periodic' || resolvedCompressionMode === 'both') {
           const periodicPhase = (2 * Math.PI * dist) / (resolvedPeriodicWavelength * unitScale);
           rawCompression *= 1 + resolvedCompressionAmount * 0.5 * Math.sin(periodicPhase);
         }
+
+        // Clamp first to stay in valid range before potential invert
+        rawCompression = Math.max(0.5, Math.min(2.0, rawCompression));
+
+        // Invert via reciprocal: 2 -> 0.5 (looser), 0.5 -> 2 (tighter)
         if (resolvedCompressionInvert) {
-          rawCompression = 2 - rawCompression;
+          rawCompression = 1 / rawCompression;
         }
 
-        // Smooth compression to avoid abrupt changes, clamp to sane range
-        const compressionFactor = Math.max(0.2, Math.min(5.0,
-          0.5 * prevCompressionFactor + 0.5 * rawCompression));
+        // Stronger smoothing (70% previous, 30% new) to prevent jumps, tighter clamp range
+        const compressionFactor = Math.max(0.5, Math.min(2.5,
+          0.7 * prevCompressionFactor + 0.3 * rawCompression));
         prevCompressionFactor = compressionFactor;
 
         // Determine how many sub-samples needed for this segment
@@ -403,7 +407,7 @@ export const schema = {
   curlyDynamicModulation: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Dynamic Modulation' },
   curlySlantAngle: { type: 'number', min: -60, max: 60, step: 5, label: 'Slant Angle', unit: 'degrees' },
   curlyCompressionMode: { type: 'select', options: ['none', 'curvature', 'periodic', 'both'], label: 'Compression Mode' },
-  curlyCompressionAmount: { type: 'number', min: 0, max: 3, step: 0.1, label: 'Compression Amount' },
+  curlyCompressionAmount: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Compression Amount' },
   curlyPeriodicWavelength: { type: 'number', min: 10, max: 200, step: 5, label: 'Periodic Wavelength', unit: 'mm' },
   curlyCompressionInvert: { type: 'checkbox', label: 'Invert Compression' },
   curlyCurvatureSensitivity: { type: 'number', min: 0.5, max: 5, step: 0.5, label: 'Curvature Sensitivity' },

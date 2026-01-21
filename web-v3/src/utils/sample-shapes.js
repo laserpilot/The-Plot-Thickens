@@ -114,6 +114,60 @@ function zigzagLine(startX, startY, length, amplitude, wavelength) {
 }
 
 /**
+ * Generate a spiral path (Archimedean spiral)
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} startRadius - Starting radius
+ * @param {number} endRadius - Ending radius
+ * @param {number} turns - Number of rotations
+ * @param {number} segments - Points per turn
+ * @returns {string} SVG path data (open path)
+ */
+function spiral(cx, cy, startRadius, endRadius, turns = 3, segments = 32) {
+  const points = [];
+  const totalPoints = turns * segments;
+
+  for (let i = 0; i <= totalPoints; i++) {
+    const t = i / totalPoints;
+    const angle = t * turns * Math.PI * 2;
+    const radius = startRadius + t * (endRadius - startRadius);
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+
+  return 'M ' + points.join(' L ');
+}
+
+/**
+ * Generate a path with sharp corners (zigzag box pattern)
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} size - Box size
+ * @param {number} steps - Number of zigzags per side
+ * @returns {string} SVG path data (open path)
+ */
+function sharpCornerPath(cx, cy, size, steps = 4) {
+  const half = size / 2;
+  const stepSize = size / steps;
+  const points = [];
+
+  // Start at top-left, zigzag down right side
+  let x = cx - half, y = cy - half;
+  points.push(`${x},${y}`);
+
+  // Right side with sharp turns
+  for (let i = 0; i < steps; i++) {
+    y += stepSize;
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+    x = (i % 2 === 0) ? cx + half : cx - half;
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+
+  return 'M ' + points.join(' L ');
+}
+
+/**
  * Generate a star path
  * @param {number} cx - Center X
  * @param {number} cy - Center Y
@@ -262,26 +316,55 @@ export function generateSampleShapes(type, size = 50, complexity = 'medium') {
       break;
     }
 
+    case 'spiral': {
+      // Archimedean spiral - continuous curvature, great for testing compression
+      paths.push({
+        id: 'spiral-tight',
+        d: spiral(center, center, 5, size * 0.8, 4, 64)
+      });
+      break;
+    }
+
+    case 'corners': {
+      // Sharp 90° corners for testing curvature detection
+      const boxSize = size * 0.8;
+      paths.push({
+        id: 'sharp-zigzag',
+        d: sharpCornerPath(center, center, boxSize, 6)
+      });
+      // Add a simple rectangle with sharp corners
+      const half = boxSize / 2;
+      paths.push({
+        id: 'rectangle',
+        d: `M ${center - half},${center - half} L ${center + half},${center - half} L ${center + half},${center + half} L ${center - half},${center + half} Z`
+      });
+      break;
+    }
+
     case 'wavy': {
       // Array of wavy open paths with varying wavelengths and amplitudes
       // Great for testing curvature-based effects
       const lineLength = size * 1.8;
       const startX = center - lineLength / 2;
-      const rowSpacing = size * 0.25;
-      const numRows = Math.min(count, 10);
+      const rowSpacing = size * 0.2;
+      const numRows = Math.min(count, 14);
 
-      // Different wave configurations: [wavelength, amplitude, type]
+      // Different wave configurations - expanded with gentler and sharper curves
       const waveConfigs = [
-        { wavelength: 8, amplitude: 3, type: 'sine', label: 'tight-small' },
-        { wavelength: 15, amplitude: 6, type: 'sine', label: 'tight-medium' },
+        { wavelength: 150, amplitude: 3, type: 'sine', label: 'almost-straight' },
+        { wavelength: 100, amplitude: 5, type: 'sine', label: 'very-gentle' },
+        { wavelength: 60, amplitude: 8, type: 'sine', label: 'lazy' },
+        { wavelength: 40, amplitude: 10, type: 'sine', label: 'gentle' },
         { wavelength: 25, amplitude: 10, type: 'sine', label: 'medium' },
-        { wavelength: 40, amplitude: 12, type: 'sine', label: 'gentle' },
-        { wavelength: 60, amplitude: 15, type: 'sine', label: 'lazy' },
-        { wavelength: 12, amplitude: 8, type: 'zigzag', label: 'zigzag-tight' },
+        { wavelength: 15, amplitude: 6, type: 'sine', label: 'tight-medium' },
+        { wavelength: 8, amplitude: 4, type: 'sine', label: 'tight-small' },
+        { wavelength: 6, amplitude: 4, type: 'sine', label: 'super-tight' },
         { wavelength: 25, amplitude: 10, type: 'zigzag', label: 'zigzag-medium' },
-        { wavelength: 20, amplitude: 4, type: 'sine', label: 'shallow' },
+        { wavelength: 12, amplitude: 8, type: 'zigzag', label: 'zigzag-tight' },
+        { wavelength: 8, amplitude: 12, type: 'zigzag', label: 'zigzag-sharp' },
+        { wavelength: 35, amplitude: 4, type: 'sine', label: 'wide-shallow' },
         { wavelength: 20, amplitude: 15, type: 'sine', label: 'deep' },
-        { wavelength: 35, amplitude: 8, type: 'sine', label: 'wide-shallow' },
+        { wavelength: 20, amplitude: 4, type: 'sine', label: 'shallow' },
       ];
 
       const startY = center - (numRows - 1) * rowSpacing / 2;
@@ -345,7 +428,9 @@ export function getSampleDescription(type, complexity) {
     star: 'Concentric stars',
     grid: '3x3 grid of varying circles',
     mixed: 'Mixed shapes with variety',
-    wavy: 'Wavy lines (open paths, various wavelengths)'
+    wavy: 'Wavy lines (open paths, various wavelengths)',
+    spiral: 'Archimedean spiral (continuous curvature)',
+    corners: 'Sharp corners and rectangles'
   };
 
   return `${descriptions[type] || 'Test shapes'} (${counts[complexity] || counts.medium} paths)`;
