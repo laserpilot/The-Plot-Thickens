@@ -123,10 +123,22 @@ export function generate(pathData, options = {}) {
     // Get envelope function
     const envelopeFn = getEnvelopePreset(envelope);
 
+    // Compute adaptive sample rate based on loop frequency
+    // Wavelength = 10mm / loopFrequency, scaled by unitScale for viewBox units
+    // Account for compression: when compression is active, effective wavelength shrinks
+    const loopWavelength = (10 / resolvedLoopFrequency) * unitScale;
+    const minSamplesPerLoop = 8;
+    // Estimate max compression factor to ensure we sample enough for tightest sections
+    const maxExpectedCompression = resolvedCompressionMode !== 'none'
+      ? Math.max(1, 1 + resolvedCompressionAmount)  // compression can roughly double frequency
+      : 1;
+    const compressionAwareStep = loopWavelength / (minSamplesPerLoop * maxExpectedCompression);
+    const effectiveSampleRate = Math.min(sampleRate, compressionAwareStep);
+
     // Sample path to get centerline points with normals
     const centerline = [];
 
-    for (let dist = 0; dist <= totalLength; dist += sampleRate) {
+    for (let dist = 0; dist <= totalLength; dist += effectiveSampleRate) {
       const point = getPointAtLength(absolutePath, dist);
 
       if (!point || isNaN(point.x) || isNaN(point.y)) {
@@ -134,7 +146,7 @@ export function generate(pathData, options = {}) {
       }
 
       // Calculate tangent using centered, larger delta for stability
-      const delta = Math.min(sampleRate, totalLength * 0.01);
+      const delta = Math.min(effectiveSampleRate, totalLength * 0.01);
       const prevDist = Math.max(0, dist - delta);
       const nextDist = Math.min(totalLength, dist + delta);
       const prevPt = getPointAtLength(absolutePath, prevDist);
@@ -176,7 +188,7 @@ export function generate(pathData, options = {}) {
       if (needsCurvature) {
         // Compare tangents at two window positions using vectors through current point
         // User-controllable sensitivity: smaller = more local/responsive, larger = smoother
-        const baseTurnWindow = Math.max(2 * unitScale, sampleRate * 4);
+        const baseTurnWindow = Math.max(2 * unitScale, effectiveSampleRate * 4);
         const turnWindow = baseTurnWindow * resolvedCurvatureSensitivity;
         const turnPrevDist = Math.max(0, dist - turnWindow);
         const turnNextDist = Math.min(totalLength, dist + turnWindow);
