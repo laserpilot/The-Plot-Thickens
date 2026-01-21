@@ -225,6 +225,22 @@ export function generate(pathData, options = {}) {
       centerline.push(point);
     }
 
+    // Smooth turn signal to reduce noise from coarse sampling
+    // This helps lean calculations when sample rate is coarse relative to loop frequency
+    for (let i = 1; i < centerline.length - 1; i++) {
+      const prev = centerline[i - 1].turn || 0;
+      const curr = centerline[i].turn || 0;
+      const next = centerline[i + 1].turn || 0;
+      centerline[i].smoothedTurn = 0.25 * prev + 0.5 * curr + 0.25 * next;
+    }
+    // Handle endpoints
+    if (centerline.length > 0) {
+      centerline[0].smoothedTurn = centerline[0].turn || 0;
+      if (centerline.length > 1) {
+        centerline[centerline.length - 1].smoothedTurn = centerline[centerline.length - 1].turn || 0;
+      }
+    }
+
     if (centerline.length < 2) {
       return paths;
     }
@@ -242,6 +258,7 @@ export function generate(pathData, options = {}) {
       let prevCompressionFactor = 1.0;
       let prevEffectiveLoopsPerMm = loopsPerMm;
       let prevDist = 0;
+      let prevLeanBias = 0;  // For smoothing lean transitions
 
       for (let i = 0; i < centerline.length; i++) {
         const point = centerline[i];
@@ -348,13 +365,17 @@ export function generate(pathData, options = {}) {
           const tangentOffset = Math.cos(phase) * loopRadius * tangentScale + slant * normalOffset;
 
           // Lean bias - shifts curls toward inside/outside of turns
+          // Uses smoothedTurn to reduce noise from coarse centerline sampling
           let leanBias = 0;
           if (resolvedLeanMode !== 'none' && resolvedLeanStrength > 0) {
             const interpTurn = nextPoint
-              ? point.turn + t * ((nextPoint.turn ?? point.turn) - point.turn)
-              : (point.turn || 0);
+              ? (point.smoothedTurn || 0) + t * ((nextPoint.smoothedTurn ?? point.smoothedTurn ?? 0) - (point.smoothedTurn || 0))
+              : (point.smoothedTurn || 0);
             const leanDir = resolvedLeanMode === 'inside' ? 1 : -1;
             leanBias = resolvedLeanStrength * loopRadius * leanDir * interpTurn;
+            // Smooth lean to prevent jumps from interpolated turn noise
+            leanBias = 0.6 * prevLeanBias + 0.4 * leanBias;
+            prevLeanBias = leanBias;
           }
 
           // Apply offset in both normal and tangent directions
