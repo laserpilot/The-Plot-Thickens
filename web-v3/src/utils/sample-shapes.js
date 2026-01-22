@@ -168,6 +168,59 @@ function sharpCornerPath(cx, cy, size, steps = 4) {
 }
 
 /**
+ * Generate an S-curve path with straight sections
+ * Ideal for testing compression: straight sections vs curved sections
+ * @param {number} cx - Center X
+ * @param {number} cy - Center Y
+ * @param {number} size - Overall size
+ * @param {number} straightLength - Length of straight sections
+ * @returns {string} SVG path data (open path)
+ */
+function sCurve(cx, cy, size, straightLength = 20) {
+  const curveRadius = size / 4;
+  const points = [];
+  const segments = 16;
+
+  // Start position
+  const startX = cx - size / 2;
+  const startY = cy - curveRadius;
+
+  // Initial straight section
+  points.push(`${startX},${startY}`);
+  points.push(`${startX + straightLength},${startY}`);
+
+  // First curve (180° arc curving down)
+  const curve1X = startX + straightLength;
+  for (let i = 1; i <= segments; i++) {
+    const angle = Math.PI * (i / segments);
+    const x = curve1X + curveRadius * Math.sin(angle);
+    const y = startY + curveRadius * (1 - Math.cos(angle));
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+
+  // Middle straight section
+  const midX = curve1X + curveRadius;
+  const midY = startY + curveRadius * 2;
+  points.push(`${midX + straightLength},${midY}`);
+
+  // Second curve (180° arc curving down, opposite direction)
+  const curve2X = midX + straightLength;
+  for (let i = 1; i <= segments; i++) {
+    const angle = Math.PI * (i / segments);
+    const x = curve2X + curveRadius * (1 - Math.cos(angle));
+    const y = midY + curveRadius * Math.sin(angle);
+    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+  }
+
+  // Final straight section
+  const endX = curve2X + curveRadius;
+  const endY = midY + curveRadius;
+  points.push(`${endX + straightLength},${endY}`);
+
+  return 'M ' + points.join(' L ');
+}
+
+/**
  * Generate a star path
  * @param {number} cx - Center X
  * @param {number} cy - Center Y
@@ -341,6 +394,15 @@ export function generateSampleShapes(type, size = 50, complexity = 'medium') {
       break;
     }
 
+    case 's-curve': {
+      // S-curve with straight sections - ideal for compression testing
+      paths.push({
+        id: 's-curve-test',
+        d: sCurve(center, center, size * 0.8, size * 0.2)
+      });
+      break;
+    }
+
     case 'wavy': {
       // Array of wavy open paths with varying wavelengths and amplitudes
       // Great for testing curvature-based effects
@@ -430,7 +492,8 @@ export function getSampleDescription(type, complexity) {
     mixed: 'Mixed shapes with variety',
     wavy: 'Wavy lines (open paths, various wavelengths)',
     spiral: 'Archimedean spiral (continuous curvature)',
-    corners: 'Sharp corners and rectangles'
+    corners: 'Sharp corners and rectangles',
+    's-curve': 'S-curve with straight sections (compression test)'
   };
 
   return `${descriptions[type] || 'Test shapes'} (${counts[complexity] || counts.medium} paths)`;

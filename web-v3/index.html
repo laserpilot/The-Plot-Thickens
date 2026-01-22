@@ -87,6 +87,7 @@
                       <option value="wavy">Wavy Lines (open paths)</option>
                       <option value="spiral">Spiral (continuous curvature)</option>
                       <option value="corners">Sharp Corners</option>
+                      <option value="s-curve">S-Curve (compression test)</option>
                     </select>
                   </label>
 
@@ -692,19 +693,19 @@
                     </label>
 
                     <label>
-                      Lean Strength
+                      Lean Strength: <span id="curly-lean-strength-value">0.5</span>
                       <input type="range" id="curly-lean-strength" min="0" max="1" step="0.1" value="0.5" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much to lean into turns (0-1)</div>
                     </label>
 
                     <label>
-                      Dynamic Modulation
+                      Dynamic Modulation: <span id="curly-dynamic-modulation-value">0</span>
                       <input type="range" id="curly-dynamic-modulation" min="0" max="1" step="0.1" value="0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Adds organic variation to loop size/phase</div>
                     </label>
 
                     <label>
-                      Slant Angle
+                      Slant Angle: <span id="curly-slant-angle-value">0°</span>
                       <input type="range" id="curly-slant-angle" min="-60" max="60" step="5" value="0" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Constant tilt angle (works on straight lines)</div>
                     </label>
@@ -730,13 +731,13 @@
                     </label>
 
                     <label>
-                      Compression Amount
+                      Compression Amount: <span id="curly-compression-amount-value">0.5</span>
                       <input type="range" id="curly-compression-amount" min="0" max="1" step="0.1" value="0.5" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Intensity of compression effect</div>
                     </label>
 
                     <label>
-                      Curvature Sensitivity
+                      Curvature Sensitivity: <span id="curly-curvature-sensitivity-value">1</span>
                       <input type="range" id="curly-curvature-sensitivity" min="0.5" max="5" step="0.5" value="1" />
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Detection window size (smaller = more local/responsive)</div>
                     </label>

@@ -819,6 +819,23 @@ export function initUI(store, renderer) {
     contourMinWidth: document.getElementById('contour-min-width')
   };
 
+  // Add numeric value displays for range sliders
+  const rangeInputs = document.querySelectorAll('input[type="range"]');
+  rangeInputs.forEach(input => {
+    const valueSpan = document.getElementById(input.id + '-value');
+    if (valueSpan) {
+      const updateValue = () => {
+        let val = input.value;
+        // Add unit suffix if applicable
+        if (input.id.includes('angle')) val += '°';
+        if (input.id.includes('wavelength')) val += 'mm';
+        valueSpan.textContent = val;
+      };
+      input.addEventListener('input', updateValue);
+      updateValue(); // Set initial value
+    }
+  });
+
   Object.entries(modeSpecificInputs).forEach(([key, input]) => {
     if (!input) return; // Skip if element doesn't exist
 
