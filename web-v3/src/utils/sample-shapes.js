@@ -168,7 +168,8 @@ function sharpCornerPath(cx, cy, size, steps = 4) {
 }
 
 /**
- * Generate an S-curve path with straight sections
+ * Generate an S-curve path with straight sections using true SVG arcs
+ * Uses arc commands for mathematically smooth curves (not polyline approximation)
  * Ideal for testing compression: straight sections vs curved sections
  * @param {number} cx - Center X
  * @param {number} cy - Center Y
@@ -177,47 +178,39 @@ function sharpCornerPath(cx, cy, size, steps = 4) {
  * @returns {string} SVG path data (open path)
  */
 function sCurve(cx, cy, size, straightLength = 20) {
-  const curveRadius = size / 4;
-  const points = [];
-  const segments = 16;
-
-  // Start position
+  const r = size / 4;  // curve radius
   const startX = cx - size / 2;
-  const startY = cy - curveRadius;
+  const startY = cy - r;
 
-  // Initial straight section
-  points.push(`${startX},${startY}`);
-  points.push(`${startX + straightLength},${startY}`);
+  // Build path with SVG arc commands
+  // Arc syntax: A rx ry rotation large-arc-flag sweep-flag x y
+  let x = startX;
+  let y = startY;
+  let path = `M ${x},${y}`;
 
-  // First curve (180° arc curving down)
-  const curve1X = startX + straightLength;
-  for (let i = 1; i <= segments; i++) {
-    const angle = Math.PI * (i / segments);
-    const x = curve1X + curveRadius * Math.sin(angle);
-    const y = startY + curveRadius * (1 - Math.cos(angle));
-    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
-  }
+  // Straight 1
+  x += straightLength;
+  path += ` L ${x},${y}`;
 
-  // Middle straight section
-  const midX = curve1X + curveRadius;
-  const midY = startY + curveRadius * 2;
-  points.push(`${midX + straightLength},${midY}`);
+  // Arc 1: 180° clockwise (sweep=1), curves down-right
+  x += r * 2;
+  y += r * 2;
+  path += ` A ${r} ${r} 0 0 1 ${x},${y}`;
 
-  // Second curve (180° arc curving down, opposite direction)
-  const curve2X = midX + straightLength;
-  for (let i = 1; i <= segments; i++) {
-    const angle = Math.PI * (i / segments);
-    const x = curve2X + curveRadius * (1 - Math.cos(angle));
-    const y = midY + curveRadius * Math.sin(angle);
-    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
-  }
+  // Straight 2 (middle)
+  x += straightLength;
+  path += ` L ${x},${y}`;
 
-  // Final straight section
-  const endX = curve2X + curveRadius;
-  const endY = midY + curveRadius;
-  points.push(`${endX + straightLength},${endY}`);
+  // Arc 2: 180° counter-clockwise (sweep=0), curves down-right
+  x += r * 2;
+  y += r * 2;
+  path += ` A ${r} ${r} 0 0 0 ${x},${y}`;
 
-  return 'M ' + points.join(' L ');
+  // Straight 3 (final)
+  x += straightLength;
+  path += ` L ${x},${y}`;
+
+  return path;
 }
 
 /**
