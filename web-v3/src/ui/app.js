@@ -4,6 +4,7 @@
 
 import { loadSVGFile, loadSVGFromURL } from '../utils/svg-loader.js';
 import { processPaths } from '../utils/processor.js';
+import { loadFont, setFontBasePath } from '../../../shared/fonts/index.js';
 import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.js';
 import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
 import { initProgressPanel } from './progress-panel.js';
@@ -207,6 +208,9 @@ function updateCLICommandDisplay(config) {
 }
 
 export function initUI(store, renderer) {
+  // Set font base path for text-fill mode
+  setFontBasePath('/fonts');
+
   // Initialize path length histogram
   pathLengthHistogram = new PathLengthHistogram('path-length-histogram', 'path-length-histogram-container');
 
@@ -694,6 +698,11 @@ export function initUI(store, renderer) {
       // If fill mode changed, show/hide mode-specific controls
       if (key === 'fillMode') {
         updateFillModeControls(value);
+        // Preload font when text-fill mode is selected
+        if (value === 'text-fill') {
+          const fontId = config.textFillFont || 'hershey-sans';
+          loadFont(fontId).catch(err => console.warn('Failed to preload font:', err));
+        }
       }
 
       // Update histogram if length thresholds changed
@@ -786,6 +795,17 @@ export function initUI(store, renderer) {
     curlyCurvatureSensitivity: document.getElementById('curly-curvature-sensitivity'),
     curlyPeriodicWavelength: document.getElementById('curly-periodic-wavelength'),
     curlyCompressionInvert: document.getElementById('curly-compression-invert'),
+    // Text fill mode controls
+    textFillText: document.getElementById('text-fill-text'),
+    textFillFont: document.getElementById('text-fill-font'),
+    textFillStartOffset: document.getElementById('text-fill-start-offset'),
+    textFillLetterSpacing: document.getElementById('text-fill-letter-spacing'),
+    textFillWordSpacing: document.getElementById('text-fill-word-spacing'),
+    textFillBaseHeight: document.getElementById('text-fill-base-height'),
+    textFillMaxWidth: document.getElementById('text-fill-max-width'),
+    textFillMinWidth: document.getElementById('text-fill-min-width'),
+    textFillCompressionStrength: document.getElementById('text-fill-compression-strength'),
+    textFillFilterWords: document.getElementById('text-fill-filter-words'),
     // Moiré mode controls
     moireMode: document.getElementById('moire-mode'),
     moireSpacingA: document.getElementById('moire-spacing-a'),
@@ -895,6 +915,14 @@ export function initUI(store, renderer) {
         store.setState({
           config: { ...config, moireFamilies: parseInt(value, 10) }
         });
+      }
+      // Special handling for text fill font - preload the font
+      else if (key === 'textFillFont') {
+        store.setState({
+          config: { ...config, textFillFont: value }
+        });
+        // Preload the selected font
+        loadFont(value).catch(err => console.warn('Failed to preload font:', err));
       } else {
         store.setState({
           config: { ...config, [configKey]: value }
@@ -1411,6 +1439,7 @@ export function initUI(store, renderer) {
     const shapeFillControls = document.getElementById('mode-shape-fill-controls');
     const barberPoleControls = document.getElementById('mode-barber-pole-controls');
     const curlyControls = document.getElementById('mode-curly-controls');
+    const textFillControls = document.getElementById('mode-text-fill-controls');
     const moireControls = document.getElementById('mode-moire-controls');
     const woodgrainControls = document.getElementById('mode-woodgrain-controls');
     const contourEchoControls = document.getElementById('mode-contour-echo-controls');
@@ -1424,6 +1453,7 @@ export function initUI(store, renderer) {
     shapeFillControls.style.display = 'none';
     barberPoleControls.style.display = 'none';
     curlyControls.style.display = 'none';
+    textFillControls.style.display = 'none';
     moireControls.style.display = 'none';
     woodgrainControls.style.display = 'none';
     contourEchoControls.style.display = 'none';
@@ -1445,6 +1475,8 @@ export function initUI(store, renderer) {
       barberPoleControls.style.display = 'block';
     } else if (mode === 'curly') {
       curlyControls.style.display = 'block';
+    } else if (mode === 'text-fill') {
+      textFillControls.style.display = 'block';
     } else if (mode === 'moire') {
       moireControls.style.display = 'block';
     } else if (mode === 'woodgrain') {
@@ -1785,6 +1817,17 @@ export function initUI(store, renderer) {
       if (modeSpecificInputs.curlyLeanStrength) modeSpecificInputs.curlyLeanStrength.value = config.curlyLeanStrength !== undefined ? config.curlyLeanStrength : 0.5;
       if (modeSpecificInputs.curlyDynamicModulation) modeSpecificInputs.curlyDynamicModulation.value = config.curlyDynamicModulation !== undefined ? config.curlyDynamicModulation : 0;
       if (modeSpecificInputs.curlySlantAngle) modeSpecificInputs.curlySlantAngle.value = config.curlySlantAngle !== undefined ? config.curlySlantAngle : 0;
+    } else if (config.fillMode === 'text-fill') {
+      if (modeSpecificInputs.textFillText) modeSpecificInputs.textFillText.value = config.textFillText !== undefined ? config.textFillText : 'HELLO ';
+      if (modeSpecificInputs.textFillFont) modeSpecificInputs.textFillFont.value = config.textFillFont || 'hershey-sans';
+      if (modeSpecificInputs.textFillStartOffset) modeSpecificInputs.textFillStartOffset.value = config.textFillStartOffset || 'fixed';
+      if (modeSpecificInputs.textFillLetterSpacing) modeSpecificInputs.textFillLetterSpacing.value = config.textFillLetterSpacing !== undefined ? config.textFillLetterSpacing : 1.0;
+      if (modeSpecificInputs.textFillWordSpacing) modeSpecificInputs.textFillWordSpacing.value = config.textFillWordSpacing !== undefined ? config.textFillWordSpacing : 1.5;
+      if (modeSpecificInputs.textFillBaseHeight) modeSpecificInputs.textFillBaseHeight.value = config.textFillBaseHeight !== undefined ? config.textFillBaseHeight : 1.0;
+      if (modeSpecificInputs.textFillMaxWidth) modeSpecificInputs.textFillMaxWidth.value = config.textFillMaxWidth !== undefined ? config.textFillMaxWidth : 1.5;
+      if (modeSpecificInputs.textFillMinWidth) modeSpecificInputs.textFillMinWidth.value = config.textFillMinWidth !== undefined ? config.textFillMinWidth : 0.1;
+      if (modeSpecificInputs.textFillCompressionStrength) modeSpecificInputs.textFillCompressionStrength.value = config.textFillCompressionStrength !== undefined ? config.textFillCompressionStrength : 0.5;
+      if (modeSpecificInputs.textFillFilterWords) modeSpecificInputs.textFillFilterWords.value = config.textFillFilterWords || '';
     } else if (config.fillMode === 'moire') {
       if (modeSpecificInputs.moireMode) modeSpecificInputs.moireMode.value = config.moireMode || 'spacing';
       if (modeSpecificInputs.moireSpacingA) modeSpecificInputs.moireSpacingA.value = config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0;

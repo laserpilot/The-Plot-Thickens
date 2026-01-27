@@ -17,6 +17,9 @@ import {
 
 // Import curly from the fills registry (has compression support)
 import { generate as generateCurlyFill } from '../../../shared/fills/curly.js';
+// Import text fill
+import { generate as generateTextFill } from '../../../shared/fills/text-fill.js';
+import { loadFont, getCachedFont, setFontBasePath } from '../../../shared/fonts/index.js';
 
 import { AttractorSystem } from '../../../shared/fields/attractor.js';
 
@@ -415,6 +418,63 @@ export async function processPaths(paths, config, attractors = [], attractorConf
           fill: 'none',
           stroke: 'black',
           strokeWidth: 0.1
+        });
+      });
+
+      // Skip to next path (don't call generatePasses)
+      continue;
+    }
+
+    // Handle text-fill mode separately (doesn't use generatePasses)
+    if (config.fillMode === 'text-fill') {
+      // Get font data - should be pre-loaded by the UI
+      const fontId = config.textFillFont || 'hershey-sans';
+      let fontData = getCachedFont(fontId);
+
+      // If not cached, try to load it (blocking, but should rarely happen)
+      if (!fontData) {
+        try {
+          fontData = await loadFont(fontId);
+        } catch (err) {
+          console.warn(`Failed to load font ${fontId}, skipping text-fill for path ${i}`);
+          continue;
+        }
+      }
+
+      const textFillPaths = generateTextFill(path.d, {
+        text: config.textFillText || 'HELLO ',
+        fontData: fontData,
+        letterSpacing: config.textFillLetterSpacing !== undefined ? config.textFillLetterSpacing : 1.0,
+        wordSpacing: config.textFillWordSpacing !== undefined ? config.textFillWordSpacing : 2.0,
+        baseHeight: (config.textFillBaseHeight !== undefined ? config.textFillBaseHeight : 3.0) * mmToViewBox,
+        envelope: config.envelope || 'flat',
+        maxWidth: (config.textFillMaxWidth !== undefined ? config.textFillMaxWidth : 5.0) * mmToViewBox,
+        minWidth: 0.0,
+        minWidthThreshold: (config.textFillMinWidth !== undefined ? config.textFillMinWidth : 0.5) * mmToViewBox,
+        compressionStrength: config.textFillCompressionStrength !== undefined ? config.textFillCompressionStrength : 0.5,
+        startOffset: config.textFillStartOffset || 'fixed',
+        filterWords: config.textFillFilterWords || '',
+        sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
+        pathId: `path-${i}`,
+        unitScale: mmToViewBox
+      });
+
+      // Add each generated glyph path
+      textFillPaths.forEach((glyphData, glyphIndex) => {
+        // Handle both string paths (legacy) and object paths (with family)
+        const pathD = typeof glyphData === 'string' ? glyphData : glyphData.d;
+        const family = typeof glyphData === 'object' ? glyphData.family : 'default';
+
+        processed.push({
+          id: `${path.id || i}-text-${glyphIndex}`,
+          d: pathD,
+          originalIndex: i,
+          layerId: path.layerId,
+          glyphIndex,
+          fill: 'none',
+          stroke: family === 'highlight' ? 'red' : 'black',
+          strokeWidth: 0.1,
+          family: family
         });
       });
 

@@ -5,6 +5,7 @@
 
 import * as curly from './curly.js';
 import * as barberPole from './barber-pole.js';
+import * as textFill from './text-fill.js';
 import * as moire from './moire.js';
 import * as woodgrain from './woodgrain.js';
 import * as contourEcho from './contour-echo.js';
@@ -38,6 +39,13 @@ export const fillRegistry = {
     generate: barberPole.generate,
     defaults: barberPole.defaults,
     schema: barberPole.schema,
+    category: 'decorative',
+    usesGeneratePasses: false,
+  },
+  'text-fill': {
+    generate: textFill.generate,
+    defaults: textFill.defaults,
+    schema: textFill.schema,
     category: 'decorative',
     usesGeneratePasses: false,
   },

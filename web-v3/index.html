@@ -137,6 +137,7 @@
                       <option value="shape-fill">Shape Fill</option>
                       <option value="barber-pole">Barber Pole</option>
                       <option value="curly">Curly</option>
+                      <option value="text-fill">Text Fill</option>
                       <option value="moire">Moiré</option>
                       <option value="woodgrain">Woodgrain</option>
                       <option value="contour-echo">Contour Echo</option>
@@ -757,6 +758,91 @@
 
                   <div class="info-box" style="display: block; margin-top: 0.75rem;">
                     <strong>Tip:</strong> Try sinTaperBoth envelope for springs that tighten at the ends. Multiple strands create a braided effect. Higher frequency = tighter coils, lower = lazy loops.
+                  </div>
+                </div>
+
+                <!-- Text Fill Mode Controls -->
+                <div id="mode-text-fill-controls" class="mode-specific-controls" style="display: none;">
+                  <h3>Text Fill Options</h3>
+                  <div class="info-box" style="display: block; margin-bottom: 1rem;">
+                    Places text along path centerlines like Illustrator's Type on Path. Text warps to follow curves and scales with the envelope.
+                  </div>
+
+                  <div class="controls-grid">
+                    <label>
+                      Text
+                      <textarea id="text-fill-text" rows="3" placeholder="Text to repeat...">HELLO </textarea>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Add trailing space for word gap between repeats</div>
+                    </label>
+
+                    <label>
+                      Font
+                      <select id="text-fill-font">
+                        <option value="hershey-sans">Hershey Sans</option>
+                        <option value="hershey-script">Hershey Script</option>
+                        <option value="ems-readability">EMS Readability</option>
+                        <option value="ems-casual-hand">EMS Casual Hand</option>
+                        <option value="ems-tech">EMS Tech</option>
+                        <option value="ems-allure">EMS Allure</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Single-line SVG font for plotter output</div>
+                    </label>
+
+                    <label>
+                      Start Offset
+                      <select id="text-fill-start-offset">
+                        <option value="fixed">Fixed (always start at first character)</option>
+                        <option value="random">Random (seeded per path)</option>
+                        <option value="path-based">Path-based (varies by path index)</option>
+                      </select>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Vary where each path starts in the text string (by word)</div>
+                    </label>
+
+                    <label>
+                      Highlight Phrases
+                      <textarea id="text-fill-filter-words" rows="2" placeholder="the quick, lazy dog, ..."></textarea>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Words or phrases to highlight in red (comma-separated, outputs to separate SVG group)</div>
+                    </label>
+
+                    <label>
+                      Letter Spacing
+                      <input type="number" id="text-fill-letter-spacing" step="0.1" min="0.3" max="3" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Multiplier for character advance (1.0 = normal)</div>
+                    </label>
+
+                    <label>
+                      Word Spacing
+                      <input type="number" id="text-fill-word-spacing" step="0.1" min="0.3" max="5" value="1.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Multiplier for space character width</div>
+                    </label>
+
+                    <label>
+                      Letter Height (mm)
+                      <input type="number" id="text-fill-base-height" step="0.1" min="0.2" max="15" value="1.0" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Base height at flat envelope (0.2mm for very dense text)</div>
+                    </label>
+
+                    <label>
+                      Max Width (mm)
+                      <input type="number" id="text-fill-max-width" step="0.1" min="0.2" max="20" value="1.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Maximum letter height at widest envelope point</div>
+                    </label>
+
+                    <label>
+                      Min Width (mm)
+                      <input type="number" id="text-fill-min-width" step="0.05" min="0" max="5" value="0.1" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Below this, skip rendering letters</div>
+                    </label>
+
+                    <label>
+                      Curve Compression: <span id="text-fill-compression-value">0.5</span>
+                      <input type="range" id="text-fill-compression-strength" min="0" max="1" step="0.1" value="0.5" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much letters squeeze on inside of curves</div>
+                    </label>
+                  </div>
+
+                  <div class="info-box" style="display: block; margin-top: 0.75rem;">
+                    <strong>Tip:</strong> Use sinTaperBoth envelope for text that grows and shrinks along the path. Higher compression strength creates more dramatic warping on tight curves.
                   </div>
                 </div>
 

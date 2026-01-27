@@ -88,6 +88,17 @@ const baseConfig = {
   curlyLeanStrength: 0.5,
   curlyDynamicModulation: 0,
   curlySlantAngle: 0,
+  // Text fill - explicit defaults to ensure they're always present
+  textFillText: 'HELLO ',
+  textFillFont: 'hershey-sans',
+  textFillStartOffset: 'fixed',
+  textFillLetterSpacing: 1.0,
+  textFillWordSpacing: 1.5,
+  textFillBaseHeight: 1.0,
+  textFillMaxWidth: 1.5,
+  textFillMinWidth: 0.1,
+  textFillCompressionStrength: 0.5,
+  textFillFilterWords: '',
   // Noise gradient configuration
   noiseGradientMode: 'flat',      // 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
   noiseMin: 0.05,
