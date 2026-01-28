@@ -804,6 +804,12 @@
                       <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Words or phrases to highlight in red (comma-separated, outputs to separate SVG group)</div>
                     </label>
 
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="text-fill-complete-words" />
+                      Complete Words Only
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Don't start words that won't fit on the path</div>
+                    </label>
+
                     <label>
                       Letter Spacing
                       <input type="number" id="text-fill-letter-spacing" step="0.1" min="0.3" max="3" value="1.0" />
@@ -835,9 +841,15 @@
                     </label>
 
                     <label>
-                      Curve Compression: <span id="text-fill-compression-value">0.5</span>
+                      Compression Strength: <span id="text-fill-compression-value">0.5</span>
                       <input type="range" id="text-fill-compression-strength" min="0" max="1" step="0.1" value="0.5" />
-                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How much letters squeeze on inside of curves</div>
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">How aggressively letters squeeze on curves (0 = none)</div>
+                    </label>
+
+                    <label>
+                      Min Compression: <span id="text-fill-min-compression-value">0.7</span>
+                      <input type="range" id="text-fill-min-compression" min="0.3" max="1" step="0.05" value="0.7" />
+                      <div style="font-size: 0.8em; color: #888; margin-top: 2px;">Floor for compression (1 = no squeezing allowed, 0.3 = very tight)</div>
                     </label>
                   </div>
 

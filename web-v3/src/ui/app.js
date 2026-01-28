@@ -806,6 +806,8 @@ export function initUI(store, renderer) {
     textFillMinWidth: document.getElementById('text-fill-min-width'),
     textFillCompressionStrength: document.getElementById('text-fill-compression-strength'),
     textFillFilterWords: document.getElementById('text-fill-filter-words'),
+    textFillCompleteWords: document.getElementById('text-fill-complete-words'),
+    textFillMinCompression: document.getElementById('text-fill-min-compression'),
     // Moiré mode controls
     moireMode: document.getElementById('moire-mode'),
     moireSpacingA: document.getElementById('moire-spacing-a'),
@@ -1828,6 +1830,8 @@ export function initUI(store, renderer) {
       if (modeSpecificInputs.textFillMinWidth) modeSpecificInputs.textFillMinWidth.value = config.textFillMinWidth !== undefined ? config.textFillMinWidth : 0.1;
       if (modeSpecificInputs.textFillCompressionStrength) modeSpecificInputs.textFillCompressionStrength.value = config.textFillCompressionStrength !== undefined ? config.textFillCompressionStrength : 0.5;
       if (modeSpecificInputs.textFillFilterWords) modeSpecificInputs.textFillFilterWords.value = config.textFillFilterWords || '';
+      if (modeSpecificInputs.textFillCompleteWords) modeSpecificInputs.textFillCompleteWords.checked = config.textFillCompleteWords || false;
+      if (modeSpecificInputs.textFillMinCompression) modeSpecificInputs.textFillMinCompression.value = config.textFillMinCompression !== undefined ? config.textFillMinCompression : 0.7;
     } else if (config.fillMode === 'moire') {
       if (modeSpecificInputs.moireMode) modeSpecificInputs.moireMode.value = config.moireMode || 'spacing';
       if (modeSpecificInputs.moireSpacingA) modeSpecificInputs.moireSpacingA.value = config.moireSpacingA !== undefined ? config.moireSpacingA : 1.0;

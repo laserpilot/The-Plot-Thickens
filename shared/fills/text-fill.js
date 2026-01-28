@@ -25,8 +25,10 @@ export const defaults = {
   textFillMaxWidth: 1.5,             // mm - max letter height at widest envelope
   textFillMinWidth: 0.1,             // mm - below this, skip rendering
   textFillCompressionStrength: 0.5,  // 0-1, how much to compress on curve inside
+  textFillMinCompression: 0.7,       // 0-1, minimum width multiplier (1 = no compression allowed)
   textFillStartOffset: 'fixed',      // 'fixed', 'random', or 'path-based'
   textFillFilterWords: '',           // Comma-separated list of words to highlight
+  textFillCompleteWords: false,      // If true, don't start words that won't fit
 };
 
 /**
@@ -49,11 +51,13 @@ export function generate(pathData, options = {}) {
     minWidth = 0.0,
     minWidthThreshold = defaults.textFillMinWidth,
     compressionStrength = defaults.textFillCompressionStrength,
+    minCompression = defaults.textFillMinCompression,
     startOffset = defaults.textFillStartOffset,
     sampleRate = 0.5,
     pathId = 'path',
     unitScale = 1.0,            // viewBox units per mm
     filterWords = defaults.textFillFilterWords,
+    completeWords = defaults.textFillCompleteWords,
     // Aliased options (support textFill* prefixed names)
     textFillText,
     textFillFont,
@@ -63,8 +67,10 @@ export function generate(pathData, options = {}) {
     textFillMaxWidth,
     textFillMinWidth,
     textFillCompressionStrength,
+    textFillMinCompression,
     textFillStartOffset,
     textFillFilterWords,
+    textFillCompleteWords,
   } = options;
 
   // Resolve prefixed vs non-prefixed options
@@ -75,8 +81,10 @@ export function generate(pathData, options = {}) {
   const resolvedMaxWidth = textFillMaxWidth ?? maxWidth;
   const resolvedMinWidthThreshold = textFillMinWidth ?? minWidthThreshold;
   const resolvedCompressionStrength = textFillCompressionStrength ?? compressionStrength;
+  const resolvedMinCompression = textFillMinCompression ?? minCompression;
   const resolvedStartOffset = textFillStartOffset ?? startOffset;
   const resolvedFilterWords = textFillFilterWords ?? filterWords;
+  const resolvedCompleteWords = textFillCompleteWords ?? completeWords;
 
   const paths = [];
 
@@ -238,9 +246,47 @@ export function generate(pathData, options = {}) {
     let charIndex = 0;
     const fallbackAdvance = fontData.defaultAdvance || 300;
 
+    // Helper to estimate width of remaining word from current position
+    function estimateWordWidth(startIdx, localScale) {
+      let width = 0;
+      let idx = startIdx;
+      while (idx < resolvedText.length) {
+        const c = resolvedText[(idx + startCharIndex) % resolvedText.length];
+        if (c === ' ') break; // Stop at space
+        const g = fontData.glyphs[c];
+        const adv = g ? g.horizAdvX : fallbackAdvance;
+        width += adv * localScale * resolvedLetterSpacing;
+        idx++;
+      }
+      return width;
+    }
+
     while (arcPosition < totalLength) {
       const char = resolvedText[(charIndex + startCharIndex) % resolvedText.length];
       const glyph = fontData.glyphs[char];
+
+      // Check if we're at the start of a word and if complete words mode is on
+      if (resolvedCompleteWords && char !== ' ') {
+        const prevCharIdx = (charIndex + startCharIndex - 1 + resolvedText.length) % resolvedText.length;
+        const prevChar = charIndex === 0 ? ' ' : resolvedText[prevCharIdx];
+        const isWordStart = prevChar === ' ' || charIndex === 0;
+
+        if (isWordStart) {
+          // Estimate current scale for width calculation
+          const t = arcPosition / totalLength;
+          const envMult = envelopeFn(pathId, t);
+          const localHeight = minWidth + envMult * (maxWidth - minWidth);
+          const estScale = localHeight * unitScale / fontData.unitsPerEm;
+
+          const wordWidth = estimateWordWidth(charIndex, estScale);
+          const remainingLength = totalLength - arcPosition;
+
+          if (wordWidth > remainingLength) {
+            // Word won't fit, stop rendering
+            break;
+          }
+        }
+      }
 
       // Get position info by interpolating centerline
       const position = interpolateCenterline(centerline, arcPosition, totalLength);
@@ -264,9 +310,11 @@ export function generate(pathData, options = {}) {
       }
 
       // Calculate compression from curvature
+      // Use squared curvature for smoother response at lower values
       const curvature = Math.abs(position.curvature || 0);
-      const compression = 1 - curvature * resolvedCompressionStrength;
-      const clampedCompression = Math.max(0.3, Math.min(1.0, compression));
+      const effectiveCurvature = curvature * curvature; // Softer falloff
+      const compression = 1 - effectiveCurvature * resolvedCompressionStrength;
+      const clampedCompression = Math.max(resolvedMinCompression, Math.min(1.0, compression));
 
       // Calculate scale for this position
       // Scale based on local height (envelope-modulated)
@@ -401,6 +449,8 @@ export const schema = {
   textFillBaseHeight: { type: 'number', min: 0.2, max: 15, step: 0.1, label: 'Letter Height', unit: 'mm' },
   textFillMaxWidth: { type: 'number', min: 0.2, max: 20, step: 0.1, label: 'Max Width', unit: 'mm' },
   textFillMinWidth: { type: 'number', min: 0, max: 5, step: 0.05, label: 'Min Width', unit: 'mm' },
-  textFillCompressionStrength: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Curve Compression' },
+  textFillCompressionStrength: { type: 'number', min: 0, max: 1, step: 0.1, label: 'Compression Strength' },
+  textFillMinCompression: { type: 'number', min: 0.3, max: 1, step: 0.05, label: 'Min Width (compression floor)' },
   textFillFilterWords: { type: 'text', label: 'Highlight Phrases (comma-separated)' },
+  textFillCompleteWords: { type: 'checkbox', label: 'Complete Words Only' },
 };

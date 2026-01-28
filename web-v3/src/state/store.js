@@ -98,7 +98,9 @@ const baseConfig = {
   textFillMaxWidth: 1.5,
   textFillMinWidth: 0.1,
   textFillCompressionStrength: 0.5,
+  textFillMinCompression: 0.7,
   textFillFilterWords: '',
+  textFillCompleteWords: false,
   // Noise gradient configuration
   noiseGradientMode: 'flat',      // 'flat', 'fuzzy-crisp', 'crisp-fuzzy'
   noiseMin: 0.05,

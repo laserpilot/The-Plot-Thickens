@@ -452,8 +452,10 @@ export async function processPaths(paths, config, attractors = [], attractorConf
         minWidth: 0.0,
         minWidthThreshold: (config.textFillMinWidth !== undefined ? config.textFillMinWidth : 0.5) * mmToViewBox,
         compressionStrength: config.textFillCompressionStrength !== undefined ? config.textFillCompressionStrength : 0.5,
+        minCompression: config.textFillMinCompression !== undefined ? config.textFillMinCompression : 0.7,
         startOffset: config.textFillStartOffset || 'fixed',
         filterWords: config.textFillFilterWords || '',
+        completeWords: config.textFillCompleteWords || false,
         sampleRate: (config.sampleRate || 0.5) * mmToViewBox,
         pathId: `path-${i}`,
         unitScale: mmToViewBox
