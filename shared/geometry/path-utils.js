@@ -918,7 +918,12 @@ function lengthToWeight(length, config) {
   } = config;
 
   // Normalize length to 0-1 range
-  const normalized = Math.max(0, Math.min(1, (length - minLength) / (maxLength - minLength)));
+  // Guard against zero range (single-path SVG, or all paths equal length):
+  // treat as the "longest" so the path gets maxPasses rather than NaN.
+  const range = maxLength - minLength;
+  const normalized = range === 0
+    ? 1
+    : Math.max(0, Math.min(1, (length - minLength) / range));
 
   let weight;
 
