@@ -3,7 +3,7 @@
  */
 
 // Import measurePathLength for calculating path lengths
-import { measurePathLength } from '../../../shared/geometry/path-utils.js';
+import { measurePathLength, splitCompoundPath } from '../../../shared/geometry/path-utils.js';
 
 export async function loadSVGFile(file) {
   const text = await file.text();
@@ -38,29 +38,39 @@ export function parseSVG(svgText) {
     viewBox: svgEl.getAttribute('viewBox')
   };
 
-  // Extract all path elements and calculate their lengths
+  // Extract all path elements, splitting compound paths (multiple M commands)
+  // into separate subpaths so offset/fill operations don't draw connecting
+  // lines between disjoint subpaths.
   const pathElements = svgEl.querySelectorAll('path');
-  const paths = Array.from(pathElements).map((pathEl, index) => {
+  const paths = [];
+  pathElements.forEach((pathEl, index) => {
     const d = pathEl.getAttribute('d');
-    if (!d) return null;
+    if (!d) return;
 
-    // Calculate path length for binning and outline filtering
-    const length = measurePathLength(d);
-
-    // Detect parent layer/group for layer preservation
+    const baseId = pathEl.id || `path-${index}`;
     const layerId = findParentLayerId(pathEl);
+    const fill = pathEl.getAttribute('fill');
+    const stroke = pathEl.getAttribute('stroke');
+    const strokeWidth = pathEl.getAttribute('stroke-width');
+    const transform = pathEl.getAttribute('transform');
 
-    return {
-      id: pathEl.id || `path-${index}`,
-      d,
-      length,  // Add length property for binning/filtering
-      layerId, // Layer/group identifier for layer preservation
-      fill: pathEl.getAttribute('fill'),
-      stroke: pathEl.getAttribute('stroke'),
-      strokeWidth: pathEl.getAttribute('stroke-width'),
-      transform: pathEl.getAttribute('transform')
-    };
-  }).filter(p => p !== null); // Only valid paths
+    const subpaths = splitCompoundPath(d);
+    subpaths.forEach((subD, subIdx) => {
+      const length = measurePathLength(subD);
+      if (length === 0) return;
+
+      paths.push({
+        id: subpaths.length > 1 ? `${baseId}-sub${subIdx}` : baseId,
+        d: subD,
+        length,
+        layerId,
+        fill,
+        stroke,
+        strokeWidth,
+        transform
+      });
+    });
+  });
 
   // Collect unique layer IDs for metadata
   const layers = [...new Set(paths.map(p => p.layerId).filter(Boolean))];

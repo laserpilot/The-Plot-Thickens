@@ -21,6 +21,34 @@ function measurePathLength(pathData) {
 }
 
 /**
+ * Split a compound SVG path (multiple M commands) into separate subpath strings.
+ * Returns the input wrapped in an array if there's only one subpath.
+ * @param {string} pathData - SVG path d attribute
+ * @returns {string[]} Array of subpath d strings
+ */
+function splitCompoundPath(pathData) {
+  try {
+    const abs = pathToAbsolute(pathData);
+    const subpaths = [];
+    let current = [];
+    for (const seg of abs) {
+      if (seg[0] === 'M' && current.length > 0) {
+        subpaths.push(current);
+        current = [];
+      }
+      current.push(seg);
+    }
+    if (current.length > 0) subpaths.push(current);
+
+    if (subpaths.length <= 1) return [pathData];
+    return subpaths.map(segs => pathToString(segs));
+  } catch (error) {
+    console.warn('Failed to split compound path:', error.message);
+    return [pathData];
+  }
+}
+
+/**
  * Sample points along an SVG path at regular intervals
  * @param {string} pathData - SVG path d attribute
  * @param {number} sampleInterval - Distance between samples (default 5mm)
@@ -3642,6 +3670,7 @@ export {
   // Core path utilities
   measurePathLength,
   samplePathPoints,
+  splitCompoundPath,
   offsetPath,
   lengthToWeight,
 
