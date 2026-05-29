@@ -411,10 +411,17 @@ export function initRenderer(canvas, store) {
     const maxPasses = config.maxPasses || 10;
     const previewEmphasis = 2.0; // Make strokes more visible
 
-    // Measure path lengths
+    // Measure path lengths. Compute min/max with a loop, NOT Math.min(...lengths)
+    // — spreading a large array as arguments overflows the call stack on heavy SVGs.
     const lengths = currentPaths.map(p => measurePathLength(p.d));
-    const minLength = (config.minLength && config.minLength > 0) ? config.minLength : Math.min(...lengths);
-    const maxLength = (config.maxLength && config.maxLength > 0) ? config.maxLength : Math.max(...lengths);
+    let lenMin = Infinity;
+    let lenMax = -Infinity;
+    for (const len of lengths) {
+      if (len < lenMin) lenMin = len;
+      if (len > lenMax) lenMax = len;
+    }
+    const minLength = (config.minLength && config.minLength > 0) ? config.minLength : lenMin;
+    const maxLength = (config.maxLength && config.maxLength > 0) ? config.maxLength : lenMax;
 
     // Set up attractor system if needed
     let attractorSystem = null;

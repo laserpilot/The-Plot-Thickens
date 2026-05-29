@@ -3,7 +3,7 @@
  */
 
 import { loadSVGFile, loadSVGFromURL } from '../utils/svg-loader.js';
-import { processPaths } from '../utils/processor.js';
+import { processInWorkerPool } from '../utils/worker-pool.js';
 import { loadFont, setFontBasePath } from '../../../shared/fonts/index.js';
 import { buildSVG, downloadSVG, generateFilename } from '../utils/svg-exporter.js';
 import { generateSampleShapes, getSampleDescription } from '../utils/sample-shapes.js';
@@ -16,8 +16,8 @@ import { PathLengthHistogram } from './histogram.js';
 let pathLengthHistogram = null;
 let currentPathLengths = [];
 
-// AbortController for cancelling processing
-let processingAbortController = null;
+// Cancel handle for the in-flight worker-pool processing run
+let cancelProcessing = null;
 
 /**
  * Throttle function to limit how often a function can be called
@@ -223,8 +223,6 @@ export function initUI(store, renderer) {
       return;
     }
 
-    // Create new AbortController for this processing run
-    processingAbortController = new AbortController();
     const cancelBtn = document.getElementById('btn-cancel-processing');
 
     try {
@@ -258,20 +256,33 @@ export function initUI(store, renderer) {
       // Get viewBox for focus blur mode
       const viewBox = store.getState('svgBounds');
 
-      // Process with or without attractors, with progress callback and abort signal
-      const result = await processPaths(
+      // Process off the main thread in a worker pool, with progress callback.
+      // Cancellation terminates the workers (see cancel button handler).
+      const { promise, cancel } = processInWorkerPool(
         originalPaths,
         config,
         useAttractors ? attractors : [],
         useAttractors ? attractorConfig : null,
         viewBox,
-        (current, total) => {
-          // Update progress bar during processing
+        (current, total, meta = {}) => {
+          // Preparing phase: font parsing + length-range calc, before any path runs
+          if (meta.phase === 'preparing') {
+            updateProgress('Preparing paths (measuring lengths, loading fonts)...', 0);
+            return;
+          }
+          // Processing phase: aggregate path count across all workers
           const percent = Math.floor((current / total) * 100);
-          updateProgress(`Processing ${current} / ${total} paths (${percent}%)...`, percent);
-        },
-        processingAbortController.signal
+          let msg = `Processing ${current.toLocaleString()} / ${total.toLocaleString()} paths (${percent}%)`;
+          // When most workers have finished, surface that the slowest shard is
+          // still grinding through its heaviest paths — explains the tail stall.
+          if (meta.totalWorkers > 1) {
+            msg += ` — ${meta.activeWorkers}/${meta.totalWorkers} workers active`;
+          }
+          updateProgress(`${msg}...`, percent);
+        }
       );
+      cancelProcessing = cancel;
+      const result = await promise;
 
       store.setState({
         processedPaths: result.paths,
@@ -280,7 +291,10 @@ export function initUI(store, renderer) {
         processing: false
       });
 
-      updateProgress('Rendering processed paths...', 100);
+      updateProgress(`Rendering ${result.paths.length.toLocaleString()} paths to canvas...`, 100);
+      // Yield one frame so the "Rendering..." label paints before the
+      // synchronous canvas draw briefly occupies the main thread.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       // Render processed paths (unless fast preview is enabled)
       const bounds = store.getState('svgBounds');
@@ -332,7 +346,7 @@ export function initUI(store, renderer) {
         cancelBtn.disabled = true;
         cancelBtn.style.opacity = '0.5';
       }
-      processingAbortController = null;
+      cancelProcessing = null;
     }
   };
 
@@ -1562,8 +1576,8 @@ export function initUI(store, renderer) {
   const cancelBtn = document.getElementById('btn-cancel-processing');
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
-      if (processingAbortController) {
-        processingAbortController.abort();
+      if (cancelProcessing) {
+        cancelProcessing();
       }
     });
   }

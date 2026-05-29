@@ -47,9 +47,14 @@ export class PathLengthHistogram {
 
     if (lengths.length === 0) return;
 
-    // Calculate data range
-    const dataMin = Math.min(...lengths);
-    const dataMax = Math.max(...lengths);
+    // Calculate data range (loop, not Math.min(...lengths) — spreading a large
+    // array as arguments overflows the call stack on heavy SVGs)
+    let dataMin = Infinity;
+    let dataMax = -Infinity;
+    for (const len of lengths) {
+      if (len < dataMin) dataMin = len;
+      if (len > dataMax) dataMax = len;
+    }
 
     // Handle edge case where all paths are the same length
     if (dataMax === dataMin) {

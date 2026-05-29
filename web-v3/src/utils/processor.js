@@ -91,13 +91,21 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     pointsPerLoop: loopPeriodMmForDebug / effectiveSampleRateForDebug
   });
 
-  // Use config overrides if provided (non-zero), otherwise auto-detect
+  // Use config overrides if provided (non-zero), otherwise auto-detect.
+  // Compute min/max with a loop, NOT Math.min(...lengths) — spreading a large
+  // array as arguments overflows the call stack on heavy SVGs.
+  let lenMin = Infinity;
+  let lenMax = -Infinity;
+  for (const len of lengths) {
+    if (len < lenMin) lenMin = len;
+    if (len > lenMax) lenMax = len;
+  }
   const minLength = (config.minLength && config.minLength > 0)
     ? config.minLength
-    : Math.min(...lengths);
+    : lenMin;
   const maxLength = (config.maxLength && config.maxLength > 0)
     ? config.maxLength
-    : Math.max(...lengths);
+    : lenMax;
 
   console.log(`Length range: ${minLength.toFixed(1)} - ${maxLength.toFixed(1)} mm ${config.minLength || config.maxLength ? '(manual override)' : '(auto-detected)'}`);
 
@@ -706,10 +714,6 @@ export async function processPaths(paths, config, attractors = [], attractorConf
     if (progressCallback) {
       progressCallback(chunkEnd, totalPaths);
     }
-
-    // Yield to browser to keep UI responsive
-    // Use setTimeout with 10ms delay to ensure browser has time to paint UI updates
-    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Check for cancellation after each chunk
     if (signal && signal.aborted) {

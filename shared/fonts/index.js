@@ -136,6 +136,17 @@ export function getCachedFont(fontId) {
 }
 
 /**
+ * Inject already-parsed font data into the cache.
+ * Used to hand fonts from the main thread (where DOMParser exists) into a
+ * Web Worker, which cannot parse SVG fonts itself.
+ * @param {string} fontId - Font identifier
+ * @param {Object} fontData - Parsed font data
+ */
+export function setCachedFont(fontId, fontData) {
+  fontCache.set(fontId, fontData);
+}
+
+/**
  * Preload multiple fonts
  * @param {Array<string>} fontIds - Array of font IDs to preload
  * @returns {Promise<Map>} Map of fontId -> fontData for successfully loaded fonts
