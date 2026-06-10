@@ -1250,8 +1250,6 @@ All generated SVGs are **plotter-ready**:
 
 Start with the Phase 1 test pattern to calibrate your plotter and understand how parameters affect real-world output.
 
-For parser testing, use `test-parser.html` to verify SVG parsing performance.
-
 ---
 
 ## Dependencies
